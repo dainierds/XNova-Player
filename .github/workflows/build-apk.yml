@@ -46,6 +46,13 @@ jobs:
       - name: Instalar Dependencias Web
         run: npm ci
 
+      - name: Sincronizar Versión en Branding con GitHub Run
+        run: |
+          BUILD_VER="1.0.${{ github.run_number }}"
+          echo "Actualizando versión a $BUILD_VER en branding.ts..."
+          sed -i "s/version: '.*'/version: '$BUILD_VER'/" src/config/branding.ts
+          cat src/config/branding.ts | grep version
+
       - name: Compilar Frontend React (Vite)
         run: npm run build
 
