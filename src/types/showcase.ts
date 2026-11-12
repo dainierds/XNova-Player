@@ -4,8 +4,8 @@ export interface ShowcaseItem {
   subtitle: string;
   backdropUrl: string;
   thumbnailUrl: string;
-  releaseDateText: string; // ej. "17 Mayo" o "24 Julio"
-  statusBadge: 'ESTRENO' | 'PRÓXIMAMENTE' | 'NUEVO';
+  releaseDateText: string; // ej. "Recién Añadido", "Próximamente", "Tendencia"
+  statusBadge: 'ESTRENO' | 'PRÓXIMAMENTE' | 'NUEVO' | 'TENDENCIA';
   genresText: string;      // ej. "Acción, Thriller"
   year: string;
   rating: string;

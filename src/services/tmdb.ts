@@ -119,7 +119,7 @@ export class TmdbService {
         ? firstResult.release_date.split('-')[0]
         : new Date().getFullYear().toString();
 
-      const enriched: MovieItem = {
+      const enriched: MovieItem & { _tmdbReleaseDate?: string } = {
         id: `tmdb_${firstResult.id}`,
         title: firstResult.title || cleanTitle,
         backdropUrl: firstResult.backdrop_path
@@ -135,6 +135,8 @@ export class TmdbService {
         rating: firstResult.vote_average ? `${firstResult.vote_average.toFixed(1)} ★` : 'PG-13',
         isPremiere: true,
         streamUrl: fallbackStreamUrl,
+        // Fecha de estreno real de TMDb (para detectar "Próximamente")
+        _tmdbReleaseDate: firstResult.release_date || undefined,
       };
 
       cache.set(cacheKey, enriched);

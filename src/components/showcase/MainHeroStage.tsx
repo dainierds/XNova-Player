@@ -56,8 +56,17 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
         <div className="flex items-center space-x-6 text-sm md:text-base font-medium text-zinc-300">
           <div className="flex items-center space-x-2">
             <span className="font-bold text-white tracking-wide">{item.releaseDateText}</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
-              {item.statusBadge}
+            {/* Badge de color dinámico según tipo de contenido */}
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase border ${
+              item.statusBadge === 'ESTRENO'
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30'
+                : item.statusBadge === 'PRÓXIMAMENTE'
+                  ? 'bg-purple-500/20 text-purple-300 border-purple-400/30 animate-pulse'
+                  : item.statusBadge === 'TENDENCIA'
+                    ? 'bg-orange-500/20 text-orange-300 border-orange-400/30'
+                    : 'bg-green-500/20 text-green-300 border-green-400/30'
+            }`}>
+              {item.statusBadge === 'PRÓXIMAMENTE' ? '⏳ PRÓXIMAMENTE' : item.statusBadge}
             </span>
           </div>
 

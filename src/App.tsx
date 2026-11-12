@@ -18,6 +18,8 @@ import { usePlaylistStore } from './store/usePlaylistStore';
 import { useAuthStore } from './store/useAuthStore';
 import { PLAN_CONFIGS } from './types/auth';
 import { StorageService } from './services/storage';
+import { useXtreamHomeFeed } from './hooks/useXtreamHomeFeed';
+import type { ContentTag } from './hooks/useXtreamHomeFeed';
 
 type FocusSection = 'sidebar' | 'search_bar' | 'hero_buttons' | 'thumbnails' | 'bottom_actions';
 
@@ -25,11 +27,23 @@ export function App() {
   const { currentUser, isAuthenticated, initializeAuth, login } = useAuthStore();
   const { 
     activePlaylist, 
-    vodMovies, 
     liveStreams, 
     loadStoredPlaylists, 
     loadUserPlaylists 
   } = usePlaylistStore();
+
+  // ─── Hook de Feed Real desde Xtream ───────────────────────────────────────
+  // Carga las películas REALES de la lista activa, enriquecidas con TMDb
+  // y clasificadas con tags ESTRENO / PRÓXIMAMENTE / NUEVO / TENDENCIA
+  const homeFeed = useXtreamHomeFeed(activePlaylist);
+
+  // Helper: convierte tag a texto de fecha/badge para el hero
+  const tagToReleaseDateText = (tag: ContentTag): string => {
+    if (tag === 'ESTRENO')       return 'Recién Añadido';
+    if (tag === 'PRÓXIMAMENTE')  return 'Próximamente';
+    if (tag === 'NUEVO')         return 'Nuevo';
+    return 'Tendencia';
+  };
 
   // Estados de navegación y foco
   const [activeTab, setActiveTab] = useState<SidebarTabId>('home');
@@ -39,17 +53,19 @@ export function App() {
   const [bottomActionIndex, setBottomActionIndex] = useState(0); // 0: Heart, 1: Bookmark, 2: Plus
   
   // Catálogo activo según pestaña (Películas o Series)
+  // Prioridad: feed real de Xtream → vodMovies del store → datos de demostración
   const currentCatalog: ShowcaseItem[] = (activeTab === 'series') 
     ? SHOWCASE_SERIES 
-    : (vodMovies && vodMovies.length > 0)
-      ? vodMovies.map((m) => ({
+    : homeFeed.featured.length > 0
+      // ✅ Películas REALES de la lista Xtream con tags automáticos
+      ? homeFeed.featured.map((m) => ({
           id: m.id,
           title: m.title.toUpperCase(),
           subtitle: `${m.title} (${m.year})`,
           backdropUrl: m.backdropUrl,
           thumbnailUrl: m.posterUrl,
-          releaseDateText: 'Estreno',
-          statusBadge: (m.isPremiere ? 'ESTRENO' : 'NUEVO') as 'ESTRENO' | 'PRÓXIMAMENTE' | 'NUEVO',
+          releaseDateText: tagToReleaseDateText(m.tag),
+          statusBadge: m.tag as 'ESTRENO' | 'PRÓXIMAMENTE' | 'NUEVO' | 'TENDENCIA',
           genresText: m.genres.join(', '),
           year: m.year,
           rating: m.rating,
@@ -58,7 +74,7 @@ export function App() {
           type: 'movie' as const,
           streamUrl: m.streamUrl,
         }))
-      : SHOWCASE_MOVIES;
+      : SHOWCASE_MOVIES; // Fallback con películas de demo si no hay lista
   const [carouselIndex, setCarouselIndex] = useState(0);
   
   // Estados de modales y reproductor
