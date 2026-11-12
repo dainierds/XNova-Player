@@ -11,6 +11,7 @@ import { SplashScreen } from './components/splash/SplashScreen';
 import { SeriviaLayout } from './components/serivia/SeriviaLayout';
 import { TvLoginScreen } from './components/auth/TvLoginScreen';
 import { AdminPanelModal } from './components/admin/AdminPanelModal';
+import { UpdateModal } from './components/common/UpdateModal';
 import { SHOWCASE_MOVIES, SHOWCASE_SERIES } from './mock/showcaseData';
 import type { SidebarTabId, ShowcaseItem } from './types/showcase';
 import type { MovieItem } from './types';
@@ -524,6 +525,9 @@ export function App() {
           }
         }}
       />
+
+      {/* Verificador y Modal de Actualización Automática OTA */}
+      <UpdateModal />
     </main>
   );
 }
