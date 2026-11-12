@@ -1,39 +1,41 @@
 import { useState, useEffect } from 'react';
-import { useTvStore } from './store/useTvStore';
+import { useTvStore, type SpatialZone } from './store/useTvStore';
 import { usePlaylistStore } from './store/usePlaylistStore';
 import { useTvNavigation } from './hooks/useTvNavigation';
-import { HeaderBar } from './components/home/HeaderBar';
-import { HeroBackdrop } from './components/home/HeroBackdrop';
-import { InfoPanel } from './components/home/InfoPanel';
-import { PosterCarousel } from './components/home/PosterCarousel';
-import { BottomNavbar } from './components/home/BottomNavbar';
-import { ExitModal } from './components/common/ExitModal';
+import { TopNavBar } from './components/navigation/TopNavBar';
+import { HeroShowcase } from './components/home/HeroShowcase';
+import { ContentShelf } from './components/home/ContentShelf';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { VideoPlayer } from './components/player/VideoPlayer';
 import { SearchModal } from './components/search/SearchModal';
 import { ProfileSelectorModal } from './components/profiles/ProfileSelectorModal';
-import { CategoryExplorer } from './components/home/CategoryExplorer';
-import type { MovieItem } from './types';
+import { ExitModal } from './components/common/ExitModal';
+import { 
+  HERO_FEATURED, 
+  CONTINUE_WATCHING, 
+  TRENDING_MOVIES, 
+  LIVE_CHANNELS 
+} from './mock/mockData';
+import type { ContentItem, NavTabId } from './types';
 import { StorageService } from './services/storage';
 
 export function App() {
   const {
-    currentSection,
-    focusZone,
-    carouselIndex,
-    bottomNavIndex,
+    activeTab,
+    focusedTab,
+    currentZone,
+    heroButtonIndex,
+    shelfIndices,
     isExitModalOpen,
-    setCarouselIndex,
-    setBottomNavIndex,
-    setFocusZone,
-    setCurrentSection,
+    setActiveTab,
+    setCurrentZone,
+    setShelfIndex,
     setIsExitModalOpen,
   } = useTvStore();
 
   const {
     activePlaylist,
     vodMovies,
-    vodCategories,
     liveStreams,
     loadStoredPlaylists,
   } = usePlaylistStore();
@@ -43,158 +45,258 @@ export function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentProfile, setCurrentProfile] = useState<'adult' | 'kids'>('adult');
-  
-  // Estado del Reproductor de Video
-  const [playingItem, setPlayingItem] = useState<MovieItem | null>(null);
+  const [playingItem, setPlayingItem] = useState<ContentItem | null>(null);
+  const [favorites, setFavorites] = useState<string[]>([]);
 
-  // Inicializar listas almacenadas y perfil
+  // Inicialización de listas y favoritos
   useEffect(() => {
     loadStoredPlaylists();
     StorageService.getActiveProfile().then((p) => setCurrentProfile(p));
+    StorageService.getFavorites().then((favs) => setFavorites(favs));
   }, [loadStoredPlaylists]);
 
-  const movies = vodMovies.length > 0 ? vodMovies : [];
-  const currentMovie = movies[carouselIndex] || movies[0] || {
-    id: 'empty',
-    title: 'XNova Player',
-    backdropUrl: '',
-    posterUrl: '',
-    genres: ['IPTV'],
-    synopsis: 'Configura una lista en Ajustes para cargar tu contenido.',
-    duration: '--',
-    year: '2026',
-    rating: 'PG',
+  // Contenido dinámico o de muestra
+  const currentHero = HERO_FEATURED;
+  const continueItems = CONTINUE_WATCHING;
+  
+  // Si hay películas sincronizadas de una lista real, usarlas en Estrenos
+  const trendingItems: ContentItem[] = vodMovies.length > 0 
+    ? vodMovies.map((m) => ({
+        id: m.id,
+        title: m.title,
+        backdropUrl: m.backdropUrl,
+        posterUrl: m.posterUrl,
+        genres: m.genres,
+        synopsis: m.synopsis,
+        duration: m.duration,
+        year: m.year,
+        rating: m.rating,
+        score: '8.5',
+        badge: 'ESTRENO',
+        type: 'movie' as const,
+        streamUrl: m.streamUrl,
+      }))
+    : TRENDING_MOVIES;
+
+  // Canales en vivo
+  const liveItems: ContentItem[] = liveStreams.length > 0
+    ? liveStreams.slice(0, 10).map((st) => ({
+        id: `live_${st.stream_id}`,
+        title: st.name,
+        backdropUrl: st.stream_icon || 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=1920&auto=format&fit=crop',
+        posterUrl: st.stream_icon || '',
+        genres: ['En Vivo', 'TV'],
+        synopsis: 'Emisión televisiva en directo en alta definición.',
+        duration: 'EN DIRECTO',
+        year: '2026',
+        rating: 'TP',
+        score: '1080p FHD',
+        badge: 'EN VIVO',
+        channelNumber: st.stream_id,
+        type: 'live' as const,
+        streamUrl: activePlaylist?.serverUrl
+          ? `${activePlaylist.serverUrl}/live/${activePlaylist.username}/${activePlaylist.password}/${st.stream_id}.m3u8`
+          : 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+      }))
+    : LIVE_CHANNELS;
+
+  const isCurrentHeroFav = favorites.includes(currentHero.id);
+
+  const handleToggleFavorite = async (id: string) => {
+    const isNowFav = await StorageService.toggleFavorite(id);
+    const updated = await StorageService.getFavorites();
+    setFavorites(updated);
+    console.log(`Favorito ${isNowFav ? 'agregado' : 'removido'}:`, id);
   };
 
-  // Manejador de teclado D-pad general
-  useTvNavigation(() => {
-    if (currentMovie && currentMovie.id !== 'empty') {
-      StorageService.toggleFavorite(currentMovie.id).then((isFav) => {
-        console.log(`Favorito ${isFav ? 'añadido' : 'eliminado'}:`, currentMovie.title);
-      });
-    }
-  });
+  const handlePlay = (item: ContentItem) => {
+    setPlayingItem(item);
+  };
 
-  // Reaccionar a la selección de opciones del menú inferior
-  useEffect(() => {
-    if (currentSection === 'settings') {
+  // Reaccionar a cambios en las pestañas del menú superior
+  const handleTabSelect = (tab: NavTabId) => {
+    setActiveTab(tab);
+    if (tab === 'settings') {
       setIsSettingsOpen(true);
+    } else if (tab === 'search') {
+      setIsSearchOpen(true);
     }
-  }, [currentSection]);
-
-  const handleOpenPlayer = (movie: MovieItem) => {
-    setPlayingItem(movie);
   };
+
+  // Manejador central de acciones con botón Enter/OK
+  const handleEnterAction = (zone: SpatialZone, index: number) => {
+    if (zone === 'nav') {
+      const tabs: NavTabId[] = ['home', 'movies', 'series', 'live', 'favorites', 'search', 'settings'];
+      handleTabSelect(tabs[index]);
+    } else if (zone === 'hero_actions') {
+      if (index === 0) {
+        handlePlay(currentHero);
+      } else if (index === 1) {
+        handleToggleFavorite(currentHero.id);
+      } else if (index === 2) {
+        console.log('Detalles de:', currentHero.title);
+      }
+    } else if (zone === 'shelf_0') {
+      handlePlay(continueItems[index]);
+    } else if (zone === 'shelf_1') {
+      handlePlay(trendingItems[index]);
+    } else if (zone === 'shelf_2') {
+      handlePlay(liveItems[index]);
+    }
+  };
+
+  // Conectar navegación espacial D-pad
+  useTvNavigation(
+    {
+      shelf0Count: continueItems.length,
+      shelf1Count: trendingItems.length,
+      shelf2Count: liveItems.length,
+    },
+    handleEnterAction,
+    () => {
+      // Pulsación prolongada (favorito instantáneo)
+      if (currentZone === 'hero_actions') {
+        handleToggleFavorite(currentHero.id);
+      } else if (currentZone === 'shelf_0') {
+        handleToggleFavorite(continueItems[shelfIndices.shelf_0]?.id);
+      } else if (currentZone === 'shelf_1') {
+        handleToggleFavorite(trendingItems[shelfIndices.shelf_1]?.id);
+      }
+    }
+  );
 
   const isModalActive = isSettingsOpen || isSearchOpen || isProfileOpen || isExitModalOpen || !!playingItem;
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden bg-[#080A0E] text-white flex flex-col justify-between font-sans select-none">
-      {/* 1. HERO BANNER: Imagen panorámica con gradientes oscuros */}
-      <HeroBackdrop
-        backdropUrl={currentMovie.backdropUrl}
-        title={currentMovie.title}
+    <main className="relative w-screen h-screen overflow-hidden bg-[#06080D] text-white flex flex-col justify-between select-none">
+      {/* 1. BARRA DE NAVEGACIÓN SUPERIOR FLOTANTE (Glassmorphism & Monograma XNova) */}
+      <TopNavBar
+        activeTab={activeTab}
+        focusedTab={focusedTab}
+        isNavFocused={currentZone === 'nav' && !isModalActive}
+        onSelectTab={handleTabSelect}
+        expDate={activePlaylist?.expDate || '29 NOV 2026'}
+        profileName={currentProfile === 'adult' ? 'ADULTO' : 'NIÑOS'}
+        onOpenProfile={() => setIsProfileOpen(true)}
       />
 
-      {/* Barra superior: Logo, Fecha de Vencimiento de Suscripción, Reloj y Perfil */}
-      <div className="relative z-20">
-        <HeaderBar
-          expDate={activePlaylist?.expDate || '29 NOVIEMBRE 2026'}
-          profileName={currentProfile === 'adult' ? 'ADULTO' : 'NIÑOS'}
+      {/* ÁREA DE CONTENIDO PRINCIPAL: Scrollable para televisores 1080p / 4K */}
+      <div className="flex-1 overflow-y-auto no-scrollbar pb-10">
+        {/* 2. HERO SHOWCASE: Gran portada cinematográfica con iluminación ambiental */}
+        <HeroShowcase
+          content={currentHero}
+          focusedButtonIndex={heroButtonIndex}
+          isHeroActionsFocused={currentZone === 'hero_actions' && !isModalActive}
+          isFavorite={isCurrentHeroFav}
+          onPlay={() => handlePlay(currentHero)}
+          onToggleFavorite={() => handleToggleFavorite(currentHero.id)}
+          onOpenDetails={() => console.log('Detalles:', currentHero.title)}
         />
 
-        {/* Botones de acceso rápido en cabecera */}
-        <div className="absolute top-8 right-56 z-30 flex items-center space-x-3 pointer-events-auto">
-          <button
-            onClick={() => setIsSearchOpen(true)}
-            className="px-3.5 py-1.5 rounded-full bg-zinc-800/80 hover:bg-cyan-600 border border-zinc-700 text-xs font-bold text-zinc-200 transition"
-          >
-            🔍 Buscar
-          </button>
-          <button
-            onClick={() => setIsProfileOpen(true)}
-            className="text-xs text-zinc-400 hover:text-white"
-          >
-            Cambiar Perfil
-          </button>
-        </div>
-      </div>
+        {/* 3. MULTI-FILAS DE CONTENIDO (Content Shelves) */}
+        <div className="space-y-4 -mt-4 relative z-10">
+          {/* Fila 1: Continuar Viendo (con barra de progreso) */}
+          <ContentShelf
+            title="Continuar Viendo"
+            items={continueItems}
+            selectedIndex={shelfIndices.shelf_0 || 0}
+            isShelfFocused={currentZone === 'shelf_0' && !isModalActive}
+            onSelectItem={(item, idx) => {
+              setShelfIndex('shelf_0', idx);
+              setCurrentZone('shelf_0');
+              handlePlay(item);
+            }}
+          />
 
-      {/* 2 & 3. Zona Central: Panel de Información (Izquierda) + Carrusel de Pósters (Derecha) */}
-      <div className="relative z-10 flex-1 flex items-end px-14 pb-2 pt-28">
-        <div className="w-full flex items-end justify-between gap-8">
-          <InfoPanel movie={currentMovie} />
+          {/* Fila 2: Películas de Estreno */}
+          <ContentShelf
+            title="Películas de Estreno"
+            items={trendingItems}
+            selectedIndex={shelfIndices.shelf_1 || 0}
+            isShelfFocused={currentZone === 'shelf_1' && !isModalActive}
+            onSelectItem={(item, idx) => {
+              setShelfIndex('shelf_1', idx);
+              setCurrentZone('shelf_1');
+              handlePlay(item);
+            }}
+          />
 
-          <PosterCarousel
-            movies={movies}
-            selectedIndex={carouselIndex}
-            isFocused={focusZone === 'carousel' && !isModalActive}
-            onSelectMovie={(idx) => {
-              setCarouselIndex(idx);
-              setFocusZone('carousel');
-              handleOpenPlayer(movies[idx]);
+          {/* Fila 3: Canales de TV en Directo (Formato Panorámico 16:9 con indicador EN VIVO) */}
+          <ContentShelf
+            title="Canales de TV en Directo"
+            items={liveItems}
+            selectedIndex={shelfIndices.shelf_2 || 0}
+            isShelfFocused={currentZone === 'shelf_2' && !isModalActive}
+            aspectRatio="landscape"
+            onSelectItem={(item, idx) => {
+              setShelfIndex('shelf_2', idx);
+              setCurrentZone('shelf_2');
+              handlePlay(item);
             }}
           />
         </div>
       </div>
-
-      {/* 4. BARRA DE MENÚ INFERIOR (Películas, Series, TV, Radio, Documentales, Conciertos, Ajustes, Salir) */}
-      <BottomNavbar
-        currentSection={currentSection}
-        focusedIndex={bottomNavIndex}
-        isFocused={focusZone === 'bottom_nav' && !isModalActive}
-        onSelect={(idx) => {
-          setBottomNavIndex(idx);
-          setFocusZone('bottom_nav');
-        }}
-      />
-
-      {/* 5. Subpantalla de Explorador de Categorías para Series, TV, Documentales, etc. */}
-      {currentSection !== 'movies' && currentSection !== 'settings' && currentSection !== 'exit' && (
-        <CategoryExplorer
-          section={currentSection}
-          categories={vodCategories}
-          items={movies}
-          onBack={() => setCurrentSection('movies')}
-          onSelectItem={(item) => handleOpenPlayer(item)}
-        />
-      )}
 
       {/* Modal de Ajustes & Gestión de Listas */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => {
           setIsSettingsOpen(false);
-          setCurrentSection('movies');
+          setActiveTab('home');
+          setCurrentZone('hero_actions');
         }}
       />
 
       {/* Modal de Búsqueda TV con Teclado en Pantalla */}
       <SearchModal
         isOpen={isSearchOpen}
-        movies={movies}
+        movies={trendingItems.map((t) => ({
+          id: t.id,
+          title: t.title,
+          backdropUrl: t.backdropUrl,
+          posterUrl: t.posterUrl,
+          genres: t.genres,
+          synopsis: t.synopsis,
+          duration: t.duration,
+          year: t.year,
+          rating: t.rating,
+          streamUrl: t.streamUrl,
+        }))}
         channels={liveStreams}
-        onClose={() => setIsSearchOpen(false)}
-        onSelectMovie={(m) => handleOpenPlayer(m)}
+        onClose={() => {
+          setIsSearchOpen(false);
+          setActiveTab('home');
+          setCurrentZone('hero_actions');
+        }}
+        onSelectMovie={(m) => {
+          handlePlay({
+            ...m,
+            score: '8.0',
+            type: 'movie',
+          });
+        }}
         onSelectChannel={(c) => {
-          handleOpenPlayer({
-            id: `ch_${c.stream_id}`,
+          handlePlay({
+            id: `live_${c.stream_id}`,
             title: c.name,
             backdropUrl: c.stream_icon || '',
             posterUrl: c.stream_icon || '',
             genres: ['En Vivo'],
-            synopsis: 'Transmisión de TV en directo.',
-            duration: 'DIRECTO',
+            synopsis: 'Emisión en directo.',
+            duration: 'EN DIRECTO',
             year: '2026',
-            rating: 'TV',
+            rating: 'TP',
+            score: '1080p FHD',
+            type: 'live',
+            channelNumber: c.stream_id,
             streamUrl: activePlaylist?.serverUrl
               ? `${activePlaylist.serverUrl}/live/${activePlaylist.username}/${activePlaylist.password}/${c.stream_id}.m3u8`
-              : '',
+              : 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
           });
         }}
       />
 
-      {/* Modal de Selección de Perfil y Control Parental */}
+      {/* Modal de Selección de Perfil */}
       <ProfileSelectorModal
         isOpen={isProfileOpen}
         currentProfile={currentProfile}
@@ -207,12 +309,13 @@ export function App() {
         <VideoPlayer
           streamUrl={
             playingItem.streamUrl ||
-            'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8' // Stream HLS de prueba de alta calidad
+            'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
           }
           title={playingItem.title}
           posterUrl={playingItem.posterUrl}
           contentId={playingItem.id}
-          isLive={playingItem.duration === 'DIRECTO'}
+          isLive={playingItem.type === 'live'}
+          channelNumber={playingItem.channelNumber}
           onClose={() => setPlayingItem(null)}
         />
       )}
@@ -226,7 +329,7 @@ export function App() {
           if ((window as unknown as { navigator?: { app?: { exitApp?: () => void } } }).navigator?.app?.exitApp) {
             (window as unknown as { navigator: { app: { exitApp: () => void } } }).navigator.app.exitApp();
           } else {
-            console.log('Saliendo de la aplicación');
+            console.log('Cerrar aplicación XNova Player');
           }
         }}
       />

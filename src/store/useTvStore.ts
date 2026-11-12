@@ -1,27 +1,38 @@
 import { create } from 'zustand';
-import type { MenuSection } from '../types';
+import type { NavTabId } from '../types';
 
-export type FocusZone = 'carousel' | 'bottom_nav';
+export type SpatialZone = 'nav' | 'hero_actions' | 'shelf_0' | 'shelf_1' | 'shelf_2';
 
-interface TvState {
-  currentSection: MenuSection;
-  focusZone: FocusZone;
-  carouselIndex: number;
-  bottomNavIndex: number;
-  totalMovies: number;
-  isExitModalOpen: boolean;
+interface TvNavigationState {
+  activeTab: NavTabId;
+  focusedTab: NavTabId;
+  currentZone: SpatialZone;
   
+  heroButtonIndex: number; // 0: Play, 1: My List, 2: Info
+  shelfIndices: Record<string, number>; // index for shelf_0, shelf_1, shelf_2
+
+  isExitModalOpen: boolean;
+
   // Acciones
-  setFocusZone: (zone: FocusZone) => void;
-  setCarouselIndex: (index: number) => void;
-  setBottomNavIndex: (index: number) => void;
-  setCurrentSection: (section: MenuSection) => void;
-  setTotalMovies: (total: number) => void;
+  setActiveTab: (tab: NavTabId) => void;
+  setFocusedTab: (tab: NavTabId) => void;
+  setCurrentZone: (zone: SpatialZone) => void;
+  setHeroButtonIndex: (idx: number) => void;
+  setShelfIndex: (shelfKey: string, idx: number) => void;
   setIsExitModalOpen: (open: boolean) => void;
-  navigateDpad: (direction: 'up' | 'down' | 'left' | 'right' | 'enter' | 'back') => void;
+
+  navigateDpad: (
+    direction: 'up' | 'down' | 'left' | 'right' | 'enter' | 'back',
+    context?: {
+      shelf0Count: number;
+      shelf1Count: number;
+      shelf2Count: number;
+      onEnterAction?: (zone: SpatialZone, index: number) => void;
+    }
+  ) => void;
 }
 
-export const BOTTOM_MENU_ITEMS: { id: MenuSection; label: string; icon: string }[] = [
+export const BOTTOM_MENU_ITEMS: { id: NavTabId; label: string; icon: string }[] = [
   { id: 'movies', label: 'Películas', icon: 'Film' },
   { id: 'series', label: 'Series', icon: 'Tv' },
   { id: 'live', label: 'Canales TV', icon: 'MonitorPlay' },
@@ -32,25 +43,41 @@ export const BOTTOM_MENU_ITEMS: { id: MenuSection; label: string; icon: string }
   { id: 'exit', label: 'Salir', icon: 'Power' },
 ];
 
-export const useTvStore = create<TvState>((set, get) => ({
-  currentSection: 'movies',
-  focusZone: 'carousel',
-  carouselIndex: 0,
-  bottomNavIndex: 0,
-  totalMovies: 6,
+const TABS_ORDER: NavTabId[] = [
+  'home',
+  'movies',
+  'series',
+  'live',
+  'favorites',
+  'search',
+  'settings',
+];
+
+export const useTvStore = create<TvNavigationState>((set, get) => ({
+  activeTab: 'home',
+  focusedTab: 'home',
+  currentZone: 'hero_actions',
+  heroButtonIndex: 0,
+  shelfIndices: { shelf_0: 0, shelf_1: 0, shelf_2: 0 },
   isExitModalOpen: false,
 
-  setFocusZone: (zone) => set({ focusZone: zone }),
-  setCarouselIndex: (index) => set({ carouselIndex: index }),
-  setBottomNavIndex: (index) => set({ bottomNavIndex: index }),
-  setCurrentSection: (section) => set({ currentSection: section }),
-  setTotalMovies: (total) => set({ totalMovies: total }),
+  setActiveTab: (tab) => set({ activeTab: tab, focusedTab: tab }),
+  setFocusedTab: (tab) => set({ focusedTab: tab }),
+  setCurrentZone: (zone) => set({ currentZone: zone }),
+  setHeroButtonIndex: (idx) => set({ heroButtonIndex: idx }),
+  setShelfIndex: (shelfKey, idx) =>
+    set((state) => ({ shelfIndices: { ...state.shelfIndices, [shelfKey]: idx } })),
   setIsExitModalOpen: (open) => set({ isExitModalOpen: open }),
 
-  navigateDpad: (direction) => {
-    const { focusZone, carouselIndex, bottomNavIndex, totalMovies, isExitModalOpen } = get();
+  navigateDpad: (direction, context) => {
+    const {
+      currentZone,
+      focusedTab,
+      heroButtonIndex,
+      shelfIndices,
+      isExitModalOpen,
+    } = get();
 
-    // Si el diálogo de salida está abierto, manejar respuesta
     if (isExitModalOpen) {
       if (direction === 'back' || direction === 'enter') {
         set({ isExitModalOpen: false });
@@ -58,69 +85,115 @@ export const useTvStore = create<TvState>((set, get) => ({
       return;
     }
 
+    // Botón Atrás
     if (direction === 'back') {
-      if (focusZone === 'carousel') {
-        // En la pantalla principal, atrás pide confirmación de salida
+      if (currentZone === 'nav') {
         set({ isExitModalOpen: true });
       } else {
-        // Volver al carrusel superior
-        set({ focusZone: 'carousel' });
+        set({ currentZone: 'nav' });
       }
       return;
     }
 
-    if (focusZone === 'carousel') {
+    // Navegación en Zona: Barra Superior (Nav)
+    if (currentZone === 'nav') {
+      const currentTabIdx = TABS_ORDER.indexOf(focusedTab);
+
       switch (direction) {
         case 'left':
-          if (carouselIndex > 0) {
-            set({ carouselIndex: carouselIndex - 1 });
+          if (currentTabIdx > 0) {
+            const nextTab = TABS_ORDER[currentTabIdx - 1];
+            set({ focusedTab: nextTab, activeTab: nextTab });
           }
           break;
         case 'right':
-          if (carouselIndex < totalMovies - 1) {
-            set({ carouselIndex: carouselIndex + 1 });
+          if (currentTabIdx < TABS_ORDER.length - 1) {
+            const nextTab = TABS_ORDER[currentTabIdx + 1];
+            set({ focusedTab: nextTab, activeTab: nextTab });
           }
           break;
         case 'down':
-          // Cambiar a la barra de menú inferior
-          set({ focusZone: 'bottom_nav' });
-          break;
-        case 'up':
-          // Límite superior alcanzado
+          set({ currentZone: 'hero_actions' });
           break;
         case 'enter':
-          // Acción al seleccionar película (ej. abrir reproductor)
-          console.log('Película seleccionada:', carouselIndex);
+          if (context?.onEnterAction) {
+            context.onEnterAction('nav', currentTabIdx);
+          }
           break;
       }
-    } else if (focusZone === 'bottom_nav') {
+      return;
+    }
+
+    // Navegación en Zona: Acciones del Hero
+    if (currentZone === 'hero_actions') {
       switch (direction) {
         case 'left':
-          if (bottomNavIndex > 0) {
-            set({ bottomNavIndex: bottomNavIndex - 1 });
+          if (heroButtonIndex > 0) {
+            set({ heroButtonIndex: heroButtonIndex - 1 });
           }
           break;
         case 'right':
-          if (bottomNavIndex < BOTTOM_MENU_ITEMS.length - 1) {
-            set({ bottomNavIndex: bottomNavIndex + 1 });
+          if (heroButtonIndex < 2) {
+            set({ heroButtonIndex: heroButtonIndex + 1 });
           }
           break;
         case 'up':
-          // Subir al carrusel de películas
-          set({ focusZone: 'carousel' });
+          set({ currentZone: 'nav' });
           break;
         case 'down':
-          // Límite inferior alcanzado
+          set({ currentZone: 'shelf_0' });
           break;
         case 'enter':
-          const selectedItem = BOTTOM_MENU_ITEMS[bottomNavIndex];
-          if (selectedItem.id === 'exit') {
-            set({ isExitModalOpen: true });
-          } else {
-            set({ currentSection: selectedItem.id });
+          if (context?.onEnterAction) {
+            context.onEnterAction('hero_actions', heroButtonIndex);
           }
           break;
       }
+      return;
+    }
+
+    // Navegación en Zona: Shelves (shelf_0, shelf_1, shelf_2)
+    const shelfCounts: Record<string, number> = {
+      shelf_0: context?.shelf0Count || 3,
+      shelf_1: context?.shelf1Count || 5,
+      shelf_2: context?.shelf2Count || 4,
+    };
+
+    const currentShelfIdx = shelfIndices[currentZone] || 0;
+    const maxItems = shelfCounts[currentZone] || 1;
+
+    switch (direction) {
+      case 'left':
+        if (currentShelfIdx > 0) {
+          get().setShelfIndex(currentZone, currentShelfIdx - 1);
+        }
+        break;
+      case 'right':
+        if (currentShelfIdx < maxItems - 1) {
+          get().setShelfIndex(currentZone, currentShelfIdx + 1);
+        }
+        break;
+      case 'up':
+        if (currentZone === 'shelf_0') {
+          set({ currentZone: 'hero_actions' });
+        } else if (currentZone === 'shelf_1') {
+          set({ currentZone: 'shelf_0' });
+        } else if (currentZone === 'shelf_2') {
+          set({ currentZone: 'shelf_1' });
+        }
+        break;
+      case 'down':
+        if (currentZone === 'shelf_0') {
+          set({ currentZone: 'shelf_1' });
+        } else if (currentZone === 'shelf_1') {
+          set({ currentZone: 'shelf_2' });
+        }
+        break;
+      case 'enter':
+        if (context?.onEnterAction) {
+          context.onEnterAction(currentZone, currentShelfIdx);
+        }
+        break;
     }
   },
 }));

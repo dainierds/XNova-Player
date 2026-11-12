@@ -1,33 +1,36 @@
 import { useEffect, useRef } from 'react';
-import { useTvStore } from '../store/useTvStore';
+import { useTvStore, type SpatialZone } from '../store/useTvStore';
 
-export function useTvNavigation(onLongPressOk?: () => void) {
+export function useTvNavigation(
+  counts: { shelf0Count: number; shelf1Count: number; shelf2Count: number },
+  onEnterAction?: (zone: SpatialZone, index: number) => void,
+  onLongPressOk?: () => void
+) {
   const navigateDpad = useTvStore((state) => state.navigateDpad);
   const okPressTimer = useRef<number | null>(null);
   const isLongPress = useRef(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevenir el scroll por defecto del navegador en TV
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
         e.preventDefault();
       }
 
       switch (e.key) {
         case 'ArrowUp':
-          navigateDpad('up');
+          navigateDpad('up', { ...counts, onEnterAction });
           break;
         case 'ArrowDown':
-          navigateDpad('down');
+          navigateDpad('down', { ...counts, onEnterAction });
           break;
         case 'ArrowLeft':
-          navigateDpad('left');
+          navigateDpad('left', { ...counts, onEnterAction });
           break;
         case 'ArrowRight':
-          navigateDpad('right');
+          navigateDpad('right', { ...counts, onEnterAction });
           break;
         case 'Enter':
-        case ' ': // Espacio o centro del D-pad
+        case ' ':
           if (!okPressTimer.current) {
             isLongPress.current = false;
             okPressTimer.current = window.setTimeout(() => {
@@ -35,14 +38,14 @@ export function useTvNavigation(onLongPressOk?: () => void) {
               if (onLongPressOk) {
                 onLongPressOk();
               }
-            }, 800); // 800ms para pulsación larga (favorito)
+            }, 750);
           }
           break;
         case 'Escape':
         case 'Backspace':
-        case 'GoBack': // Android back keycode estándar en Leanback
+        case 'GoBack':
           e.preventDefault();
-          navigateDpad('back');
+          navigateDpad('back', { ...counts, onEnterAction });
           break;
         default:
           break;
@@ -56,8 +59,7 @@ export function useTvNavigation(onLongPressOk?: () => void) {
           okPressTimer.current = null;
         }
         if (!isLongPress.current) {
-          // Fue un clic normal
-          navigateDpad('enter');
+          navigateDpad('enter', { ...counts, onEnterAction });
         }
         isLongPress.current = false;
       }
@@ -73,5 +75,5 @@ export function useTvNavigation(onLongPressOk?: () => void) {
         clearTimeout(okPressTimer.current);
       }
     };
-  }, [navigateDpad, onLongPressOk]);
+  }, [navigateDpad, counts, onEnterAction, onLongPressOk]);
 }

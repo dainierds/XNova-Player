@@ -14,25 +14,39 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: #080A0E;
+    background-color: #06080D;
     color: #FFFFFF;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
 }
 
-/* Custom TV glow and focus animation styles */
-.tv-focus-glow {
-  transition: all 0.22s cubic-bezier(0.2, 0, 0, 1);
+/* Glassmorphism cinematográfico */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.tv-focus-glow:focus,
-.tv-focused {
-  transform: scale(1.06);
-  z-index: 30;
-  box-shadow: 0 0 0 3px #0ea5e9, 0 10px 25px -5px rgba(14, 165, 233, 0.5);
+.glass-pill {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-/* Scrollbar hide for TV carousels */
+/* Efecto de Foco TV de última generación con resplandor neón */
+.tv-card-focus {
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease, border-color 0.2s ease;
+}
+
+.tv-card-focus.active-focus {
+  transform: translateY(-8px) scale(1.06);
+  z-index: 40;
+  border-color: #38BDF8 !important;
+  box-shadow: 0 16px 36px -8px rgba(6, 182, 212, 0.45), 0 0 0 2.5px #38BDF8;
+}
+
+/* Ocultar barras de scroll pero permitir deslizamiento */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -41,10 +55,12 @@
   scrollbar-width: none;
 }
 
-/* Diagonal ribbon / chip shape matching Prime Black reference */
-.slant-chip {
-  transform: skewX(-14deg);
+/* Animación pulsante suave para el badge EN VIVO */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
 }
-.slant-chip-content {
-  transform: skewX(14deg);
+
+.live-pulse {
+  animation: pulseDot 1.8s infinite ease-in-out;
 }

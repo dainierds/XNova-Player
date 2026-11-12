@@ -1,4 +1,4 @@
-export interface MovieItem {
+export interface ContentItem {
   id: string;
   title: string;
   backdropUrl: string;
@@ -8,22 +8,35 @@ export interface MovieItem {
   duration: string;
   year: string;
   rating: string;
-  isPremiere?: boolean;
+  score?: string;
+  badge?: string; // e.g. "ESTRENO", "TENDENCIA", "4K HDR"
   streamUrl?: string;
+  type?: 'movie' | 'series' | 'live';
+  channelNumber?: number;
+  progressPercent?: number; // Para la fila "Continuar Viendo"
+  isPremiere?: boolean;
 }
 
-export type MenuSection = 
-  | 'movies' 
-  | 'series' 
-  | 'live' 
-  | 'radio' 
-  | 'documentaries' 
-  | 'concerts' 
-  | 'settings' 
+// Alias de compatibilidad
+export type MovieItem = ContentItem;
+
+export type NavTabId = 
+  | 'home'
+  | 'movies'
+  | 'series'
+  | 'live'
+  | 'favorites'
+  | 'search'
+  | 'settings'
+  | 'radio'
+  | 'documentaries'
+  | 'concerts'
   | 'exit';
 
-export interface MenuItem {
-  id: MenuSection;
+export type MenuSection = NavTabId;
+
+export interface NavTabItem {
+  id: NavTabId;
   label: string;
   iconName: string;
 }
