@@ -1,0 +1,161 @@
+import type { MovieItem } from '../types';
+
+export interface TmdbMovieResult {
+  id: number;
+  title: string;
+  backdrop_path: string | null;
+  poster_path: string | null;
+  overview: string;
+  release_date: string;
+  genre_ids: number[];
+  vote_average: number;
+}
+
+const TMDB_GENRES: Record<number, string> = {
+  28: 'Acción',
+  12: 'Aventura',
+  16: 'Animación',
+  35: 'Comedia',
+  80: 'Crimen',
+  99: 'Documental',
+  18: 'Drama',
+  10751: 'Familia',
+  14: 'Fantasía',
+  36: 'Historia',
+  27: 'Terror',
+  10402: 'Música',
+  9648: 'Misterio',
+  10749: 'Romance',
+  878: 'Ciencia Ficción',
+  10770: 'Película de TV',
+  53: 'Suspense',
+  10752: 'Bélica',
+  37: 'Western',
+};
+
+const cache = new Map<string, MovieItem>();
+
+export class TmdbService {
+  private static getApiKey(): string {
+    return import.meta.env.VITE_TMDB_API_KEY || '';
+  }
+
+  public static async enrichMovie(
+    rawTitle: string,
+    fallbackPoster: string = '',
+    fallbackStreamUrl: string = ''
+  ): Promise<MovieItem> {
+    // Limpiar título de posibles tags de resolución (1080p, 4K, Latino, etc.)
+    const cleanTitle = rawTitle
+      .replace(/\[.*?\]|\(.*?\)/g, '')
+      .replace(/\b(4K|1080p|720p|HD|FHD|LATINO|CASTELLANO|SUB|ESP)\b/gi, '')
+      .trim();
+
+    const cacheKey = cleanTitle.toLowerCase();
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey)!;
+    }
+
+    const apiKey = this.getApiKey();
+
+    // Si no hay API key configurada, retornar datos básicos limpios con fallback
+    if (!apiKey) {
+      const basicItem: MovieItem = {
+        id: `local_${cleanTitle}`,
+        title: cleanTitle,
+        backdropUrl: fallbackPoster || 'https://images.unsplash.com/photo-1635863138275-d9b33299680b?q=80&w=1920&auto=format&fit=crop',
+        posterUrl: fallbackPoster || 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=600&auto=format&fit=crop',
+        genres: ['Acción', 'Estreno'],
+        synopsis: 'Disfruta de este contenido en alta definición desde tu servidor IPTV.',
+        duration: '1h 50Min',
+        year: new Date().getFullYear().toString(),
+        rating: 'PG-13',
+        isPremiere: true,
+        streamUrl: fallbackStreamUrl,
+      };
+      cache.set(cacheKey, basicItem);
+      return basicItem;
+    }
+
+    try {
+      const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(
+        cleanTitle
+      )}&language=es-ES&page=1&include_adult=false`;
+
+      const res = await fetch(searchUrl);
+      if (!res.ok) throw new Error('Error al conectar con TMDb');
+
+      const data = await res.json();
+      const firstResult: TmdbMovieResult | undefined = data.results?.[0];
+
+      if (!firstResult) {
+        throw new Error('Sin coincidencia en TMDb');
+      }
+
+      // Detalle para obtener duración
+      let runtimeMin = 115;
+      try {
+        const detailRes = await fetch(
+          `https://api.themoviedb.org/3/movie/${firstResult.id}?api_key=${apiKey}&language=es-ES`
+        );
+        if (detailRes.ok) {
+          const detailData = await detailRes.json();
+          if (detailData.runtime) runtimeMin = detailData.runtime;
+        }
+      } catch {
+        // Ignorar error secundario de detalle
+      }
+
+      const hours = Math.floor(runtimeMin / 60);
+      const minutes = runtimeMin % 60;
+      const durationStr = `${hours}h ${minutes.toString().padStart(2, '0')}Min`;
+
+      const genres = (firstResult.genre_ids || [])
+        .map((id) => TMDB_GENRES[id])
+        .filter(Boolean)
+        .slice(0, 3);
+
+      const year = firstResult.release_date
+        ? firstResult.release_date.split('-')[0]
+        : new Date().getFullYear().toString();
+
+      const enriched: MovieItem = {
+        id: `tmdb_${firstResult.id}`,
+        title: firstResult.title || cleanTitle,
+        backdropUrl: firstResult.backdrop_path
+          ? `https://image.tmdb.org/t/p/original${firstResult.backdrop_path}`
+          : fallbackPoster || 'https://images.unsplash.com/photo-1635863138275-d9b33299680b?q=80&w=1920&auto=format&fit=crop',
+        posterUrl: firstResult.poster_path
+          ? `https://image.tmdb.org/t/p/w500${firstResult.poster_path}`
+          : fallbackPoster || 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=600&auto=format&fit=crop',
+        genres: genres.length > 0 ? genres : ['Aventura', 'Acción'],
+        synopsis: firstResult.overview || 'Sin descripción disponible.',
+        duration: durationStr,
+        year,
+        rating: firstResult.vote_average ? `${firstResult.vote_average.toFixed(1)} ★` : 'PG-13',
+        isPremiere: true,
+        streamUrl: fallbackStreamUrl,
+      };
+
+      cache.set(cacheKey, enriched);
+      return enriched;
+    } catch {
+      // Fallback robusto en caso de error de red o no match
+      const fallbackItem: MovieItem = {
+        id: `fallback_${cleanTitle}`,
+        title: cleanTitle,
+        backdropUrl: fallbackPoster || 'https://images.unsplash.com/photo-1635863138275-d9b33299680b?q=80&w=1920&auto=format&fit=crop',
+        posterUrl: fallbackPoster || 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=600&auto=format&fit=crop',
+        genres: ['Acción', 'Drama'],
+        synopsis: 'Contenido disponible en tu lista de reproducción IPTV.',
+        duration: '2h 00Min',
+        year: '2026',
+        rating: 'PG-13',
+        isPremiere: false,
+        streamUrl: fallbackStreamUrl,
+      };
+      cache.set(cacheKey, fallbackItem);
+      return fallbackItem;
+    }
+  }
+}

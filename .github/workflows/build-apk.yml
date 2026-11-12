@@ -1,0 +1,111 @@
+name: Compilar APK Android TV / Fire TV
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar Repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Instalar Dependencias Web
+        run: npm install
+
+      - name: Compilar Frontend React (Vite)
+        run: npm run build
+
+      - name: Sincronizar Capacitor Android
+        run: npx cap sync android
+
+      - name: Dar permisos de ejecución a Gradle Wrapper
+        run: chmod +x android/gradlew
+
+      - name: Compilar APK con Gradle
+        run: |
+          cd android
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Firmar APK (Keystore)
+        id: sign_apk
+        run: |
+          mkdir -p build-output
+          UNSIGNED_APK=$(find android/app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
+          
+          if [ -z "$UNSIGNED_APK" ]; then
+            echo "Error: No se encontró el APK generado."
+            exit 1
+          fi
+
+          SIGNED_APK="build-output/XNova-Player-AndroidTV.apk"
+
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "==> Firmando con Keystore secreto configurado en GitHub Secrets..."
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > release.keystore
+            
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+              -keystore release.keystore \
+              -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+              -keypass "${{ secrets.KEY_PASSWORD }}" \
+              "$UNSIGNED_APK" "${{ secrets.KEY_ALIAS }}"
+            
+            cp "$UNSIGNED_APK" "$SIGNED_APK"
+          else
+            echo "==> AVISO: No se encontraron secretos de Keystore. Generando keystore de firma automática..."
+            keytool -genkey -v -keystore auto-release.keystore -alias xnova -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass xnovapass -keypass xnovapass \
+              -dname "CN=XNova Player, OU=TV, O=XNova, L=Madrid, S=Madrid, C=ES"
+            
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+              -keystore auto-release.keystore \
+              -storepass xnovapass \
+              -keypass xnovapass \
+              "$UNSIGNED_APK" xnova
+            
+            cp "$UNSIGNED_APK" "$SIGNED_APK"
+          fi
+
+          echo "apk_path=$SIGNED_APK" >> $GITHUB_OUTPUT
+
+      - name: Guardar APK como Artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: XNova-Player-AndroidTV
+          path: build-output/XNova-Player-AndroidTV.apk
+          if-no-files-found: error
+
+      - name: Publicar GitHub Release con Descarga Directa
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/heads/main')
+        with:
+          tag_name: v${{ github.run_number }}.0.0
+          name: XNova Player v${{ github.run_number }}.0.0 (Android TV / Fire TV)
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            build-output/XNova-Player-AndroidTV.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

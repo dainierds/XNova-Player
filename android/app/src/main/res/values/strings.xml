@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">XNova Player</string>
+    <string name="title_activity_main">XNova Player</string>
+    <string name="package_name">com.xnovaplayer.app</string>
+    <string name="custom_url_scheme">com.xnovaplayer.app</string>
+</resources>

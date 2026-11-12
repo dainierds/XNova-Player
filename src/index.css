@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-user-select: none;
+    user-select: none;
+    outline: none !important;
+  }
+
+  html, body, #root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #080A0E;
+    color: #FFFFFF;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  }
+}
+
+/* Custom TV glow and focus animation styles */
+.tv-focus-glow {
+  transition: all 0.22s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.tv-focus-glow:focus,
+.tv-focused {
+  transform: scale(1.06);
+  z-index: 30;
+  box-shadow: 0 0 0 3px #0ea5e9, 0 10px 25px -5px rgba(14, 165, 233, 0.5);
+}
+
+/* Scrollbar hide for TV carousels */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Diagonal ribbon / chip shape matching Prime Black reference */
+.slant-chip {
+  transform: skewX(-14deg);
+}
+.slant-chip-content {
+  transform: skewX(14deg);
+}
