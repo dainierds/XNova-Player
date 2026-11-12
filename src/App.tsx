@@ -359,16 +359,25 @@ export function App() {
               focusedTab={focusedTab}
               isSidebarFocused={focusedZone === 'sidebar'}
               onSelectTab={handleSelectTab}
+              onLogout={() => {
+                const { logout } = useAuthStore.getState();
+                logout();
+              }}
             />
 
             {/* 3. Escenario Principal: Barra de Búsqueda Superior + Hero Stage Central */}
             <div className="flex-1 h-full flex flex-col justify-between overflow-hidden">
-              {/* Barra Superior con Logo y Buscador Pill */}
+              {/* Barra Superior con Logo, Buscador y Botón de Cerrar Sesión */}
               <TopSearchBar
                 isFocused={focusedZone === 'search_bar'}
                 onOpenSearch={() => setIsSearchOpen(true)}
                 expDate={currentUser?.expDate || activePlaylist?.expDate || '29 NOV 2026'}
                 planBadge={currentUser ? PLAN_CONFIGS[currentUser.plan].badge : undefined}
+                userName={currentUser?.username}
+                onLogout={() => {
+                  const { logout } = useAuthStore.getState();
+                  logout();
+                }}
               />
 
               {/* Zona Central: Gran Imagen + Título Monumental + Botones + Miniaturas Carrusel */}

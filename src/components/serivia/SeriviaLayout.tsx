@@ -5,7 +5,6 @@ import {
   Calendar, 
   TrendingUp, 
   Settings, 
-  HelpCircle, 
   Search, 
   SlidersHorizontal, 
   Bell, 
@@ -13,7 +12,8 @@ import {
   Play, 
   ChevronLeft, 
   ChevronRight,
-  Star
+  Star,
+  LogOut
 } from 'lucide-react';
 import { BRANDING } from '../../config/branding';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -150,11 +150,14 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
           </button>
 
           <button
-            onClick={onOpenSettings}
-            className="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5 transition"
+            onClick={() => {
+              const { logout } = useAuthStore.getState();
+              logout();
+            }}
+            className="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition mt-2"
           >
-            <HelpCircle className="w-4 h-4" />
-            <span>Soporte</span>
+            <LogOut className="w-4 h-4" />
+            <span>Cerrar Sesión</span>
           </button>
         </div>
       </aside>

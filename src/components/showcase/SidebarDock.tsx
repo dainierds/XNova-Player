@@ -8,7 +8,8 @@ import {
   Radio, 
   Star, 
   Layers, 
-  Settings 
+  Settings,
+  LogOut 
 } from 'lucide-react';
 
 interface SidebarDockProps {
@@ -16,6 +17,7 @@ interface SidebarDockProps {
   focusedTab: SidebarTabId;
   isSidebarFocused: boolean;
   onSelectTab: (tab: SidebarTabId) => void;
+  onLogout?: () => void;
 }
 
 export const SIDEBAR_ITEMS: { id: SidebarTabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -33,6 +35,7 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
   focusedTab,
   isSidebarFocused,
   onSelectTab,
+  onLogout,
 }) => {
   return (
     <aside className="relative z-30 h-full w-24 flex flex-col items-center justify-between py-8 select-none border-r border-white/5 bg-gradient-to-b from-[#1F1238]/60 via-[#100D22]/60 to-[#0A0E1A]/80 backdrop-blur-2xl">
@@ -72,8 +75,16 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
         })}
       </nav>
 
-      {/* Espacio inferior reservado para equilibrio visual */}
-      <div className="w-8 h-8 opacity-0 pointer-events-none" />
+      {/* Botón Cerrar Sesión visible en la barra lateral */}
+      {onLogout && (
+        <button
+          onClick={onLogout}
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 hover:text-rose-200 transition-all shadow-md group"
+          title="Cerrar Sesión / Cambiar Cuenta"
+        >
+          <LogOut className="w-4 h-4 transition-transform group-hover:scale-110" />
+        </button>
+      )}
     </aside>
   );
 };
