@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { usePlaylistStore } from '../../store/usePlaylistStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { StorageService } from '../../services/storage';
 import { BRANDING } from '../../config/branding';
+import { PLAN_CONFIGS } from '../../types/auth';
 import { 
   Plus, 
   Trash2, 
@@ -10,7 +12,9 @@ import {
   RefreshCw, 
   Server, 
   X,
-  AlertCircle
+  AlertCircle,
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 
@@ -19,6 +23,7 @@ interface SettingsModalProps {
   onClose: () => void;
   currentTheme?: 'cinematic' | 'serivia';
   onThemeChange?: (theme: 'cinematic' | 'serivia') => void;
+  onOpenAdminPanel?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -26,7 +31,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   currentTheme = 'serivia',
   onThemeChange,
+  onOpenAdminPanel,
 }) => {
+  const { currentUser, isAdmin, logout } = useAuthStore();
   const {
     playlists,
     activePlaylist,
@@ -145,103 +152,229 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Contenido principal: Lista de cuentas o Formulario de edición */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
-          {!isEditing ? (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
-                  Listas Almacenadas ({playlists.length}/3)
-                </h3>
+          {/* 1. Acceso a Panel de Administración (Si es Admin) */}
+          {isAdmin && onOpenAdminPanel && (
+            <div className="p-4 rounded-xl bg-purple-950/40 border border-purple-500/40 mb-6 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <ShieldCheck className="w-6 h-6 text-purple-400" />
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Modo Administrador Activo</h4>
+                  <p className="text-[11px] text-zinc-300">
+                    Crea nuevos clientes, edita contraseñas, asigna paquetes (Basic, Gold, Premium) y listas IPTV
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenAdminPanel();
+                }}
+                className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs shadow-md transition"
+              >
+                Abrir Panel de Control
+              </button>
+            </div>
+          )}
 
-                {playlists.length < 3 && (
-                  <button
-                    onClick={handleOpenAdd}
-                    className="flex items-center space-x-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg font-bold text-xs transition"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Añadir Nueva Lista</span>
-                  </button>
-                )}
+          {/* 2. Tarjeta de Suscripción del Cliente (Si está logueado como cliente) */}
+          {currentUser && !isAdmin && (
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-cyan-950/20 to-purple-950/30 border border-cyan-500/30 mb-6 flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div 
+                  className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-base"
+                  style={{ backgroundColor: `${PLAN_CONFIGS[currentUser.plan].color}25`, color: PLAN_CONFIGS[currentUser.plan].color }}
+                >
+                  {currentUser.displayName.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="font-bold text-white text-base">{currentUser.displayName}</h3>
+                    <span 
+                      className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                      style={{ 
+                        borderColor: `${PLAN_CONFIGS[currentUser.plan].color}50`, 
+                        color: PLAN_CONFIGS[currentUser.plan].color, 
+                        backgroundColor: `${PLAN_CONFIGS[currentUser.plan].color}15` 
+                      }}
+                    >
+                      PLAN {PLAN_CONFIGS[currentUser.plan].badge}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Vence: <strong className="text-white">{currentUser.expDate}</strong> • {PLAN_CONFIGS[currentUser.plan].description}
+                  </p>
+                </div>
               </div>
 
-              {playlists.length === 0 ? (
-                <div className="p-8 text-center border-2 border-dashed border-zinc-800 rounded-xl">
-                  <p className="text-zinc-400 text-sm mb-4">
-                    No tienes ninguna lista configurada. Añade tus credenciales Xtream Codes o enlace M3U.
-                  </p>
-                  <button
-                    onClick={handleOpenAdd}
-                    className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg transition"
-                  >
-                    Configurar Primera Lista
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4">
-                  {playlists.map((pl) => {
-                    const isActive = activePlaylist?.id === pl.id;
+              <button
+                onClick={() => {
+                  logout();
+                  onClose();
+                }}
+                className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold transition"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Cerrar Sesión</span>
+              </button>
+            </div>
+          )}
 
-                    return (
-                      <div
-                        key={pl.id}
-                        className={`p-5 rounded-xl border transition-all flex items-center justify-between ${
-                          isActive
-                            ? 'bg-cyan-950/30 border-cyan-500/80 shadow-lg shadow-cyan-950/50'
-                            : 'bg-zinc-800/40 border-zinc-700/60 hover:border-zinc-500'
-                        }`}
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-3">
-                            <span className="text-base font-bold text-white">{pl.name}</span>
-                            <span className="text-xs uppercase px-2 py-0.5 rounded bg-zinc-700 text-zinc-300 font-mono">
-                              {pl.type}
-                            </span>
-                            {isActive && (
-                              <span className="flex items-center space-x-1 text-xs text-cyan-400 font-bold bg-cyan-900/40 px-2 py-0.5 rounded-full border border-cyan-400/40">
-                                <CheckCircle className="w-3.5 h-3.5" />
-                                <span>Activa</span>
-                              </span>
-                            )}
+          {!isEditing ? (
+            <div className="space-y-6">
+              {/* Para Clientes: Modo protegido donde NO pueden ver URLs ni editar listas */}
+              {currentUser && !isAdmin ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                      Tus Listas Activas ({playlists.length} / {PLAN_CONFIGS[currentUser.plan].maxPlaylists})
+                    </h3>
+                    <span className="text-[11px] text-zinc-400 italic">
+                      Configuradas de forma segura por tu proveedor
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {playlists.map((pl) => {
+                      const isActive = activePlaylist?.id === pl.id;
+
+                      return (
+                        <div
+                          key={pl.id}
+                          className={`p-4 rounded-xl border flex items-center justify-between ${
+                            isActive
+                              ? 'bg-cyan-950/30 border-cyan-500/70 shadow-md shadow-cyan-950/40'
+                              : 'bg-zinc-800/40 border-zinc-700/60'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center space-x-2.5">
+                              <span className="text-sm font-bold text-white">{pl.name}</span>
+                              {isActive && (
+                                <span className="flex items-center space-x-1 text-[10px] text-cyan-400 font-bold bg-cyan-900/40 px-2 py-0.5 rounded-full border border-cyan-400/40">
+                                  <CheckCircle className="w-3 h-3" />
+                                  <span>En Reproducción</span>
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-zinc-400 mt-0.5">
+                              Canales en vivo, películas y series sincronizadas
+                            </p>
                           </div>
 
-                          <div className="text-xs text-zinc-400">
-                            {pl.type === 'xtream' ? (
-                              <span>
-                                Servidor: {pl.serverUrl} | Usuario: {pl.username} | Vence: {pl.expDate || 'N/A'}
-                              </span>
-                            ) : (
-                              <span>URL M3U: {pl.m3uUrl}</span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-3">
+                          {/* Si el plan permite más de 1 lista (Gold o Premium), puede alternar entre ellas */}
                           {!isActive && (
                             <button
                               onClick={() => setActivePlaylist(pl.id)}
-                              className="px-3 py-1.5 bg-zinc-700 hover:bg-cyan-600 text-white rounded text-xs font-semibold transition"
+                              className="px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg text-xs transition"
                             >
-                              Seleccionar
+                              Activar Esta Lista
                             </button>
                           )}
-                          <button
-                            onClick={() => handleOpenEdit(pl)}
-                            className="p-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition"
-                            title="Editar"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => deletePlaylist(pl.id)}
-                            className="p-2 bg-zinc-800 hover:bg-red-600 text-zinc-400 hover:text-white rounded transition"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
+              ) : (
+                /* Para Admin: Gestión completa de listas */
+                <>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                      Listas Almacenadas ({playlists.length}/3)
+                    </h3>
+
+                    {playlists.length < 3 && (
+                      <button
+                        onClick={handleOpenAdd}
+                        className="flex items-center space-x-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg font-bold text-xs transition"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Añadir Nueva Lista</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {playlists.length === 0 ? (
+                    <div className="p-8 text-center border-2 border-dashed border-zinc-800 rounded-xl">
+                      <p className="text-zinc-400 text-sm mb-4">
+                        No tienes ninguna lista configurada. Añade tus credenciales Xtream Codes o enlace M3U.
+                      </p>
+                      <button
+                        onClick={handleOpenAdd}
+                        className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg transition"
+                      >
+                        Configurar Primera Lista
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {playlists.map((pl) => {
+                        const isActive = activePlaylist?.id === pl.id;
+
+                        return (
+                          <div
+                            key={pl.id}
+                            className={`p-5 rounded-xl border transition-all flex items-center justify-between ${
+                              isActive
+                                ? 'bg-cyan-950/30 border-cyan-500/80 shadow-lg shadow-cyan-950/50'
+                                : 'bg-zinc-800/40 border-zinc-700/60 hover:border-zinc-500'
+                            }`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center space-x-3">
+                                <span className="text-base font-bold text-white">{pl.name}</span>
+                                <span className="text-xs uppercase px-2 py-0.5 rounded bg-zinc-700 text-zinc-300 font-mono">
+                                  {pl.type}
+                                </span>
+                                {isActive && (
+                                  <span className="flex items-center space-x-1 text-xs text-cyan-400 font-bold bg-cyan-900/40 px-2 py-0.5 rounded-full border border-cyan-400/40">
+                                    <CheckCircle className="w-3.5 h-3.5" />
+                                    <span>Activa</span>
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="text-xs text-zinc-400">
+                                {pl.type === 'xtream' ? (
+                                  <span>
+                                    Servidor: {pl.serverUrl} | Usuario: {pl.username} | Vence: {pl.expDate || 'N/A'}
+                                  </span>
+                                ) : (
+                                  <span>URL M3U: {pl.m3uUrl}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-3">
+                              {!isActive && (
+                                <button
+                                  onClick={() => setActivePlaylist(pl.id)}
+                                  className="px-3 py-1.5 bg-zinc-700 hover:bg-cyan-600 text-white rounded text-xs font-semibold transition"
+                                >
+                                  Seleccionar
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleOpenEdit(pl)}
+                                className="p-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition"
+                                title="Editar"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => deletePlaylist(pl.id)}
+                                className="p-2 bg-zinc-800 hover:bg-red-600 text-zinc-400 hover:text-white rounded transition"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Botón de Sincronización Manual */}

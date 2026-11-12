@@ -9,16 +9,27 @@ import { ProfileSelectorModal } from './components/profiles/ProfileSelectorModal
 import { ExitModal } from './components/common/ExitModal';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { SeriviaLayout } from './components/serivia/SeriviaLayout';
+import { TvLoginScreen } from './components/auth/TvLoginScreen';
+import { AdminPanelModal } from './components/admin/AdminPanelModal';
 import { SHOWCASE_MOVIES, SHOWCASE_SERIES } from './mock/showcaseData';
 import type { SidebarTabId, ShowcaseItem } from './types/showcase';
 import type { MovieItem } from './types';
 import { usePlaylistStore } from './store/usePlaylistStore';
+import { useAuthStore } from './store/useAuthStore';
+import { PLAN_CONFIGS } from './types/auth';
 import { StorageService } from './services/storage';
 
 type FocusSection = 'sidebar' | 'search_bar' | 'hero_buttons' | 'thumbnails' | 'bottom_actions';
 
 export function App() {
-  const { activePlaylist, vodMovies, liveStreams, loadStoredPlaylists } = usePlaylistStore();
+  const { currentUser, isAuthenticated, initializeAuth, login } = useAuthStore();
+  const { 
+    activePlaylist, 
+    vodMovies, 
+    liveStreams, 
+    loadStoredPlaylists, 
+    loadUserPlaylists 
+  } = usePlaylistStore();
 
   // Estados de navegación y foco
   const [activeTab, setActiveTab] = useState<SidebarTabId>('home');
@@ -53,6 +64,7 @@ export function App() {
   // Estados de modales y reproductor
   const [isSplashVisible, setIsSplashVisible] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentProfile, setCurrentProfile] = useState<'adult' | 'kids'>('adult');
@@ -66,6 +78,7 @@ export function App() {
   const isUserInteractingRef = useRef(false);
 
   useEffect(() => {
+    initializeAuth();
     loadStoredPlaylists();
     StorageService.getActiveProfile().then((p) => setCurrentProfile(p));
     StorageService.getFavorites().then((favs) => setFavorites(favs));
@@ -73,7 +86,14 @@ export function App() {
     StorageService.getShowSplashAnimation().then((shouldShow) => {
       if (!shouldShow) setIsSplashVisible(false);
     });
-  }, [loadStoredPlaylists]);
+  }, [initializeAuth, loadStoredPlaylists]);
+
+  // Al cambiar el usuario autenticado, cargar sus listas exclusivas
+  useEffect(() => {
+    if (currentUser && currentUser.playlists && currentUser.playlists.length > 0) {
+      loadUserPlaylists(currentUser.playlists);
+    }
+  }, [currentUser, loadUserPlaylists]);
 
   // Reiniciar índice al cambiar entre Películas y Series
   useEffect(() => {
@@ -285,74 +305,82 @@ export function App() {
         <SplashScreen onFinish={() => setIsSplashVisible(false)} />
       )}
 
-      {/* RENDERIZADO DEL TEMA ACTIVO: Serivia Modern Deck o Cinematic Showcase */}
-      {activeTheme === 'serivia' ? (
-        <SeriviaLayout
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenSearch={() => setIsSearchOpen(true)}
-          onPlayMedia={(media) => {
-            setPlayingItem({
-              id: media.id,
-              title: media.title,
-              subtitle: media.title,
-              backdropUrl: media.posterUrl || '',
-              thumbnailUrl: media.posterUrl || '',
-              releaseDateText: 'En reproducción',
-              statusBadge: 'ESTRENO',
-              genresText: 'Streaming',
-              year: '2025',
-              rating: '13+',
-              duration: 'HD',
-              synopsis: 'Disfruta de tu contenido.',
-              type: 'movie',
-              streamUrl: media.streamUrl,
-            });
-          }}
-        />
-      ) : (
-        <>
-          {/* 2. Barra Lateral Flotante a la Izquierda (Vertical Dock) */}
-          <SidebarDock
-            activeTab={activeTab}
-            focusedTab={focusedTab}
-            isSidebarFocused={focusedZone === 'sidebar'}
-            onSelectTab={handleSelectTab}
+      {/* 2. Pantalla de Bienvenida y Login para TV (Si no hay sesión activa y terminó el splash) */}
+      {!isSplashVisible && !isAuthenticated && (
+        <TvLoginScreen onOpenAdminPanel={() => setIsAdminPanelOpen(true)} />
+      )}
+
+      {/* RENDERIZADO DEL TEMA ACTIVO: Serivia Modern Deck o Cinematic Showcase (Solo si está autenticado) */}
+      {!isSplashVisible && isAuthenticated && (
+        activeTheme === 'serivia' ? (
+          <SeriviaLayout
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenSearch={() => setIsSearchOpen(true)}
+            onPlayMedia={(media) => {
+              setPlayingItem({
+                id: media.id,
+                title: media.title,
+                subtitle: media.title,
+                backdropUrl: media.posterUrl || '',
+                thumbnailUrl: media.posterUrl || '',
+                releaseDateText: 'En reproducción',
+                statusBadge: 'ESTRENO',
+                genresText: 'Streaming',
+                year: '2025',
+                rating: '13+',
+                duration: 'HD',
+                synopsis: 'Disfruta de tu contenido.',
+                type: 'movie',
+                streamUrl: media.streamUrl,
+              });
+            }}
           />
-
-          {/* 3. Escenario Principal: Barra de Búsqueda Superior + Hero Stage Central */}
-          <div className="flex-1 h-full flex flex-col justify-between overflow-hidden">
-            {/* Barra Superior con Logo y Buscador Pill */}
-            <TopSearchBar
-              isFocused={focusedZone === 'search_bar'}
-              onOpenSearch={() => setIsSearchOpen(true)}
-              expDate={activePlaylist?.expDate || '29 NOV 2026'}
+        ) : (
+          <>
+            {/* 2. Barra Lateral Flotante a la Izquierda (Vertical Dock) */}
+            <SidebarDock
+              activeTab={activeTab}
+              focusedTab={focusedTab}
+              isSidebarFocused={focusedZone === 'sidebar'}
+              onSelectTab={handleSelectTab}
             />
 
-            {/* Zona Central: Gran Imagen + Título Monumental + Botones + Miniaturas Carrusel */}
-            <MainHeroStage
-              item={activeItem}
-              items={currentCatalog}
-              selectedIndex={carouselIndex}
-              focusedZone={
-                focusedZone === 'hero_buttons'
-                  ? 'hero_buttons'
-                  : focusedZone === 'bottom_actions'
-                    ? 'bottom_actions'
-                    : 'thumbnails'
-              }
-              heroButtonIndex={heroBtnIndex}
-              bottomActionIndex={bottomActionIndex}
-              isFavorite={isCurrentFav}
-              onSelectThumbnail={(idx) => {
-                setCarouselIndex(idx);
-                setFocusedZone('thumbnails');
-              }}
-              onPlay={() => setPlayingItem(activeItem)}
-              onOpenTrailer={() => console.log('Abrir trailer de:', activeItem.title)}
-              onToggleFavorite={handleToggleFavorite}
-            />
-          </div>
-        </>
+            {/* 3. Escenario Principal: Barra de Búsqueda Superior + Hero Stage Central */}
+            <div className="flex-1 h-full flex flex-col justify-between overflow-hidden">
+              {/* Barra Superior con Logo y Buscador Pill */}
+              <TopSearchBar
+                isFocused={focusedZone === 'search_bar'}
+                onOpenSearch={() => setIsSearchOpen(true)}
+                expDate={currentUser?.expDate || activePlaylist?.expDate || '29 NOV 2026'}
+                planBadge={currentUser ? PLAN_CONFIGS[currentUser.plan].badge : undefined}
+              />
+
+              {/* Zona Central: Gran Imagen + Título Monumental + Botones + Miniaturas Carrusel */}
+              <MainHeroStage
+                item={activeItem}
+                items={currentCatalog}
+                selectedIndex={carouselIndex}
+                focusedZone={
+                  focusedZone === 'hero_buttons'
+                    ? 'hero_buttons'
+                    : focusedZone === 'bottom_actions'
+                      ? 'bottom_actions'
+                      : 'thumbnails'
+                }
+                heroButtonIndex={heroBtnIndex}
+                bottomActionIndex={bottomActionIndex}
+                isFavorite={isCurrentFav}
+                onSelectThumbnail={(idx) => {
+                  setCarouselIndex(idx);
+                  setFocusedZone('thumbnails');
+                }}
+                onPlay={() => setPlayingItem(activeItem)}
+                onOpenTrailer={() => console.log('Abrir trailer de:', activeItem.title)}
+                onToggleFavorite={handleToggleFavorite}
+              />
+            </div>
+          </>
+        )
       )}
 
       {/* Modales del Sistema */}
@@ -360,10 +388,20 @@ export function App() {
         isOpen={isSettingsOpen}
         currentTheme={activeTheme}
         onThemeChange={(newTheme) => setActiveTheme(newTheme)}
+        onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
         onClose={() => {
           setIsSettingsOpen(false);
           setActiveTab('home');
           setFocusedZone('thumbnails');
+        }}
+      />
+
+      {/* Panel de Control de Administrador (Gestión de Usuarios, Contraseñas y Listas) */}
+      <AdminPanelModal
+        isOpen={isAdminPanelOpen}
+        onClose={() => setIsAdminPanelOpen(false)}
+        onSelectUserToLogin={(username, pass) => {
+          login(username, pass);
         }}
       />
 

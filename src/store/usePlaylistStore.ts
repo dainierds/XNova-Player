@@ -26,6 +26,7 @@ interface PlaylistState {
   deletePlaylist: (id: string) => Promise<void>;
   setActivePlaylist: (id: string) => Promise<void>;
   syncCurrentPlaylist: () => Promise<void>;
+  loadUserPlaylists: (userPlaylists: PlaylistAccount[]) => void;
   clearError: () => void;
 }
 
@@ -41,6 +42,11 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
   liveStreams: [],
 
   clearError: () => set({ errorMessage: null }),
+
+  loadUserPlaylists: (userPlaylists: PlaylistAccount[]) => {
+    const active = userPlaylists.find((p) => p.isActive) || userPlaylists[0] || null;
+    set({ playlists: userPlaylists, activePlaylist: active });
+  },
 
   loadStoredPlaylists: async () => {
     try {

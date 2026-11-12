@@ -16,6 +16,8 @@ import {
   Star
 } from 'lucide-react';
 import { BRANDING } from '../../config/branding';
+import { useAuthStore } from '../../store/useAuthStore';
+import { PLAN_CONFIGS } from '../../types/auth';
 import { 
   SERIVIA_HERO_MOVIES, 
   SERIVIA_HERO_SERIES, 
@@ -34,6 +36,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   onOpenSearch,
   onPlayMedia,
 }) => {
+  const { currentUser } = useAuthStore();
   const [sectionType, setSectionType] = useState<'movies' | 'series'>('movies');
   const [activeNav, setActiveNav] = useState('home');
   const [heroIndex, setHeroIndex] = useState(0);
@@ -202,13 +205,31 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
               <Bell className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center space-x-2.5 px-3 py-1.5 rounded-xl bg-[#131824] border border-white/10 cursor-pointer hover:bg-white/10 transition">
-              <div className="w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-[10px] font-black text-cyan-300">
-                AD
+            <div 
+              onClick={onOpenSettings}
+              className="flex items-center space-x-2.5 px-3 py-1.5 rounded-xl bg-[#131824] border border-white/10 cursor-pointer hover:bg-white/10 transition"
+              title="Ajustes y Perfil de Usuario"
+            >
+              <div 
+                className="w-6 h-6 rounded-full border flex items-center justify-center text-[10px] font-black"
+                style={{
+                  backgroundColor: currentUser ? `${PLAN_CONFIGS[currentUser.plan].color}25` : '#22D3EE25',
+                  borderColor: currentUser ? PLAN_CONFIGS[currentUser.plan].color : '#22D3EE',
+                  color: currentUser ? PLAN_CONFIGS[currentUser.plan].color : '#22D3EE',
+                }}
+              >
+                {currentUser?.displayName.charAt(0).toUpperCase() || 'XN'}
               </div>
               <div className="text-left">
-                <p className="text-xs font-bold text-white leading-tight">Perfil Premium</p>
-                <p className="text-[10px] text-amber-400 font-semibold leading-tight">Activo</p>
+                <p className="text-xs font-bold text-white leading-tight">
+                  {currentUser?.displayName || 'Cliente XNova'}
+                </p>
+                <p 
+                  className="text-[10px] font-bold leading-tight uppercase"
+                  style={{ color: currentUser ? PLAN_CONFIGS[currentUser.plan].color : '#F59E0B' }}
+                >
+                  Plan {currentUser ? PLAN_CONFIGS[currentUser.plan].badge : 'VIP'}
+                </p>
               </div>
               <ChevronDown className="w-3 h-3 text-zinc-400" />
             </div>

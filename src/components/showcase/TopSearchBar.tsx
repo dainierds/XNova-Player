@@ -6,12 +6,14 @@ interface TopSearchBarProps {
   isFocused: boolean;
   onOpenSearch: () => void;
   expDate?: string;
+  planBadge?: string;
 }
 
 export const TopSearchBar: React.FC<TopSearchBarProps> = ({
   isFocused,
   onOpenSearch,
   expDate = '29 NOV 2026',
+  planBadge,
 }) => {
   return (
     <header className="relative z-20 w-full px-12 pt-7 pb-2 flex items-center justify-between select-none">
@@ -26,6 +28,11 @@ export const TopSearchBar: React.FC<TopSearchBarProps> = ({
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400" />
           <span>VENCE: <strong className="text-white">{expDate}</strong></span>
         </div>
+        {planBadge && (
+          <span className="hidden sm:inline-flex px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-[10px] font-black text-cyan-400 uppercase tracking-wider">
+            PLAN {planBadge}
+          </span>
+        )}
       </div>
 
       {/* Barra de Búsqueda Flotante estilo Pill (idéntica a la imagen de referencia) */}
