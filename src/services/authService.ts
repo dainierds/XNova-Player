@@ -238,10 +238,10 @@ export const AuthService = {
     const cleanPass = password.trim();
 
     // Verificación de credencial de Administrador Maestro
-    if (
-      (cleanUser === 'admin' && cleanPass === 'xnova2026') ||
-      (cleanUser === 'admin' && cleanPass === '8888')
-    ) {
+    const isMasterUser = cleanUser === 'admin' || cleanUser === 'master' || cleanUser === 'administrador';
+    const isMasterPass = cleanPass === '8888' || cleanPass === 'xnova2026' || cleanPass === 'admin';
+
+    if (isMasterUser && isMasterPass) {
       return {
         success: true,
         isAdmin: true,

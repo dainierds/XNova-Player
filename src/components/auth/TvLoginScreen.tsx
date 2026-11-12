@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   User, 
   Lock, 
-  ShieldCheck, 
   Eye, 
   EyeOff, 
   LogIn, 
@@ -46,6 +45,8 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel }
       setIsLoading(false);
       if (!res.success) {
         setErrorMessage(res.error || 'Credenciales inválidas.');
+      } else if (res.isAdmin) {
+        onOpenAdminPanel();
       }
     }, 400);
   };
@@ -315,17 +316,6 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel }
             </div>
           </div>
         )}
-
-        {/* Acceso Administrador (Discreto) */}
-        <div className="mt-5 flex items-center space-x-2">
-          <button
-            onClick={onOpenAdminPanel}
-            className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-cyan-400/40 text-xs text-zinc-400 hover:text-white transition focus:ring-2 focus:ring-cyan-400 focus:outline-none"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Panel de Administración (Gestión de Clientes)</span>
-          </button>
-        </div>
       </div>
     </div>
   );
