@@ -8,6 +8,7 @@ import { SearchModal } from './components/search/SearchModal';
 import { ProfileSelectorModal } from './components/profiles/ProfileSelectorModal';
 import { ExitModal } from './components/common/ExitModal';
 import { SplashScreen } from './components/splash/SplashScreen';
+import { SeriviaLayout } from './components/serivia/SeriviaLayout';
 import { SHOWCASE_MOVIES, SHOWCASE_SERIES } from './mock/showcaseData';
 import type { SidebarTabId, ShowcaseItem } from './types/showcase';
 import type { MovieItem } from './types';
@@ -58,6 +59,7 @@ export function App() {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [playingItem, setPlayingItem] = useState<ShowcaseItem | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [activeTheme, setActiveTheme] = useState<'cinematic' | 'serivia'>('serivia');
 
   // Temporizador de rotación automática estilo carrusel (6 segundos)
   const autoPlayTimerRef = useRef<number | null>(null);
@@ -67,6 +69,7 @@ export function App() {
     loadStoredPlaylists();
     StorageService.getActiveProfile().then((p) => setCurrentProfile(p));
     StorageService.getFavorites().then((favs) => setFavorites(favs));
+    StorageService.getActiveTheme().then((t) => setActiveTheme(t));
     StorageService.getShowSplashAnimation().then((shouldShow) => {
       if (!shouldShow) setIsSplashVisible(false);
     });
@@ -282,51 +285,81 @@ export function App() {
         <SplashScreen onFinish={() => setIsSplashVisible(false)} />
       )}
 
-      {/* 2. Barra Lateral Flotante a la Izquierda (Vertical Dock) */}
-      <SidebarDock
-        activeTab={activeTab}
-        focusedTab={focusedTab}
-        isSidebarFocused={focusedZone === 'sidebar'}
-        onSelectTab={handleSelectTab}
-      />
-
-      {/* 3. Escenario Principal: Barra de Búsqueda Superior + Hero Stage Central */}
-      <div className="flex-1 h-full flex flex-col justify-between overflow-hidden">
-        {/* Barra Superior con Logo y Buscador Pill */}
-        <TopSearchBar
-          isFocused={focusedZone === 'search_bar'}
+      {/* RENDERIZADO DEL TEMA ACTIVO: Serivia Modern Deck o Cinematic Showcase */}
+      {activeTheme === 'serivia' ? (
+        <SeriviaLayout
+          onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenSearch={() => setIsSearchOpen(true)}
-          expDate={activePlaylist?.expDate || '29 NOV 2026'}
-        />
-
-        {/* Zona Central: Gran Imagen + Título Monumental + Botones + Miniaturas Carrusel */}
-        <MainHeroStage
-          item={activeItem}
-          items={currentCatalog}
-          selectedIndex={carouselIndex}
-          focusedZone={
-            focusedZone === 'hero_buttons'
-              ? 'hero_buttons'
-              : focusedZone === 'bottom_actions'
-                ? 'bottom_actions'
-                : 'thumbnails'
-          }
-          heroButtonIndex={heroBtnIndex}
-          bottomActionIndex={bottomActionIndex}
-          isFavorite={isCurrentFav}
-          onSelectThumbnail={(idx) => {
-            setCarouselIndex(idx);
-            setFocusedZone('thumbnails');
+          onPlayMedia={(media) => {
+            setPlayingItem({
+              id: media.id,
+              title: media.title,
+              subtitle: media.title,
+              backdropUrl: media.posterUrl || '',
+              thumbnailUrl: media.posterUrl || '',
+              releaseDateText: 'En reproducción',
+              statusBadge: 'ESTRENO',
+              genresText: 'Streaming',
+              year: '2025',
+              rating: '13+',
+              duration: 'HD',
+              synopsis: 'Disfruta de tu contenido.',
+              type: 'movie',
+              streamUrl: media.streamUrl,
+            });
           }}
-          onPlay={() => setPlayingItem(activeItem)}
-          onOpenTrailer={() => console.log('Abrir trailer de:', activeItem.title)}
-          onToggleFavorite={handleToggleFavorite}
         />
-      </div>
+      ) : (
+        <>
+          {/* 2. Barra Lateral Flotante a la Izquierda (Vertical Dock) */}
+          <SidebarDock
+            activeTab={activeTab}
+            focusedTab={focusedTab}
+            isSidebarFocused={focusedZone === 'sidebar'}
+            onSelectTab={handleSelectTab}
+          />
+
+          {/* 3. Escenario Principal: Barra de Búsqueda Superior + Hero Stage Central */}
+          <div className="flex-1 h-full flex flex-col justify-between overflow-hidden">
+            {/* Barra Superior con Logo y Buscador Pill */}
+            <TopSearchBar
+              isFocused={focusedZone === 'search_bar'}
+              onOpenSearch={() => setIsSearchOpen(true)}
+              expDate={activePlaylist?.expDate || '29 NOV 2026'}
+            />
+
+            {/* Zona Central: Gran Imagen + Título Monumental + Botones + Miniaturas Carrusel */}
+            <MainHeroStage
+              item={activeItem}
+              items={currentCatalog}
+              selectedIndex={carouselIndex}
+              focusedZone={
+                focusedZone === 'hero_buttons'
+                  ? 'hero_buttons'
+                  : focusedZone === 'bottom_actions'
+                    ? 'bottom_actions'
+                    : 'thumbnails'
+              }
+              heroButtonIndex={heroBtnIndex}
+              bottomActionIndex={bottomActionIndex}
+              isFavorite={isCurrentFav}
+              onSelectThumbnail={(idx) => {
+                setCarouselIndex(idx);
+                setFocusedZone('thumbnails');
+              }}
+              onPlay={() => setPlayingItem(activeItem)}
+              onOpenTrailer={() => console.log('Abrir trailer de:', activeItem.title)}
+              onToggleFavorite={handleToggleFavorite}
+            />
+          </div>
+        </>
+      )}
 
       {/* Modales del Sistema */}
       <SettingsModal
         isOpen={isSettingsOpen}
+        currentTheme={activeTheme}
+        onThemeChange={(newTheme) => setActiveTheme(newTheme)}
         onClose={() => {
           setIsSettingsOpen(false);
           setActiveTab('home');

@@ -109,9 +109,9 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
 
       {/* Zona Inferior: Carrusel de Miniaturas a la izquierda + Botones de Acción a la derecha */}
       <div className="relative z-10 w-full flex items-end justify-between pt-6">
-        {/* Carrusel de Miniaturas con Indicador de Barra Inferior */}
-        <div className="flex flex-col space-y-2.5">
-          <div className="flex items-center space-x-3">
+        {/* Carrusel de Miniaturas con Mayor Tamaño e Indicador de Barra Inferior */}
+        <div className="flex flex-col space-y-3">
+          <div className="flex items-center space-x-3.5">
             {items.map((thumbItem, index) => {
               const isSelected = index === selectedIndex;
               const isFocused = focusedZone === 'thumbnails' && isSelected;
@@ -121,12 +121,12 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                   key={thumbItem.id}
                   onClick={() => onSelectThumbnail(index)}
                   className={`
-                    relative w-16 h-20 md:w-20 md:h-24 rounded-lg overflow-hidden cursor-pointer transition-all duration-200
+                    relative w-28 h-36 md:w-32 md:h-44 rounded-xl overflow-hidden cursor-pointer transition-all duration-300
                     ${isFocused
-                      ? 'scale-110 ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/50 z-20 -translate-y-1'
+                      ? 'scale-108 ring-3 ring-cyan-400 shadow-2xl shadow-cyan-500/50 z-20 -translate-y-2'
                       : isSelected
                         ? 'ring-2 ring-white opacity-100'
-                        : 'opacity-50 hover:opacity-90 scale-95'}
+                        : 'opacity-60 hover:opacity-95 scale-95'}
                   `}
                 >
                   <img
@@ -134,9 +134,12 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                     alt={thumbItem.title}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-1">
-                    <span className="text-[9px] font-bold text-white truncate">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-2">
+                    <span className="text-[11px] font-bold text-white truncate drop-shadow">
                       {thumbItem.title}
+                    </span>
+                    <span className="text-[9px] text-zinc-300 font-semibold">
+                      {thumbItem.releaseDateText}
                     </span>
                   </div>
                 </div>
@@ -144,10 +147,10 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
             })}
           </div>
 
-          {/* Barra de progreso de posición bajo las miniaturas */}
-          <div className="w-48 h-1 bg-white/20 rounded-full overflow-hidden">
+          {/* Barra de progreso de posición bajo las miniaturas ampliada */}
+          <div className="w-64 h-1.5 bg-white/20 rounded-full overflow-hidden">
             <div
-              className="h-full bg-white transition-all duration-300 rounded-full"
+              className="h-full bg-cyan-400 transition-all duration-300 rounded-full shadow-sm shadow-cyan-400"
               style={{
                 width: `${100 / items.length}%`,
                 transform: `translateX(${selectedIndex * 100}%)`,

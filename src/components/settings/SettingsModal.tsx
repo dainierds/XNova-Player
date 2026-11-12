@@ -17,9 +17,16 @@ import type { PlaylistAccount } from '../../types';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  currentTheme?: 'cinematic' | 'serivia';
+  onThemeChange?: (theme: 'cinematic' | 'serivia') => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ 
+  isOpen, 
+  onClose,
+  currentTheme = 'serivia',
+  onThemeChange,
+}) => {
   const {
     playlists,
     activePlaylist,
@@ -45,10 +52,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   });
 
   const [showSplash, setShowSplash] = useState(true);
+  const [selectedTheme, setSelectedTheme] = useState<'cinematic' | 'serivia'>(currentTheme);
 
   useEffect(() => {
     StorageService.getShowSplashAnimation().then((val) => setShowSplash(val));
+    StorageService.getActiveTheme().then((t) => setSelectedTheme(t));
   }, []);
+
+  const handleSelectTheme = async (theme: 'cinematic' | 'serivia') => {
+    setSelectedTheme(theme);
+    await StorageService.setActiveTheme(theme);
+    if (onThemeChange) {
+      onThemeChange(theme);
+    }
+  };
 
   const handleToggleSplash = async () => {
     const nextVal = !showSplash;
@@ -244,11 +261,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </div>
               )}
 
-              {/* Opciones de Inicio de la Aplicación */}
-              <div className="pt-6 border-t border-zinc-800/80">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3">
-                  Opciones del Reproductor
+              {/* Opciones de Inicio y Tema de la Aplicación */}
+              <div className="pt-6 border-t border-zinc-800/80 space-y-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+                  Estilo de Interfaz / Tema
                 </h3>
+
+                {/* Selector de Tema Visual */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Tema 1: Serivia Modern */}
+                  <div
+                    onClick={() => handleSelectTheme('serivia')}
+                    className={`p-4 rounded-xl border cursor-pointer transition ${
+                      selectedTheme === 'serivia'
+                        ? 'bg-cyan-950/40 border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-950/40'
+                        : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-600'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-bold text-white">Serivia Modern Deck</span>
+                      {selectedTheme === 'serivia' && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500 text-white">
+                          Activo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      Diseño en tarjetas con hero deck 3D, carrusel con asomo y filtros de categorías por género.
+                    </p>
+                  </div>
+
+                  {/* Tema 2: Cinematic Showcase (John Wick) */}
+                  <div
+                    onClick={() => handleSelectTheme('cinematic')}
+                    className={`p-4 rounded-xl border cursor-pointer transition ${
+                      selectedTheme === 'cinematic'
+                        ? 'bg-cyan-950/40 border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-950/40'
+                        : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-600'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-bold text-white">Cinematic Showcase</span>
+                      {selectedTheme === 'cinematic' && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500 text-white">
+                          Activo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      Diseño con hero de pantalla completa, miniaturas ampliadas y carrusel continuo (Estilo John Wick).
+                    </p>
+                  </div>
+                </div>
+
                 <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
                   <div className="space-y-0.5">
                     <span className="text-sm font-bold text-white">Mostrar animación de inicio</span>

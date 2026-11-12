@@ -10,6 +10,7 @@ const KEYS = {
   PARENTAL_PIN: 'xnova_parental_pin',
   ACTIVE_PROFILE: 'xnova_active_profile',
   SHOW_SPLASH: 'xnova_show_splash',
+  ACTIVE_THEME: 'xnova_active_theme',
 };
 
 export interface WatchProgressItem {
@@ -114,5 +115,15 @@ export const StorageService = {
 
   async setShowSplashAnimation(show: boolean): Promise<void> {
     await set(KEYS.SHOW_SPLASH, show);
+  },
+
+  // --- Estilo / Tema de la Interfaz ---
+  async getActiveTheme(): Promise<'cinematic' | 'serivia'> {
+    const theme = await get<'cinematic' | 'serivia'>(KEYS.ACTIVE_THEME);
+    return theme || 'serivia'; // 'serivia' o 'cinematic'
+  },
+
+  async setActiveTheme(theme: 'cinematic' | 'serivia'): Promise<void> {
+    await set(KEYS.ACTIVE_THEME, theme);
   },
 };
