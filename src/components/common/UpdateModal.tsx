@@ -1,27 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Download, RefreshCw, X, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Download, RefreshCw, X, CheckCircle2 } from 'lucide-react';
 import type { AppUpdateInfo } from '../../services/updateService';
 import { UpdateService } from '../../services/updateService';
+import { BRANDING } from '../../config/branding';
 
 interface UpdateModalProps {
   onDismiss?: () => void;
+  onOpenStateChange?: (isOpen: boolean) => void;
 }
 
-export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss }) => {
+export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenStateChange }) => {
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [downloadStatus, setDownloadStatus] = useState<string>('');
+  
+  // 0: Actualizar Ahora, 1: Más tarde, 2: Cerrar (X)
+  const [focusedBtn, setFocusedBtn] = useState<0 | 1 | 2>(0);
 
   useEffect(() => {
-    // Comprobar actualizaciones tras 2 segundos del inicio para no bloquear el splash
+    // Comprobar actualizaciones tras 2.5 segundos
     const timer = setTimeout(async () => {
       try {
         const info = await UpdateService.checkForUpdates();
         if (info && info.hasUpdate && info.downloadUrl) {
           setUpdateInfo(info);
           setIsOpen(true);
+          if (onOpenStateChange) onOpenStateChange(true);
         }
       } catch (err) {
         console.log('Update check error:', err);
@@ -29,22 +35,17 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss }) => {
     }, 2500);
 
     return () => clearTimeout(timer);
-  }, []);
-
-  if (!isOpen || !updateInfo) return null;
+  }, [onOpenStateChange]);
 
   const handleStartUpdate = () => {
-    if (!updateInfo.downloadUrl) return;
+    if (!updateInfo?.downloadUrl) return;
 
     setDownloading(true);
     setDownloadStatus('Iniciando descarga del nuevo APK...');
-    setDownloadPercent(15);
+    setDownloadPercent(20);
 
-    // Si estamos en un navegador o TV, abrimos el APK directamente
-    // En Android / Fire TV, al navegar a la URL del APK, el sistema o el gestor de descargas
-    // lo descarga e inmediatamente lanza la pantalla de instalación del paquete.
     setTimeout(() => {
-      setDownloadPercent(50);
+      setDownloadPercent(55);
       setDownloadStatus('Descargando paquete de actualización...');
     }, 800);
 
@@ -63,17 +64,68 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss }) => {
 
   const handleClose = () => {
     setIsOpen(false);
+    if (onOpenStateChange) onOpenStateChange(false);
     if (onDismiss) onDismiss();
   };
 
+  // 🎮 Control D-Pad exclusivo para la ventana de actualización
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Bloquear propagación para que el fondo de la app NO se mueva
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (downloading) return;
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          if (focusedBtn === 1) setFocusedBtn(0);
+          break;
+        case 'ArrowRight':
+          if (focusedBtn === 0) setFocusedBtn(1);
+          break;
+        case 'ArrowUp':
+          if (focusedBtn === 0 || focusedBtn === 1) setFocusedBtn(2);
+          break;
+        case 'ArrowDown':
+          if (focusedBtn === 2) setFocusedBtn(0);
+          break;
+        case 'Enter':
+        case ' ':
+          if (focusedBtn === 0) {
+            handleStartUpdate();
+          } else {
+            handleClose();
+          }
+          break;
+        case 'Escape':
+        case 'Backspace':
+        case 'GoBack':
+          handleClose();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true); // useCapture = true para prioridad absoluta
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, focusedBtn, downloading, updateInfo]);
+
+  if (!isOpen || !updateInfo) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-6 select-none animate-fadeIn font-sans">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-6 select-none animate-fadeIn font-sans">
       <div className="relative w-full max-w-lg rounded-3xl bg-[#0F1422] border-2 border-cyan-500/40 p-8 shadow-2xl shadow-cyan-950/60 flex flex-col space-y-6">
-        {/* Cabecera con Icono Destacado */}
+        {/* Cabecera con Icono Oficial XNova Player */}
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
-              <Sparkles className="w-7 h-7 text-white" />
+            <div className="w-14 h-14 rounded-2xl bg-cyan-950/40 border border-cyan-400/30 flex items-center justify-center overflow-hidden shadow-lg p-2">
+              <img
+                src={BRANDING.assets.icon512}
+                alt={BRANDING.name}
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <div className="flex items-center space-x-2">
@@ -93,8 +145,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss }) => {
           {!downloading && (
             <button
               onClick={handleClose}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition"
-              title="Recordar más tarde"
+              className={`p-2 rounded-xl transition ${
+                focusedBtn === 2
+                  ? 'bg-white text-black scale-110 ring-2 ring-cyan-400'
+                  : 'bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white'
+              }`}
+              title="Cerrar"
             >
               <X className="w-5 h-5" />
             </button>
@@ -108,7 +164,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss }) => {
             <span>Novedades incluidas en esta versión:</span>
           </div>
           <p className="text-xs text-zinc-400 leading-relaxed pl-6">
-            {updateInfo.releaseNotes || 'Mejoras de rendimiento, corrección de errores y nuevas funciones exclusivas para streaming en pantalla gigante.'}
+            Mejoras de rendimiento, exploración completa de categorías y corrección de compatibilidad con televisores.
           </p>
         </div>
 
@@ -131,16 +187,16 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss }) => {
           </div>
         )}
 
-        {/* Botones de Acción optimizados para TV */}
+        {/* Botones de Acción con Foco D-Pad para Control Remoto */}
         <div className="flex items-center space-x-3 pt-2">
           <button
             onClick={handleStartUpdate}
             disabled={downloading}
             className={`
               flex-1 py-4 rounded-2xl font-black text-sm flex items-center justify-center space-x-2.5 transition-all duration-200 shadow-xl
-              ${downloading
-                ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-cyan-400 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-black font-extrabold shadow-cyan-500/30 scale-102 ring-2 ring-white/50'}
+              ${focusedBtn === 0
+                ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-black scale-105 ring-4 ring-cyan-300 shadow-cyan-500/50 font-extrabold'
+                : 'bg-zinc-800 text-zinc-300 border border-white/10'}
             `}
           >
             <Download className="w-5 h-5" />
@@ -150,7 +206,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss }) => {
           {!downloading && (
             <button
               onClick={handleClose}
-              className="px-6 py-4 rounded-2xl font-bold text-xs text-zinc-400 hover:text-white hover:bg-white/5 border border-white/10 transition"
+              className={`
+                px-6 py-4 rounded-2xl font-bold text-xs transition-all duration-200 border
+                ${focusedBtn === 1
+                  ? 'bg-white/20 text-white border-cyan-400 ring-2 ring-cyan-400 scale-105'
+                  : 'bg-transparent text-zinc-400 border-white/10 hover:text-white'}
+              `}
             >
               Más tarde
             </button>

@@ -88,6 +88,7 @@ export function App() {
   const [currentProfile, setCurrentProfile] = useState<'adult' | 'kids'>('adult');
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [isExplorerOpen, setIsExplorerOpen] = useState(false);
+  const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [explorerType, setExplorerType] = useState<'movies' | 'series' | 'live'>('movies');
   const [playingItem, setPlayingItem] = useState<ShowcaseItem | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -172,7 +173,7 @@ export function App() {
 
   // Motor de navegación D-pad para este concepto de interfaz
   useEffect(() => {
-    if (isSplashVisible || isSettingsOpen || isSearchOpen || isProfileOpen || isExitModalOpen || playingItem) {
+    if (isSplashVisible || isSettingsOpen || isSearchOpen || isProfileOpen || isExitModalOpen || isExplorerOpen || isUpdateOpen || playingItem) {
       return;
     }
 
@@ -325,6 +326,8 @@ export function App() {
     isSearchOpen,
     isProfileOpen,
     isExitModalOpen,
+    isExplorerOpen,
+    isUpdateOpen,
     playingItem,
   ]);
 
@@ -572,7 +575,7 @@ export function App() {
       )}
 
       {/* Verificador y Modal de Actualización Automática OTA */}
-      <UpdateModal />
+      <UpdateModal onOpenStateChange={(isOpen) => setIsUpdateOpen(isOpen)} />
     </main>
   );
 }
