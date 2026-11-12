@@ -19,21 +19,32 @@ jobs:
       - name: Clonar Repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
+      - name: Configurar Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '22'
           cache: 'npm'
 
       - name: Configurar JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
           cache: 'gradle'
 
+      - name: Instalar Android SDK 36
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "platform-tools" 2>/dev/null || \
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "platform-tools"
+
       - name: Instalar Dependencias Web
-        run: npm install
+        run: npm ci
 
       - name: Compilar Frontend React (Vite)
         run: npm run build
@@ -47,50 +58,64 @@ jobs:
       - name: Compilar APK con Gradle
         run: |
           cd android
-          ./gradlew assembleRelease --stacktrace
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m"
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          JAVA_HOME: ${{ env.JAVA_HOME }}
 
-      - name: Firmar APK (Keystore)
+      - name: Firmar y Renombrar APK
         id: sign_apk
         run: |
           mkdir -p build-output
           UNSIGNED_APK=$(find android/app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
-          
+
           if [ -z "$UNSIGNED_APK" ]; then
             echo "Error: No se encontró el APK generado."
+            ls -la android/app/build/outputs/ || true
             exit 1
           fi
 
+          echo "APK encontrado: $UNSIGNED_APK"
           SIGNED_APK="build-output/XNova-Player-AndroidTV.apk"
 
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "==> Firmando con Keystore secreto configurado en GitHub Secrets..."
+            echo "==> Firmando con Keystore secreto de GitHub Secrets..."
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > release.keystore
-            
+
             jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
               -keystore release.keystore \
               -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
               -keypass "${{ secrets.KEY_PASSWORD }}" \
               "$UNSIGNED_APK" "${{ secrets.KEY_ALIAS }}"
-            
+
             cp "$UNSIGNED_APK" "$SIGNED_APK"
           else
-            echo "==> AVISO: No se encontraron secretos de Keystore. Generando keystore de firma automática..."
-            keytool -genkey -v -keystore auto-release.keystore -alias xnova -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass xnovapass -keypass xnovapass \
-              -dname "CN=XNova Player, OU=TV, O=XNova, L=Madrid, S=Madrid, C=ES"
-            
+            echo "==> Generando keystore automático (sin secretos configurados)..."
+            keytool -genkey -v \
+              -keystore auto-release.keystore \
+              -alias xnova \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass xnovapass \
+              -keypass xnovapass \
+              -dname "CN=XNova Player, OU=TV, O=XNova, L=Miami, S=FL, C=US"
+
             jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
               -keystore auto-release.keystore \
               -storepass xnovapass \
               -keypass xnovapass \
               "$UNSIGNED_APK" xnova
-            
+
             cp "$UNSIGNED_APK" "$SIGNED_APK"
           fi
 
           echo "apk_path=$SIGNED_APK" >> $GITHUB_OUTPUT
 
-      - name: Guardar APK como Artefacto
+      - name: Guardar APK como Artefacto de CI
         uses: actions/upload-artifact@v4
         with:
           name: XNova-Player-AndroidTV
@@ -99,13 +124,26 @@ jobs:
 
       - name: Publicar GitHub Release con Descarga Directa
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
           tag_name: v${{ github.run_number }}.0.0
-          name: XNova Player v${{ github.run_number }}.0.0 (Android TV / Fire TV)
+          name: "XNova Player v${{ github.run_number }}.0.0 \U0001F4FA Android TV / Fire TV"
+          body: |
+            ## 📺 XNova Player — Descarga Directa
+
+            **Instalar con Downloader:**
+            - Abre **Downloader** en tu Fire TV / Android TV
+            - Ingresa el código o la URL directa del APK
+
+            **URL directa del APK:**
+            ```
+            https://github.com/dainierds/XNova-Player/releases/latest/download/XNova-Player-AndroidTV.apk
+            ```
+
+            ---
+            *Build automático desde commit `${{ github.sha }}`*
           draft: false
           prerelease: false
-          generate_release_notes: true
           files: |
             build-output/XNova-Player-AndroidTV.apk
         env:
