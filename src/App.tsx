@@ -12,6 +12,7 @@ import { SeriviaLayout } from './components/serivia/SeriviaLayout';
 import { TvLoginScreen } from './components/auth/TvLoginScreen';
 import { AdminPanelModal } from './components/admin/AdminPanelModal';
 import { UpdateModal } from './components/common/UpdateModal';
+import { FullCatalogExplorer } from './components/explorer/FullCatalogExplorer';
 import { SHOWCASE_MOVIES, SHOWCASE_SERIES } from './mock/showcaseData';
 import type { SidebarTabId, ShowcaseItem } from './types/showcase';
 import type { MovieItem } from './types';
@@ -86,6 +87,8 @@ export function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentProfile, setCurrentProfile] = useState<'adult' | 'kids'>('adult');
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+  const [isExplorerOpen, setIsExplorerOpen] = useState(false);
+  const [explorerType, setExplorerType] = useState<'movies' | 'series' | 'live'>('movies');
   const [playingItem, setPlayingItem] = useState<ShowcaseItem | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [activeTheme, setActiveTheme] = useState<'cinematic' | 'serivia'>('cinematic');
@@ -152,8 +155,18 @@ export function App() {
     setFocusedTab(tab);
     if (tab === 'settings') {
       setIsSettingsOpen(true);
+    } else if (tab === 'movies') {
+      setExplorerType('movies');
+      setIsExplorerOpen(true);
+    } else if (tab === 'series') {
+      setExplorerType('series');
+      setIsExplorerOpen(true);
     } else if (tab === 'live') {
-      console.log('Sección TV en vivo seleccionada');
+      setExplorerType('live');
+      setIsExplorerOpen(true);
+    } else if (tab === 'library') {
+      setExplorerType('movies');
+      setIsExplorerOpen(true);
     }
   };
 
@@ -525,6 +538,38 @@ export function App() {
           }
         }}
       />
+
+      {/* Explorador de Todo el Catálogo Xtream (Categorías y Carpetas Reales) */}
+      {isExplorerOpen && activePlaylist && (
+        <FullCatalogExplorer
+          playlist={activePlaylist}
+          initialType={explorerType}
+          onClose={() => {
+            setIsExplorerOpen(false);
+            setActiveTab('home');
+            setFocusedZone('thumbnails');
+          }}
+          onPlayStream={(stream) => {
+            setIsExplorerOpen(false);
+            setPlayingItem({
+              id: stream.id,
+              title: stream.title,
+              subtitle: stream.title,
+              backdropUrl: stream.posterUrl || '',
+              thumbnailUrl: stream.posterUrl || '',
+              releaseDateText: stream.isLive ? 'En Directo' : 'Película',
+              statusBadge: 'NUEVO',
+              genresText: stream.isLive ? 'TV en Vivo' : 'Streaming',
+              year: '2026',
+              rating: 'TP',
+              duration: stream.isLive ? 'DIRECTO' : 'HD',
+              synopsis: 'Disfruta de tu contenido.',
+              type: 'movie',
+              streamUrl: stream.streamUrl,
+            });
+          }}
+        />
+      )}
 
       {/* Verificador y Modal de Actualización Automática OTA */}
       <UpdateModal />
