@@ -93,14 +93,17 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel }
 
       {/* Contenedor Principal */}
       <div className="relative z-10 w-full max-w-4xl flex flex-col items-center">
-        {/* Logotipo Oficial */}
-        <div className="mb-6 flex flex-col items-center">
-          <img
-            src={BRANDING.assets.logo}
-            alt={BRANDING.name}
-            className="h-16 w-auto object-contain drop-shadow-2xl"
-          />
-          <span className="mt-2 text-xs tracking-widest uppercase text-cyan-400 font-bold flex items-center space-x-1.5">
+        {/* Icono Oficial de la App */}
+        <div className="mb-5 flex flex-col items-center">
+          <div className="relative mb-2">
+            <div className="absolute inset-0 bg-cyan-400/20 blur-xl rounded-2xl" />
+            <img
+              src={BRANDING.assets.icon512}
+              alt={BRANDING.name}
+              className="relative w-20 h-20 object-contain drop-shadow-2xl rounded-2xl"
+            />
+          </div>
+          <span className="text-xs tracking-widest uppercase text-cyan-400 font-bold flex items-center space-x-1.5">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Centro de Streaming Premium</span>
           </span>
