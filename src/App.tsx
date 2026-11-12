@@ -59,7 +59,7 @@ export function App() {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [playingItem, setPlayingItem] = useState<ShowcaseItem | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [activeTheme, setActiveTheme] = useState<'cinematic' | 'serivia'>('serivia');
+  const [activeTheme, setActiveTheme] = useState<'cinematic' | 'serivia'>('cinematic');
 
   // Temporizador de rotación automática estilo carrusel (6 segundos)
   const autoPlayTimerRef = useRef<number | null>(null);

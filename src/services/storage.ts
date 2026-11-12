@@ -120,7 +120,7 @@ export const StorageService = {
   // --- Estilo / Tema de la Interfaz ---
   async getActiveTheme(): Promise<'cinematic' | 'serivia'> {
     const theme = await get<'cinematic' | 'serivia'>(KEYS.ACTIVE_THEME);
-    return theme || 'serivia'; // 'serivia' o 'cinematic'
+    return theme || 'cinematic'; // Por defecto: 'cinematic' (John Wick)
   },
 
   async setActiveTheme(theme: 'cinematic' | 'serivia'): Promise<void> {
