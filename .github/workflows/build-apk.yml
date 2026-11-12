@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
   workflow_dispatch:
 
 permissions:
@@ -98,7 +99,7 @@ jobs:
 
       - name: Publicar GitHub Release con Descarga Directa
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/heads/main')
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
         with:
           tag_name: v${{ github.run_number }}.0.0
           name: XNova Player v${{ github.run_number }}.0.0 (Android TV / Fire TV)
