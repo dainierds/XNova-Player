@@ -32,15 +32,11 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      - name: Instalar Android SDK 36
+      - name: Instalar Android SDK 34
         run: |
           echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "platform-tools" 2>/dev/null || \
-          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
             "platform-tools"
 
       - name: Instalar Dependencias Web
@@ -81,17 +77,20 @@ jobs:
           echo "APK encontrado: $UNSIGNED_APK"
           SIGNED_APK="build-output/XNova-Player-AndroidTV.apk"
 
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+          ZIPALIGN="$BUILD_TOOLS_DIR/zipalign"
+
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
             echo "==> Firmando con Keystore secreto de GitHub Secrets..."
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > release.keystore
 
-            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-              -keystore release.keystore \
-              -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-              -keypass "${{ secrets.KEY_PASSWORD }}" \
-              "$UNSIGNED_APK" "${{ secrets.KEY_ALIAS }}"
-
-            cp "$UNSIGNED_APK" "$SIGNED_APK"
+            $ZIPALIGN -v -p 4 "$UNSIGNED_APK" aligned.apk
+            $APKSIGNER sign --ks release.keystore \
+              --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
+              --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+              --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+              --out "$SIGNED_APK" aligned.apk
           else
             echo "==> Generando keystore automático (sin secretos configurados)..."
             keytool -genkey -v \
@@ -104,13 +103,12 @@ jobs:
               -keypass xnovapass \
               -dname "CN=XNova Player, OU=TV, O=XNova, L=Miami, S=FL, C=US"
 
-            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-              -keystore auto-release.keystore \
-              -storepass xnovapass \
-              -keypass xnovapass \
-              "$UNSIGNED_APK" xnova
-
-            cp "$UNSIGNED_APK" "$SIGNED_APK"
+            $ZIPALIGN -v -p 4 "$UNSIGNED_APK" aligned.apk
+            $APKSIGNER sign --ks auto-release.keystore \
+              --ks-pass "pass:xnovapass" \
+              --key-pass "pass:xnovapass" \
+              --ks-key-alias xnova \
+              --out "$SIGNED_APK" aligned.apk
           fi
 
           echo "apk_path=$SIGNED_APK" >> $GITHUB_OUTPUT
