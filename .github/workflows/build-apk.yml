@@ -124,14 +124,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
-          tag_name: v${{ github.run_number }}.0.0
-          name: "XNova Player v${{ github.run_number }}.0.0 \U0001F4FA Android TV / Fire TV"
+          tag_name: v1.0.${{ github.run_number }}
+          name: "XNova Player v1.0.${{ github.run_number }} 📺 Android TV / Fire TV"
           body: |
             ## 📺 XNova Player — Descarga Directa
 
             **Instalar con Downloader:**
             - Abre **Downloader** en tu Fire TV / Android TV
-            - Ingresa el código o la URL directa del APK
+            - Ingresa la URL directa del APK
 
             **URL directa del APK:**
             ```
@@ -139,7 +139,7 @@ jobs:
             ```
 
             ---
-            *Build automático desde commit `${{ github.sha }}`*
+            *Build automático v1.0.${{ github.run_number }} desde commit `${{ github.sha }}`*
           draft: false
           prerelease: false
           files: |
