@@ -71,16 +71,16 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#0A0D14] text-white flex select-none font-sans">
+    <div className="relative w-screen h-screen overflow-hidden bg-[#0A0E1A] text-white flex select-none font-sans">
       {/* 1. BARRA LATERAL IZQUIERDA (Sin sección de continuar viendo, solo logo XNova y navegación) */}
-      <aside className="w-56 h-full bg-[#0E121B] border-r border-white/5 flex flex-col justify-between py-6 px-4 z-20 shrink-0">
+      <aside className="w-56 h-full bg-[#0A0E1A] border-r border-white/5 flex flex-col justify-between py-6 px-4 z-20 shrink-0">
         <div>
-          {/* Logotipo Oficial XNova Player (Sin otros logos) */}
+          {/* Logotipo Oficial XNova Player (Fondo perfectamente emparejado con la barra lateral) */}
           <div className="flex items-center px-2 mb-8">
             <img
               src={BRANDING.assets.logo}
               alt={BRANDING.name}
-              className="h-10 w-auto object-contain drop-shadow-md"
+              className="h-10 w-auto object-contain"
             />
           </div>
 
