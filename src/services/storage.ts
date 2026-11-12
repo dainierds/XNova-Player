@@ -9,6 +9,7 @@ const KEYS = {
   WATCH_PROGRESS: 'xnova_watch_progress',
   PARENTAL_PIN: 'xnova_parental_pin',
   ACTIVE_PROFILE: 'xnova_active_profile',
+  SHOW_SPLASH: 'xnova_show_splash',
 };
 
 export interface WatchProgressItem {
@@ -103,5 +104,15 @@ export const StorageService = {
 
   async setActiveProfile(profile: 'adult' | 'kids'): Promise<void> {
     await set(KEYS.ACTIVE_PROFILE, profile);
+  },
+
+  // --- Preferencia de Animación de Inicio ---
+  async getShowSplashAnimation(): Promise<boolean> {
+    const val = await get<boolean>(KEYS.SHOW_SPLASH);
+    return val !== undefined ? val : true; // Activado por defecto
+  },
+
+  async setShowSplashAnimation(show: boolean): Promise<void> {
+    await set(KEYS.SHOW_SPLASH, show);
   },
 };

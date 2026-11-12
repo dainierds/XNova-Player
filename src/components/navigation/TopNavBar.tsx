@@ -1,7 +1,6 @@
 import React from 'react';
 import type { NavTabId } from '../../types';
 import { 
-  Sparkles, 
   Home, 
   Film, 
   Tv, 
@@ -11,6 +10,7 @@ import {
   Settings 
 } from 'lucide-react';
 import { useClock } from '../../hooks/useClock';
+import { BRANDING } from '../../config/branding';
 
 interface TopNavBarProps {
   activeTab: NavTabId;
@@ -44,21 +44,18 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   const clockText = useClock();
 
   return (
-    <header className="relative z-30 w-full px-12 pt-7 pb-4 flex items-center justify-between select-none">
-      {/* 1. Logotipo Exclusivo XNOVA */}
-      <div className="flex items-center space-x-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 via-cyan-500 to-sky-400 p-[1.5px] shadow-lg shadow-cyan-500/20">
-          <div className="w-full h-full bg-[#06080D] rounded-[10px] flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-cyan-400 fill-cyan-400/20" />
-          </div>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-xl font-black tracking-widest bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">
-            XNOVA
-          </span>
-          <span className="text-[9px] uppercase tracking-[0.25em] text-cyan-400 font-extrabold -mt-1">
-            PLAYER
-          </span>
+    <header className="relative z-30 w-full px-12 pt-6 pb-3 flex items-center justify-between select-none">
+      {/* 1. Logotipo Oficial XNOVA Player (Altura exacta 48px, proporción original) */}
+      <div className="flex flex-col items-start">
+        <img
+          src={BRANDING.assets.logo}
+          alt={BRANDING.name}
+          className="h-12 w-auto object-contain drop-shadow-lg"
+          loading="eager"
+        />
+        <div className="mt-1 flex items-center space-x-1.5 text-[10px] text-zinc-400 font-semibold tracking-wider uppercase">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400" />
+          <span>VENCE: <strong className="text-white">{expDate}</strong></span>
         </div>
       </div>
 
@@ -89,14 +86,8 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
         })}
       </nav>
 
-      {/* 3. Información del Sistema: Vencimiento, Reloj y Perfil */}
+      {/* 3. Información del Sistema: Reloj y Perfil */}
       <div className="flex items-center space-x-4">
-        {/* Badge de Suscripción */}
-        <div className="hidden lg:flex items-center space-x-2 px-3 py-1 rounded-full bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-300 font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400" />
-          <span>VENCE: <strong className="text-white">{expDate}</strong></span>
-        </div>
-
         {/* Reloj en Español */}
         <div className="text-right text-[11px] font-bold text-zinc-300 tracking-wide">
           {clockText}
@@ -105,9 +96,9 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
         {/* Perfil de Usuario */}
         <button
           onClick={onOpenProfile}
-          className="flex items-center space-x-2 px-3 py-1 rounded-full bg-gradient-to-r from-violet-950/70 to-indigo-950/70 border border-violet-500/40 text-violet-200 text-xs font-bold hover:border-violet-400 transition"
+          className="flex items-center space-x-2 px-3.5 py-1 rounded-full bg-gradient-to-r from-violet-950/70 to-indigo-950/70 border border-violet-500/40 text-violet-200 text-xs font-bold hover:border-violet-400 transition shadow-md"
         >
-          <span className="w-2 h-2 rounded-full bg-violet-400" />
+          <span className="w-2 h-2 rounded-full bg-violet-400 shadow-sm shadow-violet-400" />
           <span>{profileName}</span>
         </button>
       </div>

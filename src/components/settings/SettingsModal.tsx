@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePlaylistStore } from '../../store/usePlaylistStore';
+import { StorageService } from '../../services/storage';
+import { BRANDING } from '../../config/branding';
 import { 
   Plus, 
   Trash2, 
@@ -41,6 +43,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     password: '',
     m3uUrl: '',
   });
+
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    StorageService.getShowSplashAnimation().then((val) => setShowSplash(val));
+  }, []);
+
+  const handleToggleSplash = async () => {
+    const nextVal = !showSplash;
+    setShowSplash(nextVal);
+    await StorageService.setShowSplashAnimation(nextVal);
+  };
 
   if (!isOpen) return null;
 
@@ -229,6 +243,53 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   </button>
                 </div>
               )}
+
+              {/* Opciones de Inicio de la Aplicación */}
+              <div className="pt-6 border-t border-zinc-800/80">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3">
+                  Opciones del Reproductor
+                </h3>
+                <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-sm font-bold text-white">Mostrar animación de inicio</span>
+                    <p className="text-xs text-zinc-400">
+                      Reproduce el video y sonido de presentación oficial al abrir la aplicación
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleToggleSplash}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      showSplash ? 'bg-cyan-500' : 'bg-zinc-700'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        showSplash ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Sección Acerca de XNova Player */}
+              <div className="pt-6 border-t border-zinc-800/80">
+                <div className="p-5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <img
+                      src={BRANDING.assets.logo}
+                      alt={BRANDING.name}
+                      className="h-12 w-auto object-contain"
+                    />
+                    <div>
+                      <h4 className="text-sm font-bold text-white">{BRANDING.name}</h4>
+                      <p className="text-xs text-zinc-400">{BRANDING.tagline}</p>
+                      <span className="inline-block mt-1 text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-cyan-400 border border-cyan-500/20">
+                        Versión {BRANDING.version} • Android TV & Fire TV
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             /* Formulario para Añadir o Editar Lista */

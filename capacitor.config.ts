@@ -10,7 +10,17 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: true, // Permite streams de video HTTP dentro de la app
-    backgroundColor: '#080A0E',
+    backgroundColor: '#0A0E1A',
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 1500,
+      launchAutoHide: true,
+      backgroundColor: '#0A0E1A',
+      androidSplashResourceName: 'splash',
+      androidScaleType: 'CENTER_CROP',
+      showSpinner: false,
+    },
   },
 };
 

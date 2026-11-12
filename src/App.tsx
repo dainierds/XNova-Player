@@ -10,6 +10,7 @@ import { VideoPlayer } from './components/player/VideoPlayer';
 import { SearchModal } from './components/search/SearchModal';
 import { ProfileSelectorModal } from './components/profiles/ProfileSelectorModal';
 import { ExitModal } from './components/common/ExitModal';
+import { SplashScreen } from './components/splash/SplashScreen';
 import { 
   HERO_FEATURED, 
   CONTINUE_WATCHING, 
@@ -47,12 +48,18 @@ export function App() {
   const [currentProfile, setCurrentProfile] = useState<'adult' | 'kids'>('adult');
   const [playingItem, setPlayingItem] = useState<ContentItem | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [isSplashVisible, setIsSplashVisible] = useState(true);
 
-  // Inicialización de listas y favoritos
+  // Inicialización de listas, favoritos y preferencia de splash
   useEffect(() => {
     loadStoredPlaylists();
     StorageService.getActiveProfile().then((p) => setCurrentProfile(p));
     StorageService.getFavorites().then((favs) => setFavorites(favs));
+    StorageService.getShowSplashAnimation().then((shouldShow) => {
+      if (!shouldShow) {
+        setIsSplashVisible(false);
+      }
+    });
   }, [loadStoredPlaylists]);
 
   // Contenido dinámico o de muestra
@@ -165,10 +172,14 @@ export function App() {
     }
   );
 
-  const isModalActive = isSettingsOpen || isSearchOpen || isProfileOpen || isExitModalOpen || !!playingItem;
+  const isModalActive = isSplashVisible || isSettingsOpen || isSearchOpen || isProfileOpen || isExitModalOpen || !!playingItem;
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden bg-[#06080D] text-white flex flex-col justify-between select-none">
+    <main className="relative w-screen h-screen overflow-hidden bg-[#0A0E1A] text-white flex flex-col justify-between select-none">
+      {/* Pantalla de inicio con animación oficial (Splash) */}
+      {isSplashVisible && (
+        <SplashScreen onFinish={() => setIsSplashVisible(false)} />
+      )}
       {/* 1. BARRA DE NAVEGACIÓN SUPERIOR FLOTANTE (Glassmorphism & Monograma XNova) */}
       <TopNavBar
         activeTab={activeTab}

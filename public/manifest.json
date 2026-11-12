@@ -1,0 +1,23 @@
+{
+  "short_name": "XNova Player",
+  "name": "XNova Player - IPTV Streaming",
+  "icons": [
+    {
+      "src": "/branding/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/branding/icon-1024.png",
+      "type": "image/png",
+      "sizes": "1024x1024",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0A0E1A",
+  "theme_color": "#0A0E1A",
+  "display": "fullscreen",
+  "orientation": "landscape"
+}
