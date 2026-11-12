@@ -10,10 +10,10 @@ export interface AppUpdateInfo {
   publishedAt?: string;
 }
 
-// Configuración del repositorio en GitHub (se actualiza con el usuario y repo del cliente)
+// Configuración oficial del repositorio en GitHub
 export const GITHUB_REPO_CONFIG = {
-  owner: 'xnova-tv', // Reemplazar con tu usuario u organización de GitHub
-  repo: 'xnova-player', // Reemplazar con el nombre de tu repositorio
+  owner: 'dainierds',
+  repo: 'XNova-Player',
 };
 
 export const UpdateService = {
