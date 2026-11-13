@@ -16,18 +16,11 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  const DEFAULT_KV_URL = "https://striking-monitor-200404.upstash.io";
+  const DEFAULT_KV_TOKEN = "gQAAAAAAAw7UAAIgcDJlODRmNjMxZWNmYzk0N2MzYWJhOWY2ZmEwN2Q4ODcyOA";
 
-  if (!kvUrl || !kvToken) {
-    res.status(200).json({
-      success: false,
-      error: 'Base de datos KV no conectada en Vercel. Ve a Storage -> Create Database -> KV en tu panel de Vercel.',
-      needsDbSetup: true,
-      users: [],
-    });
-    return;
-  }
+  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || DEFAULT_KV_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || DEFAULT_KV_TOKEN;
 
   // Función auxiliar para leer usuarios de la nube
   const getCloudUsers = async (): Promise<any[]> => {
