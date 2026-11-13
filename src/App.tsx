@@ -298,7 +298,10 @@ export function App() {
 
       {/* 2. Pantalla de Bienvenida y Login para TV (Si no hay sesión activa y terminó el splash) */}
       {!isSplashVisible && !isAuthenticated && (
-        <TvLoginScreen onOpenAdminPanel={() => setIsAdminPanelOpen(true)} />
+        <TvLoginScreen 
+          onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+          disabled={isUpdateOpen || isAdminPanelOpen}
+        />
       )}
 
       {/* RENDERIZADO DEL TEMA ACTIVO: Serivia Modern Deck o Cinematic Showcase (Solo si está autenticado) */}

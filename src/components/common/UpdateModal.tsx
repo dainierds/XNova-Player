@@ -27,6 +27,10 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
         if (info && info.hasUpdate && info.downloadUrl) {
           setUpdateInfo(info);
           setIsOpen(true);
+          // Desenfoque inmediato para ocultar cualquier teclado virtual en TV
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
           if (onOpenStateChange) onOpenStateChange(true);
         }
       } catch (err) {
@@ -37,8 +41,22 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
     return () => clearTimeout(timer);
   }, [onOpenStateChange]);
 
+  // Al abrir el modal, desenfocar todo elemento activo para evitar teclado en Android TV
+  useEffect(() => {
+    if (isOpen) {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    }
+  }, [isOpen]);
+
   const handleStartUpdate = () => {
     if (!updateInfo?.downloadUrl) return;
+
+    // Asegurar que ningún input tenga foco para evitar que aparezca el teclado en Android TV
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
 
     setDownloading(true);
     setDownloadStatus('Iniciando descarga del nuevo APK...');
@@ -52,7 +70,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
     setTimeout(() => {
       setDownloadPercent(90);
       setDownloadStatus('Abriendo instalador de Android...');
-      window.location.href = updateInfo.downloadUrl!;
+      try {
+        // En Android/Capacitor, abrir con el sistema para no romper el WebView
+        window.open(updateInfo.downloadUrl!, '_system');
+      } catch {
+        window.location.href = updateInfo.downloadUrl!;
+      }
     }, 1800);
 
     setTimeout(() => {
@@ -63,19 +86,29 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
   };
 
   const handleClose = () => {
+    // Asegurar desenfoque
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     setIsOpen(false);
     if (onOpenStateChange) onOpenStateChange(false);
     if (onDismiss) onDismiss();
   };
 
-  // 🎮 Control D-Pad exclusivo para la ventana de actualización
+  // 🎮 Control D-Pad exclusivo para la ventana de actualización con máxima prioridad
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Bloquear propagación para que el fondo de la app NO se mueva
-      e.stopPropagation();
+      // Bloquear propagación absoluta para que NINGÚN otro componente (ni el login) reciba la tecla
       e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      // Asegurar que no haya inputs con foco
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
 
       if (downloading) return;
 
@@ -108,7 +141,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown, true); // useCapture = true para prioridad absoluta
+    window.addEventListener('keydown', handleKeyDown, true); // useCapture = true para interceptar antes que nadie
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, focusedBtn, downloading, updateInfo]);
 
@@ -144,6 +177,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
 
           {!downloading && (
             <button
+              type="button"
               onClick={handleClose}
               className={`p-2 rounded-xl transition ${
                 focusedBtn === 2
@@ -190,6 +224,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
         {/* Botones de Acción con Foco D-Pad para Control Remoto */}
         <div className="flex items-center space-x-3 pt-2">
           <button
+            type="button"
             onClick={handleStartUpdate}
             disabled={downloading}
             className={`
@@ -205,6 +240,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
 
           {!downloading && (
             <button
+              type="button"
               onClick={handleClose}
               className={`
                 px-6 py-4 rounded-2xl font-bold text-xs transition-all duration-200 border

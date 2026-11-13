@@ -13,6 +13,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 
 interface TvLoginScreenProps {
   onOpenAdminPanel: () => void;
+  disabled?: boolean;
 }
 
 type FocusedElement = 
@@ -21,7 +22,7 @@ type FocusedElement =
   | 'toggle_eye'
   | 'submit';
 
-export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel }) => {
+export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, disabled = false }) => {
   const { login } = useAuthStore();
   
   const [username, setUsername] = useState('');
@@ -58,7 +59,17 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel }
 
   // 🎮 Motor de Navegación D-Pad Oficial para TV
   useEffect(() => {
+    if (disabled) {
+      userInputRef.current?.blur();
+      passInputRef.current?.blur();
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      return;
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (disabled) return;
       // Si pulsa Enter/OK:
       if (e.key === 'Enter') {
         if (focusedElement === 'username') {
@@ -118,7 +129,7 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusedElement, username, password]);
+  }, [focusedElement, username, password, disabled]);
 
   return (
     <div className="fixed inset-0 z-50 bg-[#0A0E1A] text-white flex flex-col items-center justify-between p-6 select-none font-sans overflow-hidden">
