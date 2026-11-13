@@ -45,10 +45,10 @@ export class TmdbService {
     fallbackPoster: string = '',
     fallbackStreamUrl: string = ''
   ): Promise<MovieItem> {
-    // Limpiar título de posibles tags de resolución (1080p, 4K, Latino, etc.)
+    // Limpiar título de posibles tags de resolución (1080p, 4K, Latino, «PLEX», «P2P», etc.)
     const cleanTitle = rawTitle
-      .replace(/\[.*?\]|\(.*?\)/g, '')
-      .replace(/\b(4K|1080p|720p|HD|FHD|LATINO|CASTELLANO|SUB|ESP)\b/gi, '')
+      .replace(/\[.*?\]|\(.*?\)|«.*?»|<.*?>/g, '')
+      .replace(/\b(4K|1080p|720p|HD|FHD|LATINO|CASTELLANO|SUB|ESP|P2P|PLEX)\b/gi, '')
       .trim();
 
     const cacheKey = cleanTitle.toLowerCase();
@@ -63,8 +63,8 @@ export class TmdbService {
       const basicItem: MovieItem = {
         id: `local_${cleanTitle}`,
         title: cleanTitle,
-        backdropUrl: fallbackPoster || 'https://images.unsplash.com/photo-1635863138275-d9b33299680b?q=80&w=1920&auto=format&fit=crop',
-        posterUrl: fallbackPoster || 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=600&auto=format&fit=crop',
+        backdropUrl: fallbackPoster || '',
+        posterUrl: fallbackPoster || '',
         genres: ['Acción', 'Estreno'],
         synopsis: 'Disfruta de este contenido en alta definición desde tu servidor IPTV.',
         duration: '1h 50Min',

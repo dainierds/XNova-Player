@@ -24,6 +24,18 @@ public class MainActivity extends BridgeActivity {
                 // Permitir reproducción automática de video con audio sin requerir gesto previo del usuario
                 settings.setMediaPlaybackRequiresUserGesture(false);
 
+                // Permitir cargar imágenes y recursos HTTP en orígenes HTTPS sin ser bloqueados por Mixed Content
+                settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+
+                // User-Agent idéntico a TiviMate para que los servidores IPTV y CDNs no rechacen la descarga de pósters ni flujos
+                settings.setUserAgentString("TiviMate/4.7.0 (Linux; Android 11; Media3; WebView)");
+
+                // Habilitar almacenamiento y caché local para acelerar la carga de imágenes
+                settings.setDomStorageEnabled(true);
+                settings.setDatabaseEnabled(true);
+                settings.setAllowFileAccess(true);
+                settings.setAllowContentAccess(true);
+
                 // Eliminar icono nativo feo de play sobre fondo blanco que Android pone por defecto en los <video>
                 webView.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
                     @Override

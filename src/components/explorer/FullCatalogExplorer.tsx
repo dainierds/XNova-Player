@@ -3,17 +3,143 @@ import {
   ArrowLeft, 
   Folder, 
   Play, 
-  RefreshCw,
-  ExternalLink,
-  Bookmark,
-  Video,
-  X,
-  Radio
+  RefreshCw, 
+  ExternalLink, 
+  Bookmark, 
+  Video, 
+  X, 
+  Radio,
+  Film
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
 import { TmdbService } from '../../services/tmdb';
 import { openExternalPlayer } from '../../utils/externalPlayer';
+
+/**
+ * Normaliza URLs de imágenes de servidores IPTV / Xtream Codes y TMDb
+ */
+const normalizeMediaUrl = (url?: string, serverBase?: string): string => {
+  if (!url) return '';
+  const trimmed = String(url).trim();
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return '';
+  
+  if (trimmed.startsWith('//')) {
+    return `https:${trimmed}`;
+  }
+  
+  if (trimmed.startsWith('/')) {
+    if (trimmed.match(/\.(jpg|jpeg|png|webp)/i)) {
+      return `https://image.tmdb.org/t/p/w500${trimmed}`;
+    }
+    if (serverBase) {
+      return `${serverBase.replace(/\/+$/, '')}${trimmed}`;
+    }
+  }
+  
+  return trimmed;
+};
+
+/**
+ * Tarjeta individual de poster con soporte anti-bloqueo y fallback elegante
+ */
+interface CatalogPosterCardProps {
+  item: XtreamStream | XtreamSeries;
+  isFocused: boolean;
+  contentType: 'movies' | 'series' | 'live';
+  server: string;
+  onSelect: () => void;
+  innerRef: (el: HTMLDivElement | null) => void;
+}
+
+const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
+  item,
+  isFocused,
+  contentType,
+  server,
+  onSelect,
+  innerRef,
+}) => {
+  const isSeries = contentType === 'series';
+  const rawCover = isSeries
+    ? ((item as any).cover || (item as any).stream_icon || (item as any).poster)
+    : ((item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
+  const initialCover = normalizeMediaUrl(rawCover, server);
+
+  const [imgSrc, setImgSrc] = useState<string>(initialCover);
+  const [hasFailed, setHasFailed] = useState<boolean>(!initialCover);
+  const title = item.name || (item as any).title || 'Sin Título';
+  const rating = item.rating || '7.0';
+
+  useEffect(() => {
+    const updated = normalizeMediaUrl(rawCover, server);
+    setImgSrc(updated);
+    setHasFailed(!updated);
+  }, [rawCover, server]);
+
+  return (
+    <div
+      ref={innerRef}
+      onClick={onSelect}
+      className={`group relative flex flex-col cursor-pointer transition-all duration-200 ${
+        isFocused
+          ? 'scale-105 ring-4 ring-cyan-400 shadow-2xl shadow-cyan-500/60 z-20 -translate-y-1'
+          : 'hover:scale-105'
+      }`}
+    >
+      <div className="aspect-[2/3] w-full rounded-2xl overflow-hidden bg-gradient-to-b from-zinc-800 to-zinc-950 border border-white/10 group-hover:border-cyan-400 relative shadow-lg flex items-center justify-center">
+        {!hasFailed && imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={title}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
+            onError={() => {
+              const cleanTitle = title
+                .replace(/\[.*?\]|\(.*?\)|«.*?»|<.*?>/g, '')
+                .replace(/\b(4K|1080p|720p|HD|FHD|LATINO|CASTELLANO|SUB|ESP|P2P|PLEX)\b/gi, '')
+                .trim();
+              if (cleanTitle && cleanTitle.length > 2) {
+                TmdbService.enrichMovie(cleanTitle)
+                  .then((tmdb) => {
+                    if (tmdb && tmdb.posterUrl && !tmdb.posterUrl.includes('unsplash')) {
+                      setImgSrc(tmdb.posterUrl);
+                    } else {
+                      setHasFailed(true);
+                    }
+                  })
+                  .catch(() => setHasFailed(true));
+              } else {
+                setHasFailed(true);
+              }
+            }}
+            className="w-full h-full object-cover transition-opacity duration-300"
+          />
+        ) : (
+          <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0A0F1D]">
+            <Film className="w-10 h-10 text-cyan-400/60 mb-3" />
+            <span className="text-xs font-bold text-zinc-300 line-clamp-3 leading-tight">{title}</span>
+            <span className="text-[10px] text-cyan-400 font-semibold mt-2 uppercase tracking-wider">{contentType === 'series' ? 'Serie' : 'Película'}</span>
+          </div>
+        )}
+
+        {/* Calificación en la esquina inferior izquierda (estilo TiviMate) */}
+        {rating && rating !== '0' && rating !== '0.0' && (
+          <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-cyan-600/90 backdrop-blur-md text-[11px] font-black text-white shadow-md border border-cyan-400/40">
+            {rating}
+          </div>
+        )}
+      </div>
+
+      <h3 className={`text-xs font-bold mt-2 truncate transition ${
+        isFocused ? 'text-cyan-300 font-extrabold' : 'text-zinc-200'
+      }`}>
+        {title}
+      </h3>
+    </div>
+  );
+};
 
 interface FullCatalogExplorerProps {
   playlist: PlaylistAccount;
@@ -218,6 +344,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     }
 
     // Inicial con datos básicos
+    const rawInitialCover = (item as any).cover || (item as any).stream_icon || (item as any).movie_image;
+    const initialCover = normalizeMediaUrl(rawInitialCover, server);
+
     const initialMeta: MediaMetadata = {
       title: itemTitle,
       rating: item.rating || '7.0',
@@ -227,8 +356,8 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       cast: 'Cargando información...',
       director: 'Cargando información...',
       plot: (item as any).plot || 'Cargando sinopsis oficial...',
-      backdropUrl: (item as any).cover || (item as any).stream_icon,
-      posterUrl: (item as any).cover || (item as any).stream_icon,
+      backdropUrl: initialCover,
+      posterUrl: initialCover,
       containerExtension: (item as any).container_extension || 'mp4',
     };
     setFocusedMetadata(initialMeta);
@@ -240,9 +369,10 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         const info = vodDetails?.info || {};
         const movieData = vodDetails?.movie_data || {};
 
-        let backdrop = (info.backdrop_path && info.backdrop_path.length > 0)
+        let rawBackdrop = (info.backdrop_path && info.backdrop_path.length > 0)
           ? info.backdrop_path[0]
-          : (info.movie_image || (item as XtreamStream).stream_icon);
+          : (info.movie_image || info.cover_big || (item as any).cover || (item as XtreamStream).stream_icon);
+        let backdrop = normalizeMediaUrl(rawBackdrop, server);
 
         let plot = info.plot || info.description;
         let cast = info.actors || info.cast;
@@ -254,12 +384,15 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             const tmdb = await TmdbService.enrichMovie(itemTitle, (item as XtreamStream).stream_icon);
             if (tmdb) {
               plot = plot || tmdb.synopsis;
-              backdrop = backdrop || tmdb.backdropUrl;
+              backdrop = backdrop || normalizeMediaUrl(tmdb.backdropUrl, server);
             }
           } catch {
             // Continuar con los datos disponibles de Xtream
           }
         }
+
+        const rawPoster = info.cover_big || info.movie_image || (item as any).cover || (item as XtreamStream).stream_icon;
+        const poster = normalizeMediaUrl(rawPoster, server);
 
         const completeMeta: MediaMetadata = {
           title: info.name || itemTitle,
@@ -271,7 +404,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           director: director || 'Director no disponible',
           plot: plot || 'Sin sinopsis disponible para este título.',
           backdropUrl: backdrop,
-          posterUrl: info.cover_big || info.movie_image || (item as XtreamStream).stream_icon,
+          posterUrl: poster,
           containerExtension: info.container_extension || movieData.container_extension || (item as any).container_extension || 'mp4',
           youtubeTrailer: info.youtube_trailer,
         };
@@ -752,6 +885,11 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               <img
                 src={focusedMetadata.backdropUrl}
                 alt={focusedMetadata.title}
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
                 className="w-full h-full object-cover object-center opacity-40 scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-[#070A12] via-[#070A12]/60 to-transparent" />
@@ -822,58 +960,20 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           {/* Cuadrícula / Fila de Posters (5 Columnas fijas para D-Pad 1:1) */}
           {contentType !== 'live' ? (
             <div className="grid grid-cols-5 gap-5 pb-8">
-              {streams.map((item, idx) => {
-                const isSeries = contentType === 'series';
-                const id = isSeries ? (item as XtreamSeries).series_id : (item as XtreamStream).stream_id;
-                const cover = isSeries ? (item as XtreamSeries).cover : (item as XtreamStream).stream_icon;
-                const title = item.name || (item as any).title || 'Sin Título';
-                const rating = item.rating || '7.0';
-                const isFocused = focusZone === 'grid' && focusedGridIndex === idx;
-
-                return (
-                  <div
-                    key={id || idx}
-                    ref={(el) => { gridItemRefs.current[idx] = el; }}
-                    onClick={() => {
-                      setFocusedGridIndex(idx);
-                      handleItemSelect(item);
-                    }}
-                    className={`group relative flex flex-col cursor-pointer transition-all duration-200 ${
-                      isFocused
-                        ? 'scale-105 ring-4 ring-cyan-400 shadow-2xl shadow-cyan-500/60 z-20 -translate-y-1'
-                        : 'hover:scale-105'
-                    }`}
-                  >
-                    <div className="aspect-[2/3] w-full rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 group-hover:border-cyan-400 relative shadow-lg">
-                      <img
-                        src={cover || 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400'}
-                        alt={title}
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          if (!target.src.includes('unsplash')) {
-                            target.src = 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400';
-                          }
-                        }}
-                        className="w-full h-full object-cover"
-                      />
-
-                      {/* Calificación en la esquina inferior izquierda (estilo TiviMate) */}
-                      {rating && (
-                        <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-cyan-600/90 backdrop-blur-md text-[11px] font-black text-white shadow-md border border-cyan-400/40">
-                          {rating}
-                        </div>
-                      )}
-                    </div>
-
-                    <h3 className={`text-xs font-bold mt-2 truncate transition ${
-                      isFocused ? 'text-cyan-300 font-extrabold' : 'text-zinc-200'
-                    }`}>
-                      {title}
-                    </h3>
-                  </div>
-                );
-              })}
+              {streams.map((item, idx) => (
+                <CatalogPosterCard
+                  key={(item as any).stream_id || (item as any).series_id || idx}
+                  item={item}
+                  isFocused={focusZone === 'grid' && focusedGridIndex === idx}
+                  contentType={contentType}
+                  server={server}
+                  onSelect={() => {
+                    setFocusedGridIndex(idx);
+                    handleItemSelect(item);
+                  }}
+                  innerRef={(el) => { gridItemRefs.current[idx] = el; }}
+                />
+              ))}
             </div>
           ) : (
             /* Lista de Canales de TV en Vivo */
@@ -899,7 +999,17 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                   >
                     <div className="w-12 h-12 rounded-xl bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 p-1">
                       {stream.stream_icon ? (
-                        <img src={stream.stream_icon} alt={title} className="w-full h-full object-contain" />
+                        <img
+                          src={normalizeMediaUrl(stream.stream_icon, server)}
+                          alt={title}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                          className="w-full h-full object-contain"
+                        />
                       ) : (
                         <Radio className="w-5 h-5 text-cyan-400" />
                       )}
@@ -930,6 +1040,8 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               <img
                 src={selectedMovieDetail.meta.backdropUrl}
                 alt={selectedMovieDetail.meta.title}
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
                 className="w-full h-full object-cover opacity-35 scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-[#070A12] via-[#070A12]/85 to-transparent" />
@@ -1055,8 +1167,10 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             <div className="flex items-center space-x-6">
               {selectedSeriesDetails.series.cover && (
                 <img
-                  src={selectedSeriesDetails.series.cover}
+                  src={normalizeMediaUrl(selectedSeriesDetails.series.cover, server)}
                   alt={selectedSeriesDetails.series.name}
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
                   className="w-20 h-28 object-cover rounded-xl border border-white/20 shadow-xl"
                 />
               )}
