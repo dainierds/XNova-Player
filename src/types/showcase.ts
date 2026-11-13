@@ -16,11 +16,7 @@ export interface ShowcaseItem {
 }
 
 export type SidebarTabId = 
-  | 'home'
+  | 'live'
   | 'movies'
   | 'series'
-  | 'live'
-  | 'favorites'
-  | 'library'
-  | 'settings'
-  | 'logout';
+  | 'settings';

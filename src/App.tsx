@@ -23,7 +23,7 @@ import { StorageService } from './services/storage';
 import { useXtreamHomeFeed } from './hooks/useXtreamHomeFeed';
 import type { ContentTag } from './hooks/useXtreamHomeFeed';
 
-type FocusSection = 'sidebar' | 'search_bar' | 'hero_buttons' | 'thumbnails' | 'bottom_actions';
+type FocusSection = 'sidebar' | 'hero_buttons' | 'thumbnails';
 
 export function App() {
   const { currentUser, isAuthenticated, initializeAuth, login } = useAuthStore();
@@ -48,11 +48,10 @@ export function App() {
   };
 
   // Estados de navegación y foco
-  const [activeTab, setActiveTab] = useState<SidebarTabId>('home');
-  const [focusedTab, setFocusedTab] = useState<SidebarTabId>('home');
+  const [activeTab, setActiveTab] = useState<SidebarTabId>('movies');
+  const [focusedTab, setFocusedTab] = useState<SidebarTabId>('movies');
   const [focusedZone, setFocusedZone] = useState<FocusSection>('thumbnails');
   const [heroBtnIndex, setHeroBtnIndex] = useState(0); // 0: Watch now, 1: Trailer
-  const [bottomActionIndex, setBottomActionIndex] = useState(0); // 0: Heart, 1: Bookmark, 2: Plus
   
   // Catálogo activo según pestaña (Películas o Series)
   // Prioridad: feed real de Xtream → vodMovies del store → datos de demostración
@@ -91,7 +90,6 @@ export function App() {
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [explorerType, setExplorerType] = useState<'movies' | 'series' | 'live'>('movies');
   const [playingItem, setPlayingItem] = useState<ShowcaseItem | null>(null);
-  const [favorites, setFavorites] = useState<string[]>([]);
   const [activeTheme, setActiveTheme] = useState<'cinematic' | 'serivia'>('cinematic');
 
   // Temporizador de rotación automática estilo carrusel (6 segundos)
@@ -102,7 +100,6 @@ export function App() {
     initializeAuth();
     loadStoredPlaylists();
     StorageService.getActiveProfile().then((p) => setCurrentProfile(p));
-    StorageService.getFavorites().then((favs) => setFavorites(favs));
     StorageService.getActiveTheme().then((t) => setActiveTheme(t));
     StorageService.getShowSplashAnimation().then((shouldShow) => {
       if (!shouldShow) setIsSplashVisible(false);
@@ -141,15 +138,6 @@ export function App() {
   }, [currentCatalog.length, isSplashVisible, isSettingsOpen, isSearchOpen, playingItem]);
 
   const activeItem = currentCatalog[carouselIndex] || currentCatalog[0];
-  const isCurrentFav = favorites.includes(activeItem?.id || '');
-
-  const handleToggleFavorite = async () => {
-    if (!activeItem) return;
-    const isNowFav = await StorageService.toggleFavorite(activeItem.id);
-    const updated = await StorageService.getFavorites();
-    setFavorites(updated);
-    console.log(`Favorito ${isNowFav ? 'añadido' : 'eliminado'}:`, activeItem.title);
-  };
 
   const handleSelectTab = (tab: SidebarTabId) => {
     setActiveTab(tab);
@@ -164,9 +152,6 @@ export function App() {
       setIsExplorerOpen(true);
     } else if (tab === 'live') {
       setExplorerType('live');
-      setIsExplorerOpen(true);
-    } else if (tab === 'library') {
-      setExplorerType('movies');
       setIsExplorerOpen(true);
     }
   };
@@ -190,14 +175,7 @@ export function App() {
             if (carouselIndex > 0) {
               setCarouselIndex(carouselIndex - 1);
             } else {
-              // Si está en la primera miniatura, volver a la barra lateral izquierda
               setFocusedZone('sidebar');
-            }
-          } else if (focusedZone === 'bottom_actions') {
-            if (bottomActionIndex > 0) {
-              setBottomActionIndex(bottomActionIndex - 1);
-            } else {
-              setFocusedZone('thumbnails');
             }
           } else if (focusedZone === 'hero_buttons') {
             if (heroBtnIndex > 0) {
@@ -205,8 +183,6 @@ export function App() {
             } else {
               setFocusedZone('sidebar');
             }
-          } else if (focusedZone === 'search_bar') {
-            setFocusedZone('sidebar');
           }
           break;
 
@@ -217,14 +193,6 @@ export function App() {
           } else if (focusedZone === 'thumbnails') {
             if (carouselIndex < currentCatalog.length - 1) {
               setCarouselIndex(carouselIndex + 1);
-            } else {
-              // Pasar a los botones de acción redondos a la derecha
-              setFocusedZone('bottom_actions');
-              setBottomActionIndex(0);
-            }
-          } else if (focusedZone === 'bottom_actions') {
-            if (bottomActionIndex < 2) {
-              setBottomActionIndex(bottomActionIndex + 1);
             }
           } else if (focusedZone === 'hero_buttons') {
             if (heroBtnIndex < 1) {
@@ -243,10 +211,8 @@ export function App() {
               setFocusedTab(nextTab);
               setActiveTab(nextTab);
             }
-          } else if (focusedZone === 'thumbnails' || focusedZone === 'bottom_actions') {
+          } else if (focusedZone === 'thumbnails') {
             setFocusedZone('hero_buttons');
-          } else if (focusedZone === 'hero_buttons') {
-            setFocusedZone('search_bar');
           }
           break;
 
@@ -260,8 +226,6 @@ export function App() {
               setFocusedTab(nextTab);
               setActiveTab(nextTab);
             }
-          } else if (focusedZone === 'search_bar') {
-            setFocusedZone('hero_buttons');
           } else if (focusedZone === 'hero_buttons') {
             setFocusedZone('thumbnails');
           }
@@ -278,20 +242,9 @@ export function App() {
             }
           } else if (focusedZone === 'thumbnails') {
             setPlayingItem(activeItem);
-          } else if (focusedZone === 'bottom_actions') {
-            if (bottomActionIndex === 0) {
-              handleToggleFavorite();
-            } else {
-              console.log('Acción secundaria pulsada');
-            }
-          } else if (focusedZone === 'search_bar') {
-            setIsSearchOpen(true);
           } else if (focusedZone === 'sidebar') {
             if (focusedTab === 'settings') {
               setIsSettingsOpen(true);
-            } else if (focusedTab === 'logout') {
-              const { logout } = useAuthStore.getState();
-              logout();
             } else {
               handleSelectTab(focusedTab);
             }
@@ -322,7 +275,6 @@ export function App() {
     focusedZone,
     carouselIndex,
     heroBtnIndex,
-    bottomActionIndex,
     focusedTab,
     currentCatalog.length,
     activeItem,
@@ -376,31 +328,20 @@ export function App() {
           />
         ) : (
           <>
-            {/* 2. Barra Lateral Flotante a la Izquierda (Vertical Dock) */}
+            {/* 2. Barra Lateral Flotante a la Izquierda: TV, Películas, Series y Configuración */}
             <SidebarDock
               activeTab={activeTab}
               focusedTab={focusedTab}
               isSidebarFocused={focusedZone === 'sidebar'}
               onSelectTab={handleSelectTab}
-              onLogout={() => {
-                const { logout } = useAuthStore.getState();
-                logout();
-              }}
             />
 
-            {/* 3. Escenario Principal: Barra de Búsqueda Superior + Hero Stage Central */}
+            {/* 3. Escenario Principal: Barra Superior Limpia + Hero Stage Central */}
             <div className="flex-1 h-full flex flex-col justify-between overflow-hidden">
-              {/* Barra Superior con Logo, Buscador y Botón de Cerrar Sesión */}
+              {/* Barra Superior con Logo e Indicador de Suscripción */}
               <TopSearchBar
-                isFocused={focusedZone === 'search_bar'}
-                onOpenSearch={() => setIsSearchOpen(true)}
-                expDate={currentUser?.expDate || activePlaylist?.expDate || '29 NOV 2026'}
+                expDate={currentUser?.expDate || activePlaylist?.expDate || '2026-12-31'}
                 planBadge={currentUser ? PLAN_CONFIGS[currentUser.plan].badge : undefined}
-                userName={currentUser?.username}
-                onLogout={() => {
-                  const { logout } = useAuthStore.getState();
-                  logout();
-                }}
               />
 
               {/* Zona Central: Gran Imagen + Título Monumental + Botones + Miniaturas Carrusel */}
@@ -411,20 +352,15 @@ export function App() {
                 focusedZone={
                   focusedZone === 'hero_buttons'
                     ? 'hero_buttons'
-                    : focusedZone === 'bottom_actions'
-                      ? 'bottom_actions'
-                      : 'thumbnails'
+                    : 'thumbnails'
                 }
                 heroButtonIndex={heroBtnIndex}
-                bottomActionIndex={bottomActionIndex}
-                isFavorite={isCurrentFav}
                 onSelectThumbnail={(idx) => {
                   setCarouselIndex(idx);
                   setFocusedZone('thumbnails');
                 }}
                 onPlay={() => setPlayingItem(activeItem)}
                 onOpenTrailer={() => console.log('Abrir trailer de:', activeItem.title)}
-                onToggleFavorite={handleToggleFavorite}
               />
             </div>
           </>
@@ -439,7 +375,7 @@ export function App() {
         onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
         onClose={() => {
           setIsSettingsOpen(false);
-          setActiveTab('home');
+          setActiveTab('movies');
           setFocusedZone('thumbnails');
         }}
       />
@@ -555,7 +491,7 @@ export function App() {
           initialType={explorerType}
           onClose={() => {
             setIsExplorerOpen(false);
-            setActiveTab('home');
+            setActiveTab('movies');
             setFocusedZone('thumbnails');
           }}
           onPlayStream={(stream) => {
