@@ -46,15 +46,15 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      const res = login(username, password);
+    setTimeout(async () => {
+      const res = await login(username, password);
       setIsLoading(false);
       if (!res.success) {
         setErrorMessage(res.error || 'Credenciales incorrectas.');
       } else if (res.isAdmin) {
         onOpenAdminPanel();
       }
-    }, 300);
+    }, 200);
   };
 
   // 🎮 Motor de Navegación D-Pad Oficial para TV

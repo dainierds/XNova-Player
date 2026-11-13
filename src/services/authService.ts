@@ -2,6 +2,7 @@ import type { UserAccount, UserPlan } from '../types/auth';
 import type { PlaylistAccount } from '../types';
 import { PLAN_CONFIGS } from '../types/auth';
 import { StorageService } from './storage';
+import { CloudService } from './cloudService';
 
 const STORAGE_USERS_KEY = 'xnova_managed_users_v2';
 const STORAGE_SESSION_KEY = 'xnova_active_session_v2';
@@ -89,10 +90,17 @@ export const AuthService = {
     }
   },
 
-  // Sincronización robusta con IndexedDB (Persistencia absoluta a prueba de reinicios y updates de APK)
+  // Sincronización robusta con la Nube de Vercel e IndexedDB local
   async syncWithPersistentStorage(): Promise<UserAccount[]> {
     try {
-      // 1. Consultar primero en IndexedDB (almacenamiento no volátil en disco)
+      // 1. Intentar sincronizar primero con el Servidor en la Nube (Vercel)
+      const cloudRes = await CloudService.getAllUsers();
+      if (cloudRes.success && Array.isArray(cloudRes.users) && cloudRes.users.length > 0) {
+        this.saveAllUsers(cloudRes.users);
+        return cloudRes.users;
+      }
+
+      // 2. Si no hay conexión con la nube, consultar IndexedDB local en disco
       const persistentUsers = await StorageService.getManagedUsers();
       if (persistentUsers && Array.isArray(persistentUsers)) {
         localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(persistentUsers));
@@ -100,7 +108,7 @@ export const AuthService = {
         return persistentUsers;
       }
 
-      // 2. Si no hay en IndexedDB, migrar los de localStorage a IndexedDB
+      // 3. Fallback a localStorage
       const localUsers = this.getAllUsers();
       if (localUsers.length > 0) {
         await StorageService.saveManagedUsers(localUsers);
@@ -109,7 +117,7 @@ export const AuthService = {
 
       return [];
     } catch (e) {
-      console.error('Error sincronizando usuarios con IndexedDB:', e);
+      console.error('Error sincronizando usuarios:', e);
       return this.getAllUsers();
     }
   },
@@ -139,7 +147,7 @@ export const AuthService = {
       localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
       localStorage.setItem(STORAGE_INIT_KEY, 'true');
       
-      // Guardado permanente en IndexedDB
+      // Guardado permanente en IndexedDB local
       StorageService.saveManagedUsers(users).catch((err) => {
         console.error('Error guardando usuarios en IndexedDB:', err);
       });
@@ -149,15 +157,45 @@ export const AuthService = {
   },
 
   // Eliminar cuentas de prueba/ejemplo con 1 solo clic
-  clearSeedUsers(): UserAccount[] {
+  async clearSeedUsers(): Promise<UserAccount[]> {
     const users = this.getAllUsers();
     const cleanUsers = users.filter((u) => !isSeedUser(u));
     this.saveAllUsers(cleanUsers);
+
+    // Intentar borrar en la nube también
+    for (const seed of SEED_USERS) {
+      await CloudService.deleteUser(seed.id).catch(() => {});
+    }
+
     return cleanUsers;
   },
 
-  // Crear un nuevo usuario desde el panel de administración
-  createUser(data: {
+  // Crear un nuevo usuario (En la Nube de Vercel y sincronizado localmente)
+  async createUser(data: {
+    username: string;
+    password: string;
+    displayName: string;
+    plan: UserPlan;
+    expDate: string;
+    playlists: PlaylistAccount[];
+    notes?: string;
+  }): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+    // 1. Intentar crear en la Nube de Vercel
+    const cloudRes = await CloudService.createUser(data);
+    if (cloudRes.success && cloudRes.user) {
+      let users = this.getAllUsers();
+      const onlyHasSeeds = users.length > 0 && users.every((u) => isSeedUser(u));
+      if (onlyHasSeeds) users = [];
+      users.push(cloudRes.user);
+      this.saveAllUsers(users);
+      return cloudRes;
+    }
+
+    // 2. Si la nube aún no tiene KV conectado o está offline, crear localmente
+    return this.createUserLocal(data);
+  },
+
+  createUserLocal(data: {
     username: string;
     password: string;
     displayName: string;
@@ -176,7 +214,6 @@ export const AuthService = {
       return { success: false, error: 'El nombre de usuario ya está registrado.' };
     }
 
-    // Validar límite de listas según el paquete
     const maxAllowed = PLAN_CONFIGS[data.plan].maxPlaylists;
     if (data.playlists.length > maxAllowed) {
       return {
@@ -185,13 +222,11 @@ export const AuthService = {
       };
     }
 
-    // Si solo existían las cuentas de demostración, limpiarlas automáticamente para conservar únicamente la cuenta real
     const onlyHasSeeds = users.length > 0 && users.every((u) => isSeedUser(u));
     if (onlyHasSeeds) {
       users = [];
     }
 
-    // Asegurar que al menos una lista esté activa si existen
     const playlists = data.playlists.map((pl, idx) => ({
       ...pl,
       isActive: idx === 0,
@@ -216,10 +251,14 @@ export const AuthService = {
   },
 
   // Actualizar un usuario existente
-  updateUser(
+  async updateUser(
     id: string,
     updates: Partial<Omit<UserAccount, 'id' | 'createdAt'>>
-  ): { success: boolean; user?: UserAccount; error?: string } {
+  ): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+    // 1. Actualizar en la nube
+    await CloudService.updateUser(id, updates).catch(() => {});
+
+    // 2. Actualizar local
     const users = this.getAllUsers();
     const index = users.findIndex((u) => u.id === id);
     if (index === -1) {
@@ -245,7 +284,6 @@ export const AuthService = {
     users[index] = updatedUser;
     this.saveAllUsers(users);
 
-    // Si el usuario actualizado es la sesión activa actual, actualizar la sesión
     const active = this.getActiveSession();
     if (active && active.id === id) {
       this.saveActiveSession(updatedUser);
@@ -255,7 +293,9 @@ export const AuthService = {
   },
 
   // Eliminar usuario
-  deleteUser(id: string): boolean {
+  async deleteUser(id: string): Promise<boolean> {
+    await CloudService.deleteUser(id).catch(() => {});
+
     const users = this.getAllUsers().filter((u) => u.id !== id);
     this.saveAllUsers(users);
 
@@ -266,19 +306,41 @@ export const AuthService = {
     return true;
   },
 
-  // Autenticar credenciales en la app
-  login(
+  // Autenticar credenciales en la app (Intentando Nube primero, luego Fallback Local)
+  async login(
     username: string,
     password: string
-  ): {
+  ): Promise<{
     success: boolean;
     user?: UserAccount;
     isAdmin?: boolean;
     error?: string;
-  } {
+  }> {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = password.trim();
 
+    // 1. Intento de inicio de sesión en la Nube de Vercel
+    try {
+      const cloudRes = await CloudService.login(cleanUser, cleanPass);
+      if (cloudRes.success && cloudRes.user) {
+        if (!cloudRes.isAdmin) {
+          this.saveActiveSession(cloudRes.user);
+          // Asegurar que el usuario esté sincronizado en disco local para cuando esté offline
+          const current = this.getAllUsers();
+          if (!current.some((u) => u.id === cloudRes.user!.id)) {
+            current.push(cloudRes.user);
+            this.saveAllUsers(current);
+          }
+        }
+        return cloudRes;
+      } else if (cloudRes.error && !cloudRes.needsDbSetup) {
+        return cloudRes;
+      }
+    } catch {
+      // Si el servidor en la nube no responde, continuar con verificación local
+    }
+
+    // 2. Fallback de autenticación local
     // Verificación de credencial de Administrador Maestro
     const isMasterUser = cleanUser === 'admin' || cleanUser === 'master' || cleanUser === 'administrador';
     const isMasterPass = cleanPass === '8888' || cleanPass === 'xnova2026' || cleanPass === 'admin';
@@ -325,7 +387,6 @@ export const AuthService = {
       };
     }
 
-    // Actualizar último login
     found.lastLogin = new Date().toISOString();
     this.saveAllUsers(users);
     this.saveActiveSession(found);

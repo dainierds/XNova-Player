@@ -9,7 +9,7 @@ interface AuthState {
   isInitialized: boolean;
   
   initializeAuth: () => Promise<void>;
-  login: (username: string, password: string) => { success: boolean; error?: string; isAdmin?: boolean };
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string; isAdmin?: boolean }>;
   logout: () => void;
   refreshCurrentUser: () => void;
   setAdminStatus: (isAdmin: boolean) => void;
@@ -23,7 +23,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   initializeAuth: async () => {
     AuthService.init();
-    // Sincronizar usuarios y sesión desde IndexedDB (persistente a través de actualizaciones de APK)
+    // Sincronizar usuarios y sesión desde la Nube (Vercel) e IndexedDB (persistente)
     await AuthService.syncWithPersistentStorage();
     const active = await AuthService.syncSessionFromPersistentStorage();
     if (active) {
@@ -43,8 +43,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  login: (username: string, password: string) => {
-    const res = AuthService.login(username, password);
+  login: async (username: string, password: string) => {
+    const res = await AuthService.login(username, password);
     if (res.success && res.user) {
       set({
         currentUser: res.user,

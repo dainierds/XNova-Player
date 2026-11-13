@@ -157,7 +157,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     });
   };
 
-  const handleSaveUser = (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -172,7 +172,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }
 
     if (editingUser) {
-      const res = AuthService.updateUser(editingUser.id, {
+      const res = await AuthService.updateUser(editingUser.id, {
         displayName: formDisplayName.trim() || formUsername.trim(),
         username: formUsername.trim(),
         password: formPassword.trim(),
@@ -186,7 +186,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         return;
       }
     } else {
-      const res = AuthService.createUser({
+      const res = await AuthService.createUser({
         username: formUsername,
         password: formPassword,
         displayName: formDisplayName,
@@ -205,16 +205,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setShowCreateModal(false);
   };
 
-  const handleDeleteUser = (id: string, name: string) => {
+  const handleDeleteUser = async (id: string, name: string) => {
     if (confirm(`¿Estás seguro de eliminar el usuario "${name}"?`)) {
-      AuthService.deleteUser(id);
+      await AuthService.deleteUser(id);
       refreshUserList();
     }
   };
 
-  const handleToggleStatus = (user: UserAccount) => {
+  const handleToggleStatus = async (user: UserAccount) => {
     const nextStatus = user.status === 'active' ? 'suspended' : 'active';
-    AuthService.updateUser(user.id, { status: nextStatus });
+    await AuthService.updateUser(user.id, { status: nextStatus });
     refreshUserList();
   };
 
@@ -296,9 +296,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         <div className="flex items-center space-x-3">
           {users.some(isSeedUser) && (
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (confirm('¿Eliminar las cuentas de ejemplo/demo y conservar solo tus usuarios reales?')) {
-                  const cleaned = AuthService.clearSeedUsers();
+                  const cleaned = await AuthService.clearSeedUsers();
                   setUsers(cleaned);
                 }
               }}
