@@ -470,7 +470,20 @@ export function App() {
           posterUrl={playingItem.thumbnailUrl}
           contentId={playingItem.id}
           isLive={playingItem.duration === 'DIRECTO'}
-          onClose={() => setPlayingItem(null)}
+          onClose={() => {
+            // Jerarquía de navegación: al salir del reproductor, regresar a la sección que se estaba viendo
+            const isLiveVideo = playingItem.duration === 'DIRECTO' || playingItem.id.startsWith('live_');
+            const isSeriesVideo = playingItem.type === 'series' || playingItem.id.startsWith('series_') || explorerType === 'series';
+            const targetType: 'live' | 'movies' | 'series' = isLiveVideo 
+              ? 'live' 
+              : isSeriesVideo 
+                ? 'series' 
+                : 'movies';
+
+            setPlayingItem(null);
+            setExplorerType(targetType);
+            setIsExplorerOpen(true);
+          }}
         />
       )}
 
