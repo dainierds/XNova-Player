@@ -173,7 +173,7 @@ export function App() {
 
   // Motor de navegación D-pad para este concepto de interfaz
   useEffect(() => {
-    if (isSplashVisible || isSettingsOpen || isSearchOpen || isProfileOpen || isExitModalOpen || isExplorerOpen || isUpdateOpen || playingItem) {
+    if (isSplashVisible || !isAuthenticated || isSettingsOpen || isSearchOpen || isProfileOpen || isExitModalOpen || isExplorerOpen || isUpdateOpen || playingItem) {
       return;
     }
 
@@ -322,6 +322,7 @@ export function App() {
     currentCatalog.length,
     activeItem,
     isSplashVisible,
+    isAuthenticated,
     isSettingsOpen,
     isSearchOpen,
     isProfileOpen,
