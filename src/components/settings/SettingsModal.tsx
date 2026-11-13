@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { usePlaylistStore } from '../../store/usePlaylistStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { StorageService } from '../../services/storage';
@@ -24,6 +24,11 @@ interface SettingsModalProps {
   currentTheme?: 'cinematic' | 'serivia';
   onThemeChange?: (theme: 'cinematic' | 'serivia') => void;
   onOpenAdminPanel?: () => void;
+}
+
+interface FocusItem {
+  id: string;
+  onSelect: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -60,29 +65,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const [showSplash, setShowSplash] = useState(true);
   const [selectedTheme, setSelectedTheme] = useState<'cinematic' | 'serivia'>(currentTheme);
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
 
   useEffect(() => {
     StorageService.getShowSplashAnimation().then((val) => setShowSplash(val));
     StorageService.getActiveTheme().then((t) => setSelectedTheme(t));
   }, []);
 
-  const handleSelectTheme = async (theme: 'cinematic' | 'serivia') => {
+  const handleSelectTheme = useCallback(async (theme: 'cinematic' | 'serivia') => {
     setSelectedTheme(theme);
     await StorageService.setActiveTheme(theme);
     if (onThemeChange) {
       onThemeChange(theme);
     }
-  };
+  }, [onThemeChange]);
 
-  const handleToggleSplash = async () => {
-    const nextVal = !showSplash;
-    setShowSplash(nextVal);
-    await StorageService.setShowSplashAnimation(nextVal);
-  };
+  const handleToggleSplash = useCallback(async () => {
+    setShowSplash((prev) => {
+      const nextVal = !prev;
+      StorageService.setShowSplashAnimation(nextVal);
+      return nextVal;
+    });
+  }, []);
 
-  if (!isOpen) return null;
-
-  const handleOpenAdd = () => {
+  const handleOpenAdd = useCallback(() => {
     clearError();
     setEditingAccount({
       name: `Lista ${playlists.length + 1}`,
@@ -93,13 +100,185 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       m3uUrl: '',
     });
     setIsEditing(true);
-  };
+  }, [clearError, playlists.length]);
 
-  const handleOpenEdit = (account: PlaylistAccount) => {
+  const handleOpenEdit = useCallback((account: PlaylistAccount) => {
     clearError();
     setEditingAccount({ ...account });
     setIsEditing(true);
-  };
+  }, [clearError]);
+
+  // Lista dinámica de elementos enfocables con el control remoto
+  const focusItems = useMemo<FocusItem[]>(() => {
+    if (isEditing) return [];
+    const items: FocusItem[] = [];
+
+    // 1. Botón cerrar
+    items.push({ id: 'close', onSelect: onClose });
+
+    // 2. Si es Admin: Botón panel admin
+    if (isAdmin && onOpenAdminPanel) {
+      items.push({
+        id: 'admin_panel',
+        onSelect: () => {
+          onClose();
+          onOpenAdminPanel();
+        },
+      });
+    }
+
+    // 3. Si es Cliente: Botón cerrar sesión
+    if (currentUser && !isAdmin) {
+      items.push({
+        id: 'logout',
+        onSelect: () => {
+          logout();
+          onClose();
+        },
+      });
+    }
+
+    // 4. Si es Admin: Botón Añadir Lista
+    if (isAdmin && playlists.length < 3) {
+      items.push({ id: 'add_playlist', onSelect: handleOpenAdd });
+    }
+
+    // 5. Botones de Playlists
+    if (currentUser && !isAdmin) {
+      playlists.forEach((pl) => {
+        if (activePlaylist?.id !== pl.id) {
+          items.push({ id: `activate_${pl.id}`, onSelect: () => setActivePlaylist(pl.id) });
+        }
+      });
+    } else if (isAdmin) {
+      playlists.forEach((pl) => {
+        if (activePlaylist?.id !== pl.id) {
+          items.push({ id: `activate_${pl.id}`, onSelect: () => setActivePlaylist(pl.id) });
+        }
+        items.push({ id: `edit_${pl.id}`, onSelect: () => handleOpenEdit(pl) });
+        items.push({ id: `delete_${pl.id}`, onSelect: () => deletePlaylist(pl.id) });
+      });
+    }
+
+    // 6. Botón Sincronizar catálogo
+    if (activePlaylist) {
+      items.push({ id: 'sync', onSelect: () => syncCurrentPlaylist() });
+    }
+
+    // 7. Temas
+    items.push({ id: 'theme_serivia', onSelect: () => handleSelectTheme('serivia') });
+    items.push({ id: 'theme_cinematic', onSelect: () => handleSelectTheme('cinematic') });
+
+    // 8. Switch Splash
+    items.push({ id: 'toggle_splash', onSelect: handleToggleSplash });
+
+    return items;
+  }, [
+    isEditing,
+    isAdmin,
+    onOpenAdminPanel,
+    currentUser,
+    playlists,
+    activePlaylist,
+    onClose,
+    logout,
+    handleOpenAdd,
+    setActivePlaylist,
+    handleOpenEdit,
+    deletePlaylist,
+    syncCurrentPlaylist,
+    handleSelectTheme,
+    handleToggleSplash,
+  ]);
+
+  // Auto-scroll del elemento enfocado
+  useEffect(() => {
+    if (!isOpen || isEditing) return;
+    const cur = focusItems[focusedIndex];
+    if (cur && itemRefs.current[cur.id]) {
+      itemRefs.current[cur.id]?.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth',
+      });
+    }
+  }, [focusedIndex, isOpen, isEditing, focusItems]);
+
+  // 🎮 Motor Oficial de Navegación D-Pad para Ajustes en Android TV
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isEditing) {
+        if (['Escape', 'GoBack'].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsEditing(false);
+        }
+        return;
+      }
+
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      switch (e.key) {
+        case 'ArrowDown':
+          setFocusedIndex((prev) => Math.min(focusItems.length - 1, prev + 1));
+          break;
+
+        case 'ArrowUp':
+          setFocusedIndex((prev) => Math.max(0, prev - 1));
+          break;
+
+        case 'ArrowLeft':
+          if (focusItems[focusedIndex]?.id === 'theme_cinematic') {
+            const seriviaIdx = focusItems.findIndex((it) => it.id === 'theme_serivia');
+            if (seriviaIdx !== -1) setFocusedIndex(seriviaIdx);
+          } else {
+            setFocusedIndex((prev) => Math.max(0, prev - 1));
+          }
+          break;
+
+        case 'ArrowRight':
+          if (focusItems[focusedIndex]?.id === 'theme_serivia') {
+            const cinematicIdx = focusItems.findIndex((it) => it.id === 'theme_cinematic');
+            if (cinematicIdx !== -1) setFocusedIndex(cinematicIdx);
+          } else {
+            setFocusedIndex((prev) => Math.min(focusItems.length - 1, prev + 1));
+          }
+          break;
+
+        case 'Enter':
+        case ' ':
+          e.preventDefault();
+          e.stopPropagation();
+          if (focusItems[focusedIndex]) {
+            focusItems[focusedIndex].onSelect();
+          }
+          break;
+
+        case 'Escape':
+        case 'Backspace':
+        case 'GoBack':
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, isEditing, focusItems, focusedIndex, onClose]);
+
+  const isItemFocused = (id: string) => focusItems[focusedIndex]?.id === id;
+  const getFocusClass = (id: string) =>
+    isItemFocused(id)
+      ? 'ring-4 ring-cyan-400 bg-cyan-950/90 scale-[1.03] shadow-xl shadow-cyan-500/50 z-20'
+      : '';
+
+  if (!isOpen) return null;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,8 +311,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <button
+            ref={(el) => { itemRefs.current['close'] = el; }}
             onClick={onClose}
-            className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition"
+            className={`p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition ${getFocusClass('close')}`}
+            title="Cerrar (o pulsa Atrás)"
           >
             <X className="w-5 h-5" />
           </button>
@@ -165,11 +346,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
               <button
+                ref={(el) => { itemRefs.current['admin_panel'] = el; }}
                 onClick={() => {
                   onClose();
                   onOpenAdminPanel();
                 }}
-                className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs shadow-md transition"
+                className={`px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs shadow-md transition ${getFocusClass('admin_panel')}`}
               >
                 Abrir Panel de Control
               </button>
@@ -207,11 +389,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               <button
+                ref={(el) => { itemRefs.current['logout'] = el; }}
                 onClick={() => {
                   logout();
                   onClose();
                 }}
-                className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold transition"
+                className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold transition ${getFocusClass('logout')}`}
               >
                 <LogOut className="w-4 h-4" />
                 <span>Cerrar Sesión</span>
@@ -264,8 +447,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           {/* Si el plan permite más de 1 lista (Gold o Premium), puede alternar entre ellas */}
                           {!isActive && (
                             <button
+                              ref={(el) => { itemRefs.current[`activate_${pl.id}`] = el; }}
                               onClick={() => setActivePlaylist(pl.id)}
-                              className="px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg text-xs transition"
+                              className={`px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg text-xs transition ${getFocusClass(`activate_${pl.id}`)}`}
                             >
                               Activar Esta Lista
                             </button>
@@ -285,8 +469,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     {playlists.length < 3 && (
                       <button
+                        ref={(el) => { itemRefs.current['add_playlist'] = el; }}
                         onClick={handleOpenAdd}
-                        className="flex items-center space-x-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg font-bold text-xs transition"
+                        className={`flex items-center space-x-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg font-bold text-xs transition ${getFocusClass('add_playlist')}`}
                       >
                         <Plus className="w-4 h-4" />
                         <span>Añadir Nueva Lista</span>
@@ -300,8 +485,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         No tienes ninguna lista configurada. Añade tus credenciales Xtream Codes o enlace M3U.
                       </p>
                       <button
+                        ref={(el) => { itemRefs.current['add_playlist'] = el; }}
                         onClick={handleOpenAdd}
-                        className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg transition"
+                        className={`px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg transition ${getFocusClass('add_playlist')}`}
                       >
                         Configurar Primera Lista
                       </button>
@@ -348,22 +534,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <div className="flex items-center space-x-3">
                               {!isActive && (
                                 <button
+                                  ref={(el) => { itemRefs.current[`activate_${pl.id}`] = el; }}
                                   onClick={() => setActivePlaylist(pl.id)}
-                                  className="px-3 py-1.5 bg-zinc-700 hover:bg-cyan-600 text-white rounded text-xs font-semibold transition"
+                                  className={`px-3 py-1.5 bg-zinc-700 hover:bg-cyan-600 text-white rounded text-xs font-semibold transition ${getFocusClass(`activate_${pl.id}`)}`}
                                 >
                                   Seleccionar
                                 </button>
                               )}
                               <button
+                                ref={(el) => { itemRefs.current[`edit_${pl.id}`] = el; }}
                                 onClick={() => handleOpenEdit(pl)}
-                                className="p-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition"
+                                className={`p-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition ${getFocusClass(`edit_${pl.id}`)}`}
                                 title="Editar"
                               >
                                 <Edit3 className="w-4 h-4" />
                               </button>
                               <button
+                                ref={(el) => { itemRefs.current[`delete_${pl.id}`] = el; }}
                                 onClick={() => deletePlaylist(pl.id)}
-                                className="p-2 bg-zinc-800 hover:bg-red-600 text-zinc-400 hover:text-white rounded transition"
+                                className={`p-2 bg-zinc-800 hover:bg-red-600 text-zinc-400 hover:text-white rounded transition ${getFocusClass(`delete_${pl.id}`)}`}
                                 title="Eliminar"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -384,9 +573,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {isLoading ? syncProgress : 'Catálogo guardado localmente en caché.'}
                   </div>
                   <button
+                    ref={(el) => { itemRefs.current['sync'] = el; }}
                     onClick={() => syncCurrentPlaylist()}
                     disabled={isLoading}
-                    className="flex items-center space-x-2 px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-bold transition disabled:opacity-50"
+                    className={`flex items-center space-x-2 px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-bold transition disabled:opacity-50 ${getFocusClass('sync')}`}
                   >
                     <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                     <span>Actualizar Catálogo</span>
@@ -404,12 +594,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="grid grid-cols-2 gap-4">
                   {/* Tema 1: Serivia Modern */}
                   <div
+                    ref={(el) => { itemRefs.current['theme_serivia'] = el; }}
                     onClick={() => handleSelectTheme('serivia')}
                     className={`p-4 rounded-xl border cursor-pointer transition ${
                       selectedTheme === 'serivia'
                         ? 'bg-cyan-950/40 border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-950/40'
                         : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-600'
-                    }`}
+                    } ${getFocusClass('theme_serivia')}`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-bold text-white">Serivia Modern Deck</span>
@@ -426,12 +617,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   {/* Tema 2: Cinematic Showcase (John Wick) */}
                   <div
+                    ref={(el) => { itemRefs.current['theme_cinematic'] = el; }}
                     onClick={() => handleSelectTheme('cinematic')}
                     className={`p-4 rounded-xl border cursor-pointer transition ${
                       selectedTheme === 'cinematic'
                         ? 'bg-cyan-950/40 border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-950/40'
                         : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-600'
-                    }`}
+                    } ${getFocusClass('theme_cinematic')}`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-bold text-white">Cinematic Showcase</span>
@@ -455,10 +647,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </p>
                   </div>
                   <button
+                    ref={(el) => { itemRefs.current['toggle_splash'] = el; }}
                     onClick={handleToggleSplash}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                       showSplash ? 'bg-cyan-500' : 'bg-zinc-700'
-                    }`}
+                    } ${getFocusClass('toggle_splash')}`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
