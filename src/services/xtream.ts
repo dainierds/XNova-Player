@@ -131,7 +131,7 @@ export class XtreamService {
   ): Promise<XtreamStream[]> {
     const base = this.normalizeUrl(serverUrl);
     let url = `${base}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_vod_streams`;
-    if (categoryId) {
+    if (categoryId && categoryId !== 'all') {
       url += `&category_id=${encodeURIComponent(categoryId)}`;
     }
     const res = await fetch(url);
@@ -157,7 +157,7 @@ export class XtreamService {
   ): Promise<XtreamStream[]> {
     const base = this.normalizeUrl(serverUrl);
     let url = `${base}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_streams`;
-    if (categoryId) {
+    if (categoryId && categoryId !== 'all') {
       url += `&category_id=${encodeURIComponent(categoryId)}`;
     }
     const res = await fetch(url);
@@ -183,9 +183,32 @@ export class XtreamService {
   ): Promise<XtreamSeries[]> {
     const base = this.normalizeUrl(serverUrl);
     let url = `${base}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_series`;
-    if (categoryId) {
+    if (categoryId && categoryId !== 'all') {
       url += `&category_id=${encodeURIComponent(categoryId)}`;
     }
+    const res = await fetch(url);
+    return res.json();
+  }
+
+  // Obtener información detallada y episodios de una serie
+  public static async getSeriesInfo(
+    serverUrl: string,
+    username: string,
+    password: string,
+    seriesId: number | string
+  ): Promise<{
+    seasons?: Array<{ air_date?: string; episode_count?: number; id?: number; name?: string; season_number: number }>;
+    info?: { name?: string; cover?: string; plot?: string; genre?: string; rating?: string; releaseDate?: string; backdrop_path?: string[] };
+    episodes?: Record<string, Array<{
+      id: string | number;
+      episode_num: number;
+      title: string;
+      container_extension?: string;
+      info?: { plot?: string; duration_secs?: number; movie_image?: string };
+    }>>;
+  }> {
+    const base = this.normalizeUrl(serverUrl);
+    const url = `${base}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_series_info&series_id=${encodeURIComponent(seriesId)}`;
     const res = await fetch(url);
     return res.json();
   }
@@ -200,6 +223,17 @@ export class XtreamService {
   ): string {
     const base = this.normalizeUrl(serverUrl);
     return `${base}/movie/${username}/${password}/${streamId}.${containerExtension}`;
+  }
+
+  public static buildSeriesStreamUrl(
+    serverUrl: string,
+    username: string,
+    password: string,
+    episodeId: number | string,
+    containerExtension: string = 'mp4'
+  ): string {
+    const base = this.normalizeUrl(serverUrl);
+    return `${base}/series/${username}/${password}/${episodeId}.${containerExtension}`;
   }
 
   public static buildLiveStreamUrl(

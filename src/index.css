@@ -72,3 +72,12 @@
 .live-pulse {
   animation: pulseDot 1.8s infinite ease-in-out;
 }
+
+/* Erradicar el botón nativo de play sobre fondo blanco que Android WebView inyecta en los <video> */
+video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+video::-webkit-media-controls {
+  display: none !important;
+}

@@ -8,7 +8,9 @@ import {
   Radio, 
   Search, 
   Star, 
-  RefreshCw 
+  RefreshCw,
+  X,
+  Layers
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
@@ -16,6 +18,7 @@ import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSerie
 interface FullCatalogExplorerProps {
   playlist: PlaylistAccount;
   initialType?: 'movies' | 'series' | 'live';
+  isActive?: boolean;
   onClose: () => void;
   onPlayStream: (stream: {
     id: string;
@@ -26,11 +29,27 @@ interface FullCatalogExplorerProps {
   }) => void;
 }
 
-type FocusZone = 'tabs' | 'categories' | 'grid';
+type FocusZone = 'tabs' | 'categories' | 'grid' | 'episodes';
+type FocusedHeaderTab = -1 | 0 | 1 | 2; // -1: Botón Volver, 0: Películas, 1: Series, 2: TV en Vivo
+
+interface EpisodeItem {
+  id: string | number;
+  episode_num: number;
+  title: string;
+  container_extension?: string;
+  info?: { plot?: string; duration_secs?: number; movie_image?: string };
+}
+
+interface SeriesDetails {
+  series: XtreamSeries;
+  seasons: Array<{ season_number: number; name?: string; episode_count?: number }>;
+  episodes: Record<string, EpisodeItem[]>;
+}
 
 export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   playlist,
   initialType = 'movies',
+  isActive = true,
   onClose,
   onPlayStream,
 }) => {
@@ -44,20 +63,29 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
   // 🎮 Estados de navegación D-Pad para control remoto de TV
   const [focusZone, setFocusZone] = useState<FocusZone>('categories');
-  const [focusedTab, setFocusedTab] = useState<0 | 1 | 2>(
+  const [focusedTab, setFocusedTab] = useState<FocusedHeaderTab>(
     initialType === 'movies' ? 0 : initialType === 'series' ? 1 : 2
   );
   const [focusedCatIndex, setFocusedCatIndex] = useState(0);
   const [focusedGridIndex, setFocusedGridIndex] = useState(0);
 
+  // 🎬 Estados para visualizador y selector de episodios de Series
+  const [selectedSeriesDetails, setSelectedSeriesDetails] = useState<SeriesDetails | null>(null);
+  const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<number>(1);
+  const [focusedEpisodeIndex, setFocusedEpisodeIndex] = useState(0);
+  const [focusedSeasonIndex, setFocusedSeasonIndex] = useState(0);
+  const [episodeFocusZone, setEpisodeFocusZone] = useState<'seasons' | 'episodes'>('episodes');
+  const [loadingSeriesModal, setLoadingSeriesModal] = useState(false);
+
   const catItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const gridItemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const episodeItemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const server = playlist.serverUrl || '';
   const user = playlist.username || '';
   const pass = playlist.password || '';
 
-  // Número de columnas en la cuadrícula según el tipo de contenido
+  // Número estricto y fijo de columnas para cálculo perfecto de D-pad
   const numCols = contentType === 'live' ? 4 : 5;
 
   // 1. Cargar las categorías según el tipo seleccionado (Películas, Series o TV en Vivo)
@@ -124,9 +152,10 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   }, [selectedCategoryId, contentType, server, user, pass]);
 
   // Filtrado por buscador en tiempo real
-  const filteredStreams = streams.filter((item) =>
-    item.name.toLowerCase().includes(searchFilter.toLowerCase())
-  );
+  const filteredStreams = streams.filter((item) => {
+    const title = (item.name || (item as any).title || '').toLowerCase();
+    return title.includes(searchFilter.toLowerCase());
+  });
 
   // Auto-scroll del elemento enfocado en categorías
   useEffect(() => {
@@ -148,42 +177,125 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     }
   }, [focusedGridIndex, focusZone]);
 
-  const handleItemClick = (item: XtreamStream | XtreamSeries) => {
+  // Auto-scroll del episodio enfocado en el modal de series
+  useEffect(() => {
+    if (focusZone === 'episodes' && episodeFocusZone === 'episodes') {
+      episodeItemRefs.current[focusedEpisodeIndex]?.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth',
+      });
+    }
+  }, [focusedEpisodeIndex, focusZone, episodeFocusZone]);
+
+  // Manejar clic o selección con OK en cualquier ítem del catálogo
+  const handleItemClick = async (item: XtreamStream | XtreamSeries) => {
     if (contentType === 'movies') {
       const vod = item as XtreamStream;
+      const streamId = vod.stream_id || (vod as any).id;
+      const title = vod.name || (vod as any).title || 'Película VOD';
+      const ext = vod.container_extension || (vod as any).extension || 'mp4';
       const streamUrl = XtreamService.buildVodStreamUrl(
         server, user, pass,
-        vod.stream_id,
-        vod.container_extension || 'mp4'
+        streamId,
+        ext
       );
       onPlayStream({
-        id: `vod_${vod.stream_id}`,
-        title: vod.name,
+        id: `vod_${streamId}`,
+        title,
         streamUrl,
-        posterUrl: vod.stream_icon,
+        posterUrl: vod.stream_icon || (vod as any).cover || (vod as any).movie_image,
         isLive: false,
       });
     } else if (contentType === 'live') {
       const live = item as XtreamStream;
+      const streamId = live.stream_id || (live as any).id;
+      const title = live.name || (live as any).title || 'Canal de TV';
       const streamUrl = XtreamService.buildLiveStreamUrl(
         server, user, pass,
-        live.stream_id
+        streamId
       );
       onPlayStream({
-        id: `live_${live.stream_id}`,
-        title: live.name,
+        id: `live_${streamId}`,
+        title,
         streamUrl,
         posterUrl: live.stream_icon,
         isLive: true,
       });
     } else {
+      // SERIES: Cargar información detallada y episodios
       const series = item as XtreamSeries;
-      console.log('Serie seleccionada:', series.name);
+      const seriesId = series.series_id || (series as any).id;
+      setLoadingSeriesModal(true);
+      try {
+        const details = await XtreamService.getSeriesInfo(server, user, pass, seriesId);
+        const seasons = details.seasons || [];
+        const episodes = details.episodes || {};
+        const seasonKeys = Object.keys(episodes);
+
+        if (seasonKeys.length > 0) {
+          const firstSeasonNum = Number(seasonKeys[0]) || 1;
+          setSelectedSeriesDetails({
+            series,
+            seasons: seasons.length > 0 ? seasons : seasonKeys.map((k) => ({
+              season_number: Number(k),
+              name: `Temporada ${k}`,
+            })),
+            episodes,
+          });
+          setSelectedSeasonNumber(firstSeasonNum);
+          setFocusedEpisodeIndex(0);
+          setFocusedSeasonIndex(0);
+          setEpisodeFocusZone('episodes');
+          setFocusZone('episodes');
+        } else {
+          // Si no tiene estructura de episodios desglosada, intentar reproducir directo
+          const streamUrl = XtreamService.buildSeriesStreamUrl(server, user, pass, seriesId, 'mp4');
+          onPlayStream({
+            id: `series_${seriesId}`,
+            title: series.name || (series as any).title || 'Serie',
+            streamUrl,
+            posterUrl: series.cover,
+            isLive: false,
+          });
+        }
+      } catch (err) {
+        console.error('Error al cargar episodios de la serie:', err);
+      } finally {
+        setLoadingSeriesModal(false);
+      }
     }
   };
 
+  // Reproducir un episodio específico de la serie seleccionada
+  const playEpisode = (episode: EpisodeItem) => {
+    if (!selectedSeriesDetails) return;
+    const series = selectedSeriesDetails.series;
+    const epId = episode.id;
+    const ext = episode.container_extension || 'mp4';
+    const streamUrl = XtreamService.buildSeriesStreamUrl(server, user, pass, epId, ext);
+    const epTitle = episode.title 
+      ? `T${selectedSeasonNumber}E${episode.episode_num}: ${episode.title}`
+      : `T${selectedSeasonNumber} Episodio ${episode.episode_num}`;
+
+    onPlayStream({
+      id: `series_${epId}`,
+      title: `${series.name || 'Serie'} - ${epTitle}`,
+      streamUrl,
+      posterUrl: episode.info?.movie_image || series.cover,
+      isLive: false,
+    });
+  };
+
+  // Obtener lista de episodios para la temporada actual seleccionada
+  const currentSeasonEpisodes: EpisodeItem[] = 
+    selectedSeriesDetails?.episodes[String(selectedSeasonNumber)] ||
+    selectedSeriesDetails?.episodes[selectedSeasonNumber] ||
+    [];
+
   // 🎮 Motor Oficial de Navegación D-Pad para TV / Control Remoto
   useEffect(() => {
+    if (!isActive) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Prevenir scroll nativo del navegador para que responda solo al D-pad
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
@@ -191,19 +303,113 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         e.stopPropagation();
       }
 
+      // --- NAVEGACIÓN EN MODAL DE EPISODIOS DE SERIES ---
+      if (focusZone === 'episodes' && selectedSeriesDetails) {
+        const seasonsList = selectedSeriesDetails.seasons || [];
+
+        switch (e.key) {
+          case 'ArrowLeft':
+            if (episodeFocusZone === 'seasons') {
+              if (focusedSeasonIndex > 0) {
+                const prevSeasonIdx = focusedSeasonIndex - 1;
+                setFocusedSeasonIndex(prevSeasonIdx);
+                setSelectedSeasonNumber(seasonsList[prevSeasonIdx]?.season_number || prevSeasonIdx + 1);
+                setFocusedEpisodeIndex(0);
+              }
+            } else if (episodeFocusZone === 'episodes') {
+              // Si está en la lista de episodios, permitir cambiar de temporada
+              if (focusedSeasonIndex > 0) {
+                const prevSeasonIdx = focusedSeasonIndex - 1;
+                setFocusedSeasonIndex(prevSeasonIdx);
+                setSelectedSeasonNumber(seasonsList[prevSeasonIdx]?.season_number || prevSeasonIdx + 1);
+                setFocusedEpisodeIndex(0);
+              }
+            }
+            break;
+
+          case 'ArrowRight':
+            if (episodeFocusZone === 'seasons') {
+              if (focusedSeasonIndex < seasonsList.length - 1) {
+                const nextSeasonIdx = focusedSeasonIndex + 1;
+                setFocusedSeasonIndex(nextSeasonIdx);
+                setSelectedSeasonNumber(seasonsList[nextSeasonIdx]?.season_number || nextSeasonIdx + 1);
+                setFocusedEpisodeIndex(0);
+              }
+            } else if (episodeFocusZone === 'episodes') {
+              if (focusedSeasonIndex < seasonsList.length - 1) {
+                const nextSeasonIdx = focusedSeasonIndex + 1;
+                setFocusedSeasonIndex(nextSeasonIdx);
+                setSelectedSeasonNumber(seasonsList[nextSeasonIdx]?.season_number || nextSeasonIdx + 1);
+                setFocusedEpisodeIndex(0);
+              }
+            }
+            break;
+
+          case 'ArrowUp':
+            if (episodeFocusZone === 'episodes') {
+              if (focusedEpisodeIndex > 0) {
+                setFocusedEpisodeIndex((prev) => prev - 1);
+              } else {
+                setEpisodeFocusZone('seasons');
+              }
+            }
+            break;
+
+          case 'ArrowDown':
+            if (episodeFocusZone === 'seasons') {
+              if (currentSeasonEpisodes.length > 0) {
+                setEpisodeFocusZone('episodes');
+                setFocusedEpisodeIndex(0);
+              }
+            } else if (episodeFocusZone === 'episodes') {
+              if (focusedEpisodeIndex < currentSeasonEpisodes.length - 1) {
+                setFocusedEpisodeIndex((prev) => prev + 1);
+              }
+            }
+            break;
+
+          case 'Enter':
+          case ' ':
+            e.preventDefault();
+            if (episodeFocusZone === 'episodes') {
+              if (currentSeasonEpisodes[focusedEpisodeIndex]) {
+                playEpisode(currentSeasonEpisodes[focusedEpisodeIndex]);
+              }
+            } else if (episodeFocusZone === 'seasons') {
+              setEpisodeFocusZone('episodes');
+              setFocusedEpisodeIndex(0);
+            }
+            break;
+
+          case 'Escape':
+          case 'Backspace':
+          case 'GoBack':
+            e.preventDefault();
+            e.stopPropagation();
+            setSelectedSeriesDetails(null);
+            setFocusZone('grid');
+            break;
+        }
+        return;
+      }
+
+      // --- NAVEGACIÓN EN CATÁLOGO PRINCIPAL (Pestañas, Categorías, Cuadrícula) ---
       switch (e.key) {
         // --- FLECHA IZQUIERDA ---
         case 'ArrowLeft':
           if (focusZone === 'grid') {
             if (focusedGridIndex % numCols === 0) {
-              // Si está en la primera columna, regresar a la lista de categorías
+              // Si está en la primera columna, regresar exactamente a la categoría seleccionada
               setFocusZone('categories');
             } else {
               setFocusedGridIndex((prev) => Math.max(0, prev - 1));
             }
           } else if (focusZone === 'tabs') {
-            if (focusedTab > 0) {
-              const nextTab = (focusedTab - 1) as 0 | 1 | 2;
+            if (focusedTab === 0) {
+              // De Películas pasa a "Volver"
+              setFocusedTab(-1);
+            } else if (focusedTab > 0) {
+              const nextTab = (focusedTab - 1) as FocusedHeaderTab;
               setFocusedTab(nextTab);
               setContentType(nextTab === 0 ? 'movies' : nextTab === 1 ? 'series' : 'live');
             }
@@ -218,8 +424,11 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               setFocusedGridIndex(0);
             }
           } else if (focusZone === 'tabs') {
-            if (focusedTab < 2) {
-              const nextTab = (focusedTab + 1) as 0 | 1 | 2;
+            if (focusedTab === -1) {
+              // De "Volver" pasa a Películas
+              setFocusedTab(0);
+            } else if (focusedTab < 2) {
+              const nextTab = (focusedTab + 1) as FocusedHeaderTab;
               setFocusedTab(nextTab);
               setContentType(nextTab === 0 ? 'movies' : nextTab === 1 ? 'series' : 'live');
             }
@@ -240,15 +449,18 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 setSelectedCategoryId(categories[nextIdx].category_id);
               }
             } else {
-              // Subir a la barra superior de pestañas
+              // Subir a la barra superior de navegación
               setFocusZone('tabs');
+              setFocusedTab(0);
             }
           } else if (focusZone === 'grid') {
             if (focusedGridIndex >= numCols) {
+              // Sube exactamente a la tarjeta que está arriba
               setFocusedGridIndex((prev) => prev - numCols);
             } else {
-              // Subir a la barra de pestañas
+              // Si está en la primera fila, subir a la barra superior
               setFocusZone('tabs');
+              setFocusedTab(0);
             }
           }
           break;
@@ -267,7 +479,11 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             }
           } else if (focusZone === 'grid') {
             if (focusedGridIndex + numCols < filteredStreams.length) {
+              // Baja exactamente a la tarjeta que está directamente debajo
               setFocusedGridIndex((prev) => prev + numCols);
+            } else if (focusedGridIndex < filteredStreams.length - 1) {
+              // Si está en la penúltima fila y la última fila tiene menos tarjetas, ir al último ítem
+              setFocusedGridIndex(filteredStreams.length - 1);
             }
           }
           break;
@@ -277,8 +493,12 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         case ' ':
           e.preventDefault();
           if (focusZone === 'tabs') {
-            setContentType(focusedTab === 0 ? 'movies' : focusedTab === 1 ? 'series' : 'live');
-            setFocusZone('categories');
+            if (focusedTab === -1) {
+              onClose();
+            } else {
+              setContentType(focusedTab === 0 ? 'movies' : focusedTab === 1 ? 'series' : 'live');
+              setFocusZone('categories');
+            }
           } else if (focusZone === 'categories') {
             if (categories[focusedCatIndex]) {
               setSelectedCategoryId(categories[focusedCatIndex].category_id);
@@ -301,7 +521,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           e.preventDefault();
           e.stopPropagation();
           if (focusZone === 'grid') {
-            // Si está dentro de la cuadrícula, volver primero a las categorías
+            // Si está dentro de la cuadrícula, volver primero a las categorías manteniendo la categoría intacta
             setFocusZone('categories');
           } else {
             // Si está en categorías o pestañas, cerrar el explorador y volver a inicio
@@ -314,6 +534,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [
+    isActive,
     focusZone,
     focusedTab,
     focusedCatIndex,
@@ -322,6 +543,11 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     filteredStreams,
     numCols,
     onClose,
+    selectedSeriesDetails,
+    episodeFocusZone,
+    focusedSeasonIndex,
+    focusedEpisodeIndex,
+    currentSeasonEpisodes,
   ]);
 
   return (
@@ -330,10 +556,14 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       <header className="px-8 py-4 border-b border-white/10 bg-[#0C101D] flex items-center justify-between shrink-0">
         <button
           onClick={onClose}
-          className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white transition flex items-center space-x-2 border border-white/5 shrink-0"
+          className={`p-3 rounded-2xl transition-all duration-200 flex items-center space-x-2 shrink-0 ${
+            focusZone === 'tabs' && focusedTab === -1
+              ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-105 shadow-xl shadow-cyan-400/50'
+              : 'bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/5'
+          }`}
           title="Volver a Inicio (O pulsa Atrás en el mando)"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className={`w-5 h-5 ${focusZone === 'tabs' && focusedTab === -1 ? 'text-black font-black' : 'text-white'}`} />
           <span className="text-xs font-bold hidden sm:inline">Volver</span>
         </button>
 
@@ -348,7 +578,11 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               contentType === 'movies'
                 ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/40'
                 : 'text-zinc-400 hover:text-white hover:bg-white/5'
-            } ${focusZone === 'tabs' && focusedTab === 0 ? 'ring-4 ring-white scale-105' : ''}`}
+            } ${
+              focusZone === 'tabs' && focusedTab === 0
+                ? 'ring-4 ring-cyan-400 scale-102 font-extrabold z-10'
+                : ''
+            }`}
           >
             <Film className="w-5 h-5" />
             <span>Películas</span>
@@ -361,9 +595,13 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             }}
             className={`flex-1 flex items-center justify-center space-x-2.5 py-3 px-6 rounded-xl text-sm font-black transition-all ${
               contentType === 'series'
-                ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/40'
+                ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/40'
                 : 'text-zinc-400 hover:text-white hover:bg-white/5'
-            } ${focusZone === 'tabs' && focusedTab === 1 ? 'ring-4 ring-white scale-105' : ''}`}
+            } ${
+              focusZone === 'tabs' && focusedTab === 1
+                ? 'ring-4 ring-cyan-400 scale-102 font-extrabold z-10'
+                : ''
+            }`}
           >
             <Tv className="w-5 h-5" />
             <span>Series</span>
@@ -376,42 +614,46 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             }}
             className={`flex-1 flex items-center justify-center space-x-2.5 py-3 px-6 rounded-xl text-sm font-black transition-all ${
               contentType === 'live'
-                ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/40'
+                ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/40'
                 : 'text-zinc-400 hover:text-white hover:bg-white/5'
-            } ${focusZone === 'tabs' && focusedTab === 2 ? 'ring-4 ring-white scale-105' : ''}`}
+            } ${
+              focusZone === 'tabs' && focusedTab === 2
+                ? 'ring-4 ring-cyan-400 scale-102 font-extrabold z-10'
+                : ''
+            }`}
           >
             <Radio className="w-5 h-5" />
             <span>TV en Vivo</span>
           </button>
         </div>
 
-        {/* Buscador Rápido de Canales/Películas dentro de la categoría */}
-        <div className="relative w-64 hidden md:block shrink-0">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+        {/* Buscador Rápido con Icono */}
+        <div className="relative w-64 shrink-0">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
           <input
             type="text"
+            placeholder="Filtrar por título..."
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder="Filtrar..."
-            className="w-full pl-9 pr-3 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-400 transition"
+            className="w-full bg-[#131826] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-400"
           />
         </div>
       </header>
 
-      {/* ── Cuerpo Principal: Sidebar de Categorías + Grid de Contenido ── */}
+      {/* ── Cuerpo Principal Dividido: Categorías (Izquierda) + Cuadrícula (Derecha) ── */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Columna Izquierda: Carpetas / Categorías del Servidor */}
-        <aside className="w-72 md:w-80 border-r border-white/10 bg-[#0A0E1A] p-4 flex flex-col shrink-0">
-          <div className="flex items-center justify-between px-2 mb-2">
-            <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400">
+        {/* Panel Lateral: Lista de Categorías */}
+        <aside className="w-80 border-r border-white/10 bg-[#0A0D17] flex flex-col shrink-0">
+          <div className="p-4 border-b border-white/5 flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-300">
               Categorías ({categories.length})
             </span>
             {loading && <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />}
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+          <div className="flex-1 overflow-y-auto p-3 space-y-1 scroll-smooth">
             {categories.map((cat, idx) => {
-              const isSelected = cat.category_id === selectedCategoryId;
+              const isSelected = selectedCategoryId === cat.category_id;
               const isFocused = focusZone === 'categories' && focusedCatIndex === idx;
 
               return (
@@ -423,30 +665,26 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                     setFocusedCatIndex(idx);
                     setFocusZone('categories');
                   }}
-                  className={`w-full flex items-center space-x-3 px-3.5 py-3 rounded-xl text-left text-xs font-bold transition-all ${
+                  className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center space-x-3 ${
+                    isSelected
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                      : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
+                  } ${
                     isFocused
-                      ? 'bg-gradient-to-r from-cyan-400 to-blue-600 text-black font-extrabold scale-105 shadow-xl shadow-cyan-500/50 ring-4 ring-cyan-300 z-10'
-                      : isSelected
-                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-md ring-1 ring-cyan-400/40'
-                        : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
+                      ? 'ring-4 ring-cyan-400 bg-cyan-500/30 text-white font-extrabold scale-102 z-10 shadow-lg shadow-cyan-500/30'
+                      : ''
                   }`}
                 >
-                  <Folder className={`w-4 h-4 shrink-0 ${isFocused ? 'text-black' : isSelected ? 'text-cyan-400' : 'text-zinc-500'}`} />
+                  <Folder className={`w-4 h-4 shrink-0 ${isSelected || isFocused ? 'text-cyan-400' : 'text-zinc-500'}`} />
                   <span className="truncate flex-1">{cat.category_name}</span>
                 </button>
               );
             })}
-
-            {categories.length === 0 && !loading && (
-              <div className="text-center py-10 text-xs text-zinc-500">
-                No se encontraron categorías en esta sección.
-              </div>
-            )}
           </div>
         </aside>
 
-        {/* Columna Derecha: Cuadrícula con Todo el Contenido Real */}
-        <main className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-[#090D17] to-[#06080F]">
+        {/* Panel Principal: Cuadrícula de Contenido */}
+        <main className="flex-1 overflow-y-auto p-6 scroll-smooth">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-black uppercase tracking-wider text-zinc-300 flex items-center space-x-2">
               <span>Contenido</span>
@@ -455,27 +693,28 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               </span>
             </h2>
 
-            {loadingStreams && (
+            {(loadingStreams || loadingSeriesModal) && (
               <div className="flex items-center space-x-2 text-xs text-cyan-400">
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Cargando streams del servidor...</span>
+                <span>{loadingSeriesModal ? 'Cargando episodios de la serie...' : 'Cargando streams del servidor...'}</span>
               </div>
             )}
           </div>
 
-          {/* Grid de Películas o Series (Posters Verticales) */}
+          {/* Grid de Películas o Series (Posters Verticales): Estrictamente 5 columnas fijas */}
           {contentType !== 'live' ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-5 gap-4">
               {filteredStreams.map((item, idx) => {
                 const isSeries = contentType === 'series';
                 const id = isSeries ? (item as XtreamSeries).series_id : (item as XtreamStream).stream_id;
                 const cover = isSeries ? (item as XtreamSeries).cover : (item as XtreamStream).stream_icon;
                 const rating = item.rating;
+                const title = item.name || (item as any).title || 'Sin Título';
                 const isFocused = focusZone === 'grid' && focusedGridIndex === idx;
 
                 return (
                   <div
-                    key={id}
+                    key={id || idx}
                     ref={(el) => { gridItemRefs.current[idx] = el; }}
                     onClick={() => {
                       setFocusedGridIndex(idx);
@@ -490,7 +729,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                     <div className="aspect-[2/3] w-full rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 group-hover:border-cyan-400 relative">
                       <img
                         src={cover || 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400'}
-                        alt={item.name}
+                        alt={title}
                         loading="lazy"
                         onError={(e) => {
                           const target = e.currentTarget;
@@ -504,7 +743,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                         isFocused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                       }`}>
                         <div className="w-12 h-12 rounded-full bg-cyan-400 text-black flex items-center justify-center shadow-xl">
-                          <Play className="w-5 h-5 fill-black ml-0.5" />
+                          {isSeries ? <Layers className="w-5 h-5 ml-0.5" /> : <Play className="w-5 h-5 fill-black ml-0.5" />}
                         </div>
                       </div>
                       {rating && (
@@ -518,22 +757,23 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                     <h3 className={`text-xs font-bold mt-2 truncate transition ${
                       isFocused ? 'text-cyan-300 font-extrabold' : 'text-white'
                     }`}>
-                      {item.name}
+                      {title}
                     </h3>
                   </div>
                 );
               })}
             </div>
           ) : (
-            /* Grid de Canales de TV en Vivo (Tarjetas Horizontales con Logo) */
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            /* Grid de Canales de TV en Vivo (Tarjetas Horizontales con Logo): Estrictamente 4 columnas fijas */
+            <div className="grid grid-cols-4 gap-3">
               {filteredStreams.map((live, idx) => {
                 const stream = live as XtreamStream;
+                const title = stream.name || (stream as any).title || `Canal #${stream.stream_id}`;
                 const isFocused = focusZone === 'grid' && focusedGridIndex === idx;
 
                 return (
                   <div
-                    key={stream.stream_id}
+                    key={stream.stream_id || idx}
                     ref={(el) => { gridItemRefs.current[idx] = el; }}
                     onClick={() => {
                       setFocusedGridIndex(idx);
@@ -549,7 +789,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                       {stream.stream_icon ? (
                         <img
                           src={stream.stream_icon}
-                          alt={stream.name}
+                          alt={title}
                           className="w-full h-full object-contain"
                         />
                       ) : (
@@ -560,7 +800,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                       <h4 className={`text-xs font-bold truncate ${
                         isFocused ? 'text-cyan-300 font-extrabold' : 'text-white'
                       }`}>
-                        {stream.name}
+                        {title}
                       </h4>
                       <span className="text-[10px] text-zinc-500 font-semibold flex items-center space-x-1 mt-0.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -582,6 +822,138 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           )}
         </main>
       </div>
+
+      {/* ── Modal de Selección de Episodios para Series ── */}
+      {selectedSeriesDetails && (
+        <div className="fixed inset-0 z-60 bg-black/85 backdrop-blur-xl flex flex-col p-8 animate-fadeIn">
+          {/* Cabecera del modal con información de la serie */}
+          <div className="flex items-start justify-between border-b border-white/10 pb-6 shrink-0">
+            <div className="flex items-center space-x-6">
+              {selectedSeriesDetails.series.cover && (
+                <img
+                  src={selectedSeriesDetails.series.cover}
+                  alt={selectedSeriesDetails.series.name}
+                  className="w-20 h-28 object-cover rounded-xl border border-white/20 shadow-xl"
+                />
+              )}
+              <div>
+                <h2 className="text-2xl font-black text-white">{selectedSeriesDetails.series.name}</h2>
+                <div className="flex items-center space-x-4 mt-1.5 text-xs text-zinc-300">
+                  {selectedSeriesDetails.series.rating && (
+                    <span className="flex items-center text-amber-400 font-black">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 mr-1" />
+                      {selectedSeriesDetails.series.rating}
+                    </span>
+                  )}
+                  {selectedSeriesDetails.series.genre && (
+                    <span className="text-cyan-400">{selectedSeriesDetails.series.genre}</span>
+                  )}
+                  <span>{selectedSeriesDetails.seasons.length} Temporadas</span>
+                </div>
+                {selectedSeriesDetails.series.plot && (
+                  <p className="text-xs text-zinc-400 mt-2 max-w-3xl line-clamp-2">
+                    {selectedSeriesDetails.series.plot}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setSelectedSeriesDetails(null);
+                setFocusZone('grid');
+              }}
+              className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+              title="Cerrar (o pulsa Atrás)"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Selector de Temporadas */}
+          <div className="flex items-center space-x-3 py-4 overflow-x-auto shrink-0 border-b border-white/5">
+            {selectedSeriesDetails.seasons.map((season, sIdx) => {
+              const sNum = season.season_number || sIdx + 1;
+              const isSeasonSelected = selectedSeasonNumber === sNum;
+              const isSeasonFocused = focusZone === 'episodes' && episodeFocusZone === 'seasons' && focusedSeasonIndex === sIdx;
+
+              return (
+                <button
+                  key={sNum}
+                  onClick={() => {
+                    setSelectedSeasonNumber(sNum);
+                    setFocusedSeasonIndex(sIdx);
+                    setFocusedEpisodeIndex(0);
+                    setEpisodeFocusZone('episodes');
+                  }}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
+                    isSeasonSelected
+                      ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/40'
+                      : 'bg-[#131826] text-zinc-400 hover:text-white border border-white/10'
+                  } ${
+                    isSeasonFocused
+                      ? 'ring-4 ring-cyan-300 scale-105 z-10'
+                      : ''
+                  }`}
+                >
+                  {season.name || `Temporada ${sNum}`}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Lista de Episodios con Navegación Remota */}
+          <div className="flex-1 overflow-y-auto py-4 space-y-3">
+            <h3 className="text-xs font-black uppercase text-zinc-400 tracking-wider mb-2">
+              Episodios de la Temporada {selectedSeasonNumber} ({currentSeasonEpisodes.length})
+            </h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              {currentSeasonEpisodes.map((ep, eIdx) => {
+                const isEpFocused = focusZone === 'episodes' && episodeFocusZone === 'episodes' && focusedEpisodeIndex === eIdx;
+
+                return (
+                  <div
+                    key={ep.id || eIdx}
+                    ref={(el) => { episodeItemRefs.current[eIdx] = el; }}
+                    onClick={() => playEpisode(ep)}
+                    className={`p-4 rounded-2xl flex items-center space-x-4 cursor-pointer transition-all duration-200 border ${
+                      isEpFocused
+                        ? 'bg-gradient-to-r from-cyan-900/70 to-blue-900/70 border-cyan-400 ring-4 ring-cyan-400/50 scale-102 z-10 shadow-xl'
+                        : 'bg-[#0E1424] hover:bg-cyan-950/40 border-white/5'
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-cyan-500/20 text-cyan-400 font-black text-sm flex items-center justify-center shrink-0 border border-cyan-500/30">
+                      {ep.episode_num || eIdx + 1}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <h4 className={`text-sm font-bold truncate ${isEpFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>
+                        {ep.title || `Episodio ${ep.episode_num || eIdx + 1}`}
+                      </h4>
+                      {ep.info?.plot && (
+                        <p className="text-[11px] text-zinc-400 line-clamp-1 mt-0.5">
+                          {ep.info.plot}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className={`p-2.5 rounded-full transition ${isEpFocused ? 'bg-cyan-400 text-black' : 'bg-white/10 text-white'}`}>
+                      <Play className="w-4 h-4 fill-current ml-0.5" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {currentSeasonEpisodes.length === 0 && (
+              <div className="h-40 flex items-center justify-center text-zinc-500 text-xs">
+                No hay episodios registrados para esta temporada.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

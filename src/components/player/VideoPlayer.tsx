@@ -39,6 +39,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const [isPlaying, setIsPlaying] = useState(true);
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
@@ -133,13 +134,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
+              console.warn('HLS Network Error, reintentando carga de flujo...');
               hls.startLoad();
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
+              console.warn('HLS Media Error, recuperando códec/buffer...');
               hls.recoverMediaError();
               break;
             default:
               hls.destroy();
+              setStreamError('No se pudo establecer conexión con este flujo. Verifica tu red o intenta más tarde.');
               break;
           }
         }
@@ -426,8 +430,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onPlaying={() => {
           setIsVideoReady(true);
         }}
+        onCanPlay={() => {
+          setIsVideoReady(true);
+        }}
         onLoadedData={() => {
           setIsVideoReady(true);
+        }}
+        onError={() => {
+          console.error('Error al reproducir el flujo de video:', streamUrl);
+          setStreamError('No se pudo reproducir este flujo. El servidor IPTV no responde o el formato no es compatible.');
         }}
         onPause={() => {
           setIsPlaying(false);
@@ -440,11 +451,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onTimeUpdate={() => {
           if (videoRef.current) {
             setCurrentTime(videoRef.current.currentTime);
+            if (videoRef.current.currentTime > 0) {
+              setIsVideoReady(true);
+            }
           }
         }}
         onLoadedMetadata={() => {
           if (videoRef.current) {
             setDuration(videoRef.current.duration);
+            setIsVideoReady(true);
           }
         }}
         onEnded={() => {
@@ -452,6 +467,38 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           onClose();
         }}
       />
+
+      {/* Cartel de Error si el flujo falla o no responde */}
+      {streamError && (
+        <div className="absolute inset-0 z-40 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-8 space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center border border-red-500/30">
+            <RotateCcw className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-black text-white">Error de Reproducción</h2>
+          <p className="text-sm text-zinc-400 text-center max-w-md">{streamError}</p>
+          <div className="flex items-center space-x-4 pt-4">
+            <button
+              onClick={() => {
+                setStreamError(null);
+                setIsVideoReady(false);
+                if (videoRef.current) {
+                  videoRef.current.load();
+                  videoRef.current.play().catch(() => {});
+                }
+              }}
+              className="px-6 py-3 rounded-xl bg-cyan-500 text-black font-black text-xs hover:bg-cyan-400 transition"
+            >
+              Reintentar
+            </button>
+            <button
+              onClick={onClose}
+              className="px-6 py-3 rounded-xl bg-white/10 text-white font-bold text-xs hover:bg-white/20 transition"
+            >
+              Volver al Catálogo
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Capa de Controles OSD superpuesta: A pantalla completa sin márgenes ni cajas flotantes */}
       <div

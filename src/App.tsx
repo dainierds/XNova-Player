@@ -471,18 +471,9 @@ export function App() {
           contentId={playingItem.id}
           isLive={playingItem.duration === 'DIRECTO'}
           onClose={() => {
-            // Jerarquía de navegación: al salir del reproductor, regresar a la sección que se estaba viendo
-            const isLiveVideo = playingItem.duration === 'DIRECTO' || playingItem.id.startsWith('live_');
-            const isSeriesVideo = playingItem.type === 'series' || playingItem.id.startsWith('series_') || explorerType === 'series';
-            const targetType: 'live' | 'movies' | 'series' = isLiveVideo 
-              ? 'live' 
-              : isSeriesVideo 
-                ? 'series' 
-                : 'movies';
-
+            // Al salir del reproductor, cerrar video y regresar inmediatamente
+            // a la misma sección y carpeta donde estaba el usuario
             setPlayingItem(null);
-            setExplorerType(targetType);
-            setIsExplorerOpen(true);
           }}
         />
       )}
@@ -503,34 +494,36 @@ export function App() {
 
       {/* Explorador de Todo el Catálogo Xtream (Categorías y Carpetas Reales) */}
       {isExplorerOpen && activePlaylist && (
-        <FullCatalogExplorer
-          playlist={activePlaylist}
-          initialType={explorerType}
-          onClose={() => {
-            setIsExplorerOpen(false);
-            setActiveTab('movies');
-            setFocusedZone('thumbnails');
-          }}
-          onPlayStream={(stream) => {
-            setIsExplorerOpen(false);
-            setPlayingItem({
-              id: stream.id,
-              title: stream.title,
-              subtitle: stream.title,
-              backdropUrl: stream.posterUrl || '',
-              thumbnailUrl: stream.posterUrl || '',
-              releaseDateText: stream.isLive ? 'En Directo' : 'Película',
-              statusBadge: 'NUEVO',
-              genresText: stream.isLive ? 'TV en Vivo' : 'Streaming',
-              year: '2026',
-              rating: 'TP',
-              duration: stream.isLive ? 'DIRECTO' : 'HD',
-              synopsis: 'Disfruta de tu contenido.',
-              type: 'movie',
-              streamUrl: stream.streamUrl,
-            });
-          }}
-        />
+        <div className={playingItem ? 'hidden' : 'block'}>
+          <FullCatalogExplorer
+            playlist={activePlaylist}
+            initialType={explorerType}
+            isActive={!playingItem}
+            onClose={() => {
+              setIsExplorerOpen(false);
+              setActiveTab('movies');
+              setFocusedZone('thumbnails');
+            }}
+            onPlayStream={(stream) => {
+              setPlayingItem({
+                id: stream.id,
+                title: stream.title,
+                subtitle: stream.title,
+                backdropUrl: stream.posterUrl || '',
+                thumbnailUrl: stream.posterUrl || '',
+                releaseDateText: stream.isLive ? 'En Directo' : 'Película',
+                statusBadge: 'NUEVO',
+                genresText: stream.isLive ? 'TV en Vivo' : 'Streaming',
+                year: '2026',
+                rating: 'TP',
+                duration: stream.isLive ? 'DIRECTO' : 'HD',
+                synopsis: 'Disfruta de tu contenido.',
+                type: stream.id.startsWith('series_') ? 'series' : 'movie',
+                streamUrl: stream.streamUrl,
+              });
+            }}
+          />
+        </div>
       )}
 
       {/* Verificador y Modal de Actualización Automática OTA */}
