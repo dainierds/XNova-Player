@@ -356,9 +356,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         // --- ENTER / OK / ESPACIO ---
         case 'Enter':
         case ' ':
+        case 'Select':
           e.preventDefault();
           e.stopPropagation();
-          if (focusedControl === 'back') {
+          if (!showControls) {
+            if (video) {
+              if (video.paused) {
+                video.play();
+                setIsPlaying(true);
+                resetHideTimer();
+              } else {
+                video.pause();
+                setIsPlaying(false);
+                setShowControls(true);
+                setFocusedControl('play_pause');
+                if (hideTimerRef.current) {
+                  window.clearTimeout(hideTimerRef.current);
+                  hideTimerRef.current = null;
+                }
+                saveProgress();
+              }
+            }
+          } else if (focusedControl === 'back') {
             saveProgress();
             onClose();
           } else if (focusedControl === 'rewind') {

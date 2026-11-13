@@ -224,66 +224,97 @@ public class ExoPlayerActivity extends AppCompatActivity {
     }
 
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
+    public boolean dispatchKeyEvent(KeyEvent event) {
         // 🛑 SI EL DIÁLOGO DE ERROR ESTÁ VISIBLE, PERMITIR NAVEGACIÓN D-PAD NATIVA ENTRE LOS BOTONES
         if (errorLayout != null && errorLayout.getVisibility() == View.VISIBLE) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_DOWN) {
                 finish();
                 return true;
             }
-            return super.onKeyDown(keyCode, event);
+            return super.dispatchKeyEvent(event);
         }
 
         if (player == null) {
-            return super.onKeyDown(keyCode, event);
+            return super.dispatchKeyEvent(event);
         }
+
+        int keyCode = event.getKeyCode();
 
         switch (keyCode) {
             case KeyEvent.KEYCODE_BACK:
-                finish();
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    finish();
+                }
                 return true;
-
-            case KeyEvent.KEYCODE_DPAD_UP:
-            case KeyEvent.KEYCODE_DPAD_DOWN:
-                if (playerView != null && !playerView.isControllerFullyVisible()) {
-                    playerView.showController();
-                    return true;
-                }
-                break;
-
-            case KeyEvent.KEYCODE_DPAD_LEFT:
-                if (!isLive && player.isCurrentMediaItemSeekable()) {
-                    long current = player.getCurrentPosition();
-                    player.seekTo(Math.max(0, current - 10000));
-                    if (playerView != null) playerView.showController();
-                    return true;
-                }
-                break;
-
-            case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (!isLive && player.isCurrentMediaItemSeekable()) {
-                    long current = player.getCurrentPosition();
-                    player.seekTo(current + 10000);
-                    if (playerView != null) playerView.showController();
-                    return true;
-                }
-                break;
 
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
             case KeyEvent.KEYCODE_DPAD_CENTER:
-                if (playerView != null && !playerView.isControllerFullyVisible()) {
+            case KeyEvent.KEYCODE_ENTER:
+            case KeyEvent.KEYCODE_NUMPAD_ENTER:
+            case KeyEvent.KEYCODE_SPACE:
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    View currentFocus = getCurrentFocus();
+                    if (currentFocus != null && currentFocus.getId() == R.id.btn_back) {
+                        finish();
+                        return true;
+                    }
                     if (player.isPlaying()) {
                         player.pause();
                     } else {
                         player.play();
                     }
-                    playerView.showController();
+                    if (playerView != null) {
+                        playerView.showController();
+                    }
+                }
+                return true;
+
+            case KeyEvent.KEYCODE_MEDIA_PLAY:
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    player.play();
+                    if (playerView != null) playerView.showController();
+                }
+                return true;
+
+            case KeyEvent.KEYCODE_MEDIA_PAUSE:
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    player.pause();
+                    if (playerView != null) playerView.showController();
+                }
+                return true;
+
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (!isLive && player.isCurrentMediaItemSeekable()) {
+                        long current = player.getCurrentPosition();
+                        player.seekTo(Math.max(0, current - 10000));
+                        if (playerView != null) playerView.showController();
+                    }
+                }
+                return true;
+
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (!isLive && player.isCurrentMediaItemSeekable()) {
+                        long current = player.getCurrentPosition();
+                        player.seekTo(current + 10000);
+                        if (playerView != null) playerView.showController();
+                    }
+                }
+                return true;
+
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                if (playerView != null && !playerView.isControllerFullyVisible()) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        playerView.showController();
+                    }
                     return true;
                 }
                 break;
         }
 
-        return super.onKeyDown(keyCode, event);
+        return super.dispatchKeyEvent(event);
     }
 
     @Override
