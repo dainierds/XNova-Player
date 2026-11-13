@@ -38,6 +38,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const hlsRef = useRef<Hls | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
@@ -268,13 +269,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
       }}
     >
-      {/* Elemento de Video */}
+      {/* Pantalla de Carga Cinemática: Fondo oscuro con póster desenfocado y spinner mientras conecta */}
+      {!isVideoReady && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10 pointer-events-none">
+          {posterUrl && (
+            <img
+              src={posterUrl}
+              alt={title}
+              className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-20 scale-110"
+            />
+          )}
+          <div className="relative z-10 flex flex-col items-center space-y-4">
+            <div className="w-14 h-14 rounded-full border-4 border-cyan-500/20 border-t-cyan-400 animate-spin shadow-lg shadow-cyan-500/30" />
+            <p className="text-sm font-bold text-zinc-200 tracking-wider">
+              Cargando {isLive ? 'emisión en directo' : 'reproducción'}...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Elemento de Video: Con poster negro SVG para erradicar el icono blanco nativo */}
       <video
         ref={videoRef}
-        className="w-full h-full object-contain"
+        poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23000000'/%3E%3C/svg%3E"
+        className={`w-full h-full object-contain transition-opacity duration-500 ${
+          isVideoReady ? 'opacity-100' : 'opacity-0'
+        }`}
         onPlay={() => {
           setIsPlaying(true);
+          setIsVideoReady(true);
           resetHideTimer();
+        }}
+        onPlaying={() => {
+          setIsVideoReady(true);
+        }}
+        onLoadedData={() => {
+          setIsVideoReady(true);
         }}
         onPause={() => {
           setIsPlaying(false);
@@ -300,49 +330,50 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }}
       />
 
-      {/* Capa de Controles OSD superpuesta */}
+      {/* Capa de Controles OSD superpuesta: A pantalla completa sin márgenes ni cajas flotantes */}
       <div
-        className={`absolute inset-0 flex flex-col justify-between p-10 transition-opacity duration-300 pointer-events-none ${
+        className={`absolute inset-0 flex flex-col justify-between p-0 transition-opacity duration-300 pointer-events-none ${
           showControls ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Cabecera Superior del Reproductor */}
-        <div className="flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent p-4 rounded-xl">
-          <div className="flex items-center space-x-4">
+        {/* Cabecera Superior del Reproductor (A todo lo ancho, fundida hacia el video) */}
+        <div className="w-full bg-gradient-to-b from-black/95 via-black/75 to-transparent px-10 pt-8 pb-16 flex items-center justify-between pointer-events-auto">
+          <div className="flex items-center space-x-5">
             <button
               onClick={() => {
                 saveProgress();
                 onClose();
               }}
-              className="pointer-events-auto p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition"
+              className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition shadow-lg"
+              title="Volver (o botón Atrás del mando)"
             >
               <ArrowLeft className="w-6 h-6" />
             </button>
 
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 {isLive && channelNumber && (
-                  <span className="px-2.5 py-0.5 rounded bg-red-600 text-white font-black text-xs">
+                  <span className="px-3 py-1 rounded bg-red-600 text-white font-black text-xs shadow-md">
                     CH {channelNumber}
                   </span>
                 )}
-                <h1 className="text-xl font-bold text-white drop-shadow">{title}</h1>
+                <h1 className="text-2xl font-black text-white drop-shadow-lg tracking-wide">{title}</h1>
               </div>
-              <p className="text-xs text-zinc-300">
+              <p className="text-xs text-zinc-300 mt-0.5">
                 {isLive ? 'Transmisión en Vivo (HLS Directo)' : 'Película VOD'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-3">
-            <span className="px-2.5 py-1 rounded bg-zinc-800/80 border border-zinc-600 text-xs font-bold text-cyan-400">
+            <span className="px-3 py-1 rounded-lg bg-zinc-900/90 border border-zinc-700 text-xs font-black text-cyan-400 shadow-md">
               1080p FHD
             </span>
           </div>
         </div>
 
-        {/* Zona Inferior: Barra de Progreso y Controles */}
-        <div className="bg-gradient-to-t from-black/90 via-black/60 to-transparent p-6 rounded-xl flex flex-col space-y-4">
+        {/* Zona Inferior: Barra de Progreso y Controles (A todo lo ancho, fundida hacia arriba) */}
+        <div className="w-full bg-gradient-to-t from-black/95 via-black/75 to-transparent px-10 pb-8 pt-16 flex flex-col space-y-4 pointer-events-auto">
           {/* Barra de Progreso (Solo en VOD) */}
           {!isLive && (
             <div className="w-full flex items-center space-x-4">

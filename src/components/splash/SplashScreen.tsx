@@ -9,6 +9,7 @@ type SplashState = 'video' | 'fallback_gif' | 'fallback_logo';
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const [stage, setStage] = useState<SplashState>('video');
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasFinishedRef = useRef(false);
@@ -111,9 +112,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           playsInline
           autoPlay
           preload="auto"
+          poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%230A0E1A'/%3E%3C/svg%3E"
+          onPlaying={() => setIsVideoPlaying(true)}
           onEnded={completeSplash}
           onError={() => handleFallbackToGif()}
-          className="w-full h-full object-contain pointer-events-none"
+          className={`w-full h-full object-contain pointer-events-none transition-opacity duration-300 ${
+            isVideoPlaying ? 'opacity-100' : 'opacity-0'
+          }`}
         />
       )}
 

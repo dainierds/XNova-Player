@@ -327,44 +327,30 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-[#070A12] text-white flex flex-col overflow-hidden select-none animate-fadeIn font-sans">
       {/* ── Barra Superior de Navegación ── */}
-      <header className="px-8 py-3.5 border-b border-white/10 bg-[#0C101D] flex items-center justify-between shrink-0">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={onClose}
-            className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white transition flex items-center space-x-2 border border-white/5"
-            title="Volver a Inicio (O pulsa Atrás en el mando)"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="text-xs font-bold hidden sm:inline">Volver</span>
-          </button>
+      <header className="px-8 py-4 border-b border-white/10 bg-[#0C101D] flex items-center justify-between shrink-0">
+        <button
+          onClick={onClose}
+          className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white transition flex items-center space-x-2 border border-white/5 shrink-0"
+          title="Volver a Inicio (O pulsa Atrás en el mando)"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-xs font-bold hidden sm:inline">Volver</span>
+        </button>
 
-          <div>
-            <h1 className="text-base font-black tracking-wide text-white flex items-center space-x-2">
-              <span>Explorador de Contenido</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-bold uppercase">
-                {playlist.name}
-              </span>
-            </h1>
-            <p className="text-[11px] text-zinc-400">
-              Navega con las flechas de tu mando: ◄ Categorías | ► Contenido | OK Reproducir
-            </p>
-          </div>
-        </div>
-
-        {/* Selector de Pestañas: Películas / Series / TV en Vivo */}
-        <div className="flex items-center bg-[#131826] p-1 rounded-2xl border border-white/10 space-x-1.5">
+        {/* Selector de Pestañas: Películas / Series / TV en Vivo (Amplio, Espacioso y Centrado) */}
+        <div className="flex-1 max-w-2xl mx-8 flex items-center bg-[#131826] p-1.5 rounded-2xl border border-white/10 space-x-3">
           <button
             onClick={() => {
               setContentType('movies');
               setFocusedTab(0);
             }}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            className={`flex-1 flex items-center justify-center space-x-2.5 py-3 px-6 rounded-xl text-sm font-black transition-all ${
               contentType === 'movies'
                 ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/40'
                 : 'text-zinc-400 hover:text-white hover:bg-white/5'
             } ${focusZone === 'tabs' && focusedTab === 0 ? 'ring-4 ring-white scale-105' : ''}`}
           >
-            <Film className="w-4 h-4" />
+            <Film className="w-5 h-5" />
             <span>Películas</span>
           </button>
 
@@ -373,13 +359,13 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               setContentType('series');
               setFocusedTab(1);
             }}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            className={`flex-1 flex items-center justify-center space-x-2.5 py-3 px-6 rounded-xl text-sm font-black transition-all ${
               contentType === 'series'
                 ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/40'
                 : 'text-zinc-400 hover:text-white hover:bg-white/5'
             } ${focusZone === 'tabs' && focusedTab === 1 ? 'ring-4 ring-white scale-105' : ''}`}
           >
-            <Tv className="w-4 h-4" />
+            <Tv className="w-5 h-5" />
             <span>Series</span>
           </button>
 
@@ -388,26 +374,26 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               setContentType('live');
               setFocusedTab(2);
             }}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            className={`flex-1 flex items-center justify-center space-x-2.5 py-3 px-6 rounded-xl text-sm font-black transition-all ${
               contentType === 'live'
                 ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/40'
                 : 'text-zinc-400 hover:text-white hover:bg-white/5'
             } ${focusZone === 'tabs' && focusedTab === 2 ? 'ring-4 ring-white scale-105' : ''}`}
           >
-            <Radio className="w-4 h-4" />
+            <Radio className="w-5 h-5" />
             <span>TV en Vivo</span>
           </button>
         </div>
 
         {/* Buscador Rápido de Canales/Películas dentro de la categoría */}
-        <div className="relative w-56 hidden md:block">
+        <div className="relative w-64 hidden md:block shrink-0">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input
             type="text"
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             placeholder="Filtrar..."
-            className="w-full pl-9 pr-3 py-1.5 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-400 transition"
+            className="w-full pl-9 pr-3 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-400 transition"
           />
         </div>
       </header>
@@ -506,6 +492,12 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                         src={cover || 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400'}
                         alt={item.name}
                         loading="lazy"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (!target.src.includes('unsplash')) {
+                            target.src = 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400';
+                          }
+                        }}
                         className="w-full h-full object-cover"
                       />
                       <div className={`absolute inset-0 bg-black/40 transition flex items-center justify-center ${

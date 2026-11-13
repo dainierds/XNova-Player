@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ShowcaseItem } from '../../types/showcase';
 import { Play } from 'lucide-react';
+
+const FALLBACK_POSTER = 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400';
+const FALLBACK_BACKDROP = 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=1920';
 
 interface MainHeroStageProps {
   item: ShowcaseItem;
@@ -23,14 +26,22 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
   onPlay,
   onOpenTrailer,
 }) => {
+  const [backdropSrc, setBackdropSrc] = useState(item.backdropUrl || FALLBACK_BACKDROP);
+
+  // Sincronizar backdrop al cambiar el item activo
+  React.useEffect(() => {
+    setBackdropSrc(item.backdropUrl || FALLBACK_BACKDROP);
+  }, [item.backdropUrl]);
+
   return (
     <div className="relative flex-1 w-full h-full flex flex-col justify-between px-12 pb-6 pt-0 select-none overflow-hidden font-sans">
       {/* Fondo panorámico con personaje dominante a la derecha y desvanecimiento a la izquierda */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 bg-[#0A0E1A]">
         <img
-          key={item.backdropUrl}
-          src={item.backdropUrl}
+          key={backdropSrc}
+          src={backdropSrc}
           alt={item.title}
+          onError={() => setBackdropSrc(FALLBACK_BACKDROP)}
           className="w-full h-full object-cover object-right-top transition-opacity duration-700 ease-out opacity-90 animate-fadeIn"
         />
 
@@ -121,7 +132,7 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                 key={thumbItem.id}
                 onClick={() => onSelectThumbnail(index)}
                 className={`
-                  relative w-28 h-32 md:w-32 md:h-36 rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shrink-0
+                  relative w-28 h-32 md:w-32 md:h-36 rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shrink-0 bg-gradient-to-br from-zinc-800 to-zinc-950 border border-white/10
                   ${isFocused
                     ? 'scale-105 ring-4 ring-cyan-400 shadow-2xl shadow-cyan-500/60 z-20 -translate-y-1'
                     : isSelected
@@ -130,11 +141,18 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                 `}
               >
                 <img
-                  src={thumbItem.thumbnailUrl}
+                  src={thumbItem.thumbnailUrl || FALLBACK_POSTER}
                   alt={thumbItem.title}
-                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (target.src !== FALLBACK_POSTER) {
+                      target.src = FALLBACK_POSTER;
+                    }
+                  }}
+                  className="w-full h-full object-cover transition-opacity duration-300"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-2">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent flex flex-col justify-end p-2.5">
                   <span className="text-[11px] font-bold text-white truncate drop-shadow">
                     {thumbItem.title}
                   </span>
