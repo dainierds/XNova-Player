@@ -385,6 +385,7 @@ export function App() {
         isOpen={isAdminPanelOpen}
         onClose={() => setIsAdminPanelOpen(false)}
         onSelectUserToLogin={(username, pass) => {
+          setIsAdminPanelOpen(false);
           login(username, pass);
         }}
       />

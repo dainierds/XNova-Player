@@ -1,5 +1,6 @@
 import { get, set, del } from 'idb-keyval';
 import type { PlaylistAccount } from '../types';
+import type { UserAccount } from '../types/auth';
 
 const KEYS = {
   PLAYLISTS: 'xnova_playlists',
@@ -11,6 +12,9 @@ const KEYS = {
   ACTIVE_PROFILE: 'xnova_active_profile',
   SHOW_SPLASH: 'xnova_show_splash',
   ACTIVE_THEME: 'xnova_active_theme',
+  MANAGED_USERS: 'xnova_managed_users_v2',
+  ACTIVE_SESSION: 'xnova_active_session_v2',
+  USERS_INITIALIZED: 'xnova_users_initialized_v2',
 };
 
 export interface WatchProgressItem {
@@ -125,5 +129,38 @@ export const StorageService = {
 
   async setActiveTheme(theme: 'cinematic' | 'serivia'): Promise<void> {
     await set(KEYS.ACTIVE_THEME, theme);
+  },
+
+  // --- Gestión de Usuarios y Sesiones Persistentes (Almacenamiento permanente en Disco / IndexedDB) ---
+  async getManagedUsers(): Promise<UserAccount[] | null> {
+    const users = await get<UserAccount[]>(KEYS.MANAGED_USERS);
+    return users || null;
+  },
+
+  async saveManagedUsers(users: UserAccount[]): Promise<void> {
+    await set(KEYS.MANAGED_USERS, users);
+    await set(KEYS.USERS_INITIALIZED, true);
+  },
+
+  async getHasInitializedUsers(): Promise<boolean> {
+    const initialized = await get<boolean>(KEYS.USERS_INITIALIZED);
+    return !!initialized;
+  },
+
+  async setHasInitializedUsers(val: boolean): Promise<void> {
+    await set(KEYS.USERS_INITIALIZED, val);
+  },
+
+  async getPersistentSession(): Promise<UserAccount | null> {
+    const session = await get<UserAccount>(KEYS.ACTIVE_SESSION);
+    return session || null;
+  },
+
+  async savePersistentSession(user: UserAccount): Promise<void> {
+    await set(KEYS.ACTIVE_SESSION, user);
+  },
+
+  async clearPersistentSession(): Promise<void> {
+    await del(KEYS.ACTIVE_SESSION);
   },
 };

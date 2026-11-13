@@ -8,7 +8,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isInitialized: boolean;
   
-  initializeAuth: () => void;
+  initializeAuth: () => Promise<void>;
   login: (username: string, password: string) => { success: boolean; error?: string; isAdmin?: boolean };
   logout: () => void;
   refreshCurrentUser: () => void;
@@ -21,9 +21,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isInitialized: false,
 
-  initializeAuth: () => {
+  initializeAuth: async () => {
     AuthService.init();
-    const active = AuthService.getActiveSession();
+    // Sincronizar usuarios y sesión desde IndexedDB (persistente a través de actualizaciones de APK)
+    await AuthService.syncWithPersistentStorage();
+    const active = await AuthService.syncSessionFromPersistentStorage();
     if (active) {
       set({
         currentUser: active,

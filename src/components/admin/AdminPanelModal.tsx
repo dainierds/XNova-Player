@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   UserPlus, 
@@ -16,7 +16,7 @@ import {
 import type { UserAccount, UserPlan } from '../../types/auth';
 import { PLAN_CONFIGS } from '../../types/auth';
 import type { PlaylistAccount } from '../../types';
-import { AuthService } from '../../services/authService';
+import { AuthService, isSeedUser } from '../../services/authService';
 import { useAuthStore } from '../../store/useAuthStore';
 
 interface AdminPanelModalProps {
@@ -55,6 +55,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     },
   ]);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Sincronizar usuarios desde IndexedDB permanente cada vez que se abre el panel
+  useEffect(() => {
+    if (isOpen) {
+      AuthService.syncWithPersistentStorage().then((loaded) => {
+        setUsers(loaded);
+      });
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -285,6 +294,22 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         </div>
 
         <div className="flex items-center space-x-3">
+          {users.some(isSeedUser) && (
+            <button
+              onClick={() => {
+                if (confirm('¿Eliminar las cuentas de ejemplo/demo y conservar solo tus usuarios reales?')) {
+                  const cleaned = AuthService.clearSeedUsers();
+                  setUsers(cleaned);
+                }
+              }}
+              className="flex items-center space-x-2 px-3.5 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs border border-rose-500/30 transition shadow-sm"
+              title="Eliminar las cuentas de ejemplo Carlos Gómez, Mariana Silva, etc."
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>LIMPIAR CUENTAS DEMO</span>
+            </button>
+          )}
+
           <button
             onClick={handleOpenCreate}
             className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs shadow-lg shadow-cyan-500/20 transition transform active:scale-95"
@@ -380,6 +405,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     >
                       {user.status === 'active' ? 'ACTIVO' : 'SUSPENDIDO'}
                     </span>
+
+                    {isSeedUser(user) ? (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-semibold tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                        EJEMPLO DEMO
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-400/30">
+                        ✓ GUARDADO EN DISCO
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center space-x-4 mt-1 text-xs text-zinc-400">

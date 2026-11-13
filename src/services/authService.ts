@@ -1,17 +1,19 @@
 import type { UserAccount, UserPlan } from '../types/auth';
 import type { PlaylistAccount } from '../types';
 import { PLAN_CONFIGS } from '../types/auth';
+import { StorageService } from './storage';
 
-const STORAGE_USERS_KEY = 'xnova_managed_users_v1';
-const STORAGE_SESSION_KEY = 'xnova_active_session_v1';
+const STORAGE_USERS_KEY = 'xnova_managed_users_v2';
+const STORAGE_SESSION_KEY = 'xnova_active_session_v2';
+const STORAGE_INIT_KEY = 'xnova_users_initialized_v2';
 
-// Cuentas de demostración iniciales para pruebas inmediatas
-const SEED_USERS: UserAccount[] = [
+// Cuentas de demostración iniciales solo para primera visualización opcional
+export const SEED_USERS: UserAccount[] = [
   {
     id: 'user_basic_01',
     username: 'cliente_basic',
     password: '123',
-    displayName: 'Carlos Gómez',
+    displayName: 'Carlos Gómez (Demo)',
     plan: 'basic',
     status: 'active',
     expDate: '2026-12-31',
@@ -32,7 +34,7 @@ const SEED_USERS: UserAccount[] = [
     id: 'user_gold_02',
     username: 'cliente_gold',
     password: '123',
-    displayName: 'Mariana Silva',
+    displayName: 'Mariana Silva (Demo)',
     plan: 'gold',
     status: 'active',
     expDate: '2027-06-30',
@@ -47,20 +49,13 @@ const SEED_USERS: UserAccount[] = [
         password: 'secure_password_2',
         isActive: true,
       },
-      {
-        id: 'pl_gold_2',
-        name: 'VOD Películas y Series',
-        type: 'm3u',
-        m3uUrl: 'https://cdn.xnova.live/vod/movies.m3u8',
-        isActive: false,
-      },
     ],
   },
   {
     id: 'user_premium_03',
     username: 'cliente_premium',
     password: '123',
-    displayName: 'Alejandro Morales',
+    displayName: 'Alejandro Morales (Demo)',
     plan: 'premium',
     status: 'active',
     expDate: '2027-12-31',
@@ -75,49 +70,90 @@ const SEED_USERS: UserAccount[] = [
         password: 'secure_password_3',
         isActive: true,
       },
-      {
-        id: 'pl_prem_2',
-        name: 'Cinema 4K HDR',
-        type: 'xtream',
-        serverUrl: 'http://vip.xnovatv.com:8080',
-        username: 'prem_cinema_2',
-        password: 'secure_password_4',
-        isActive: false,
-      },
-      {
-        id: 'pl_prem_3',
-        name: 'Canales Internacionales',
-        type: 'm3u',
-        m3uUrl: 'https://cdn.xnova.live/world/live.m3u8',
-        isActive: false,
-      },
     ],
   },
 ];
 
+export const isSeedUser = (user: UserAccount): boolean => {
+  return ['user_basic_01', 'user_gold_02', 'user_premium_03'].includes(user.id);
+};
+
 export const AuthService = {
-  // Inicializar almacenamiento con datos semilla si está vacío
+  // Inicialización básica síncrona
   init(): void {
     const raw = localStorage.getItem(STORAGE_USERS_KEY);
-    if (!raw) {
+    const hasInit = localStorage.getItem(STORAGE_INIT_KEY);
+
+    if (!raw && !hasInit) {
       localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(SEED_USERS));
+    }
+  },
+
+  // Sincronización robusta con IndexedDB (Persistencia absoluta a prueba de reinicios y updates de APK)
+  async syncWithPersistentStorage(): Promise<UserAccount[]> {
+    try {
+      // 1. Consultar primero en IndexedDB (almacenamiento no volátil en disco)
+      const persistentUsers = await StorageService.getManagedUsers();
+      if (persistentUsers && Array.isArray(persistentUsers)) {
+        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(persistentUsers));
+        localStorage.setItem(STORAGE_INIT_KEY, 'true');
+        return persistentUsers;
+      }
+
+      // 2. Si no hay en IndexedDB, migrar los de localStorage a IndexedDB
+      const localUsers = this.getAllUsers();
+      if (localUsers.length > 0) {
+        await StorageService.saveManagedUsers(localUsers);
+        return localUsers;
+      }
+
+      return [];
+    } catch (e) {
+      console.error('Error sincronizando usuarios con IndexedDB:', e);
+      return this.getAllUsers();
     }
   },
 
   // Obtener todos los usuarios registrados (Para el panel de administración)
   getAllUsers(): UserAccount[] {
-    this.init();
     try {
       const raw = localStorage.getItem(STORAGE_USERS_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      
+      const hasInit = localStorage.getItem(STORAGE_INIT_KEY);
+      if (hasInit) {
+        return [];
+      }
       return SEED_USERS;
+    } catch {
+      return [];
     }
   },
 
-  // Guardar la lista completa de usuarios
+  // Guardar la lista completa de usuarios (en localStorage e IndexedDB)
   saveAllUsers(users: UserAccount[]): void {
-    localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
+    try {
+      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
+      localStorage.setItem(STORAGE_INIT_KEY, 'true');
+      
+      // Guardado permanente en IndexedDB
+      StorageService.saveManagedUsers(users).catch((err) => {
+        console.error('Error guardando usuarios en IndexedDB:', err);
+      });
+    } catch (e) {
+      console.error('Error guardando usuarios en localStorage:', e);
+    }
+  },
+
+  // Eliminar cuentas de prueba/ejemplo con 1 solo clic
+  clearSeedUsers(): UserAccount[] {
+    const users = this.getAllUsers();
+    const cleanUsers = users.filter((u) => !isSeedUser(u));
+    this.saveAllUsers(cleanUsers);
+    return cleanUsers;
   },
 
   // Crear un nuevo usuario desde el panel de administración
@@ -130,7 +166,7 @@ export const AuthService = {
     playlists: PlaylistAccount[];
     notes?: string;
   }): { success: boolean; user?: UserAccount; error?: string } {
-    const users = this.getAllUsers();
+    let users = this.getAllUsers();
     
     // Verificar si el username ya existe
     const exists = users.some(
@@ -147,6 +183,12 @@ export const AuthService = {
         success: false,
         error: `El plan ${PLAN_CONFIGS[data.plan].name} solo permite hasta ${maxAllowed} lista(s) activa(s).`,
       };
+    }
+
+    // Si solo existían las cuentas de demostración, limpiarlas automáticamente para conservar únicamente la cuenta real
+    const onlyHasSeeds = users.length > 0 && users.every((u) => isSeedUser(u));
+    if (onlyHasSeeds) {
+      users = [];
     }
 
     // Asegurar que al menos una lista esté activa si existen
@@ -301,11 +343,37 @@ export const AuthService = {
     }
   },
 
+  async syncSessionFromPersistentStorage(): Promise<UserAccount | null> {
+    const local = this.getActiveSession();
+    if (local) return local;
+
+    const persistent = await StorageService.getPersistentSession();
+    if (persistent) {
+      localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(persistent));
+      return persistent;
+    }
+    return null;
+  },
+
   saveActiveSession(user: UserAccount): void {
-    localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(user));
+    try {
+      localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(user));
+      StorageService.savePersistentSession(user).catch((err) => {
+        console.error('Error guardando sesión en IndexedDB:', err);
+      });
+    } catch (e) {
+      console.error('Error guardando sesión activa:', e);
+    }
   },
 
   clearActiveSession(): void {
-    localStorage.removeItem(STORAGE_SESSION_KEY);
+    try {
+      localStorage.removeItem(STORAGE_SESSION_KEY);
+      StorageService.clearPersistentSession().catch((err) => {
+        console.error('Error eliminando sesión en IndexedDB:', err);
+      });
+    } catch (e) {
+      console.error('Error limpiando sesión:', e);
+    }
   },
 };
