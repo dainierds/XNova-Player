@@ -97,7 +97,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<number>(1);
   const [focusedEpisodeIndex, setFocusedEpisodeIndex] = useState(0);
   const [focusedSeasonIndex, setFocusedSeasonIndex] = useState(0);
-  const [seriesFocusZone, setSeriesFocusZone] = useState<'seasons' | 'episodes'>('episodes');
+  const [seriesFocusZone, setSeriesFocusZone] = useState<'close' | 'seasons' | 'episodes'>('episodes');
   const [loadingSeriesModal, setLoadingSeriesModal] = useState(false);
 
   const catItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -195,6 +195,16 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       });
     }
   }, [focusedGridIndex, focusZone]);
+
+  // Auto-scroll del episodio enfocado en modal de series
+  useEffect(() => {
+    if (focusZone === 'series_modal' && seriesFocusZone === 'episodes') {
+      episodeItemRefs.current[focusedEpisodeIndex]?.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth',
+      });
+    }
+  }, [focusedEpisodeIndex, focusZone, seriesFocusZone]);
 
   // 3. Cargar información cinematográfica de la película enfocada (Hero Preview - Imagen 1)
   const fetchMetadataForFocusedItem = useCallback(async (item: XtreamStream | XtreamSeries) => {
@@ -449,7 +459,10 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
       // ── CASO 2: MODAL DE EPISODIOS DE SERIES ──
       if (focusZone === 'series_modal' && selectedSeriesDetails) {
+        e.preventDefault();
+        e.stopPropagation();
         const seasonsList = selectedSeriesDetails.seasons || [];
+        const numEpisodeCols = 2;
 
         switch (e.key) {
           case 'ArrowLeft':
@@ -460,6 +473,13 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 setSelectedSeasonNumber(seasonsList[prev]?.season_number || prev + 1);
                 setFocusedEpisodeIndex(0);
               }
+            } else if (seriesFocusZone === 'episodes') {
+              setFocusedEpisodeIndex((prev) => {
+                if (prev % numEpisodeCols === 1) {
+                  return prev - 1;
+                }
+                return prev;
+              });
             }
             break;
 
@@ -471,48 +491,69 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 setSelectedSeasonNumber(seasonsList[next]?.season_number || next + 1);
                 setFocusedEpisodeIndex(0);
               }
+            } else if (seriesFocusZone === 'episodes') {
+              setFocusedEpisodeIndex((prev) => {
+                if (prev % numEpisodeCols === 0 && prev + 1 < currentSeasonEpisodes.length) {
+                  return prev + 1;
+                }
+                return prev;
+              });
             }
             break;
 
           case 'ArrowUp':
             if (seriesFocusZone === 'episodes') {
-              if (focusedEpisodeIndex > 0) {
-                setFocusedEpisodeIndex((prev) => prev - 1);
-              } else {
+              setFocusedEpisodeIndex((prev) => {
+                if (prev >= numEpisodeCols) {
+                  return prev - numEpisodeCols;
+                }
                 setSeriesFocusZone('seasons');
-              }
+                return prev;
+              });
+            } else if (seriesFocusZone === 'seasons') {
+              setSeriesFocusZone('close');
             }
             break;
 
           case 'ArrowDown':
-            if (seriesFocusZone === 'seasons') {
+            if (seriesFocusZone === 'close') {
+              setSeriesFocusZone('seasons');
+            } else if (seriesFocusZone === 'seasons') {
               if (currentSeasonEpisodes.length > 0) {
                 setSeriesFocusZone('episodes');
                 setFocusedEpisodeIndex(0);
               }
             } else if (seriesFocusZone === 'episodes') {
-              if (focusedEpisodeIndex < currentSeasonEpisodes.length - 1) {
-                setFocusedEpisodeIndex((prev) => prev + 1);
-              }
+              setFocusedEpisodeIndex((prev) => {
+                const nextDown = prev + numEpisodeCols;
+                if (nextDown < currentSeasonEpisodes.length) {
+                  return nextDown;
+                }
+                if (prev % numEpisodeCols === 1 && prev + 1 < currentSeasonEpisodes.length) {
+                  return prev + 1;
+                }
+                return prev;
+              });
             }
             break;
 
           case 'Enter':
           case ' ':
-            e.preventDefault();
+          case 'Select':
             if (seriesFocusZone === 'episodes' && currentSeasonEpisodes[focusedEpisodeIndex]) {
               playEpisode(currentSeasonEpisodes[focusedEpisodeIndex]);
             } else if (seriesFocusZone === 'seasons') {
               setSeriesFocusZone('episodes');
               setFocusedEpisodeIndex(0);
+            } else if (seriesFocusZone === 'close') {
+              setSelectedSeriesDetails(null);
+              setFocusZone('grid');
             }
             break;
 
           case 'Escape':
           case 'Backspace':
           case 'GoBack':
-            e.preventDefault();
-            e.stopPropagation();
             setSelectedSeriesDetails(null);
             setFocusZone('grid');
             break;
@@ -1033,7 +1074,11 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 setSelectedSeriesDetails(null);
                 setFocusZone('grid');
               }}
-              className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+              className={`p-3 rounded-full transition ${
+                focusZone === 'series_modal' && seriesFocusZone === 'close'
+                  ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-110 shadow-lg'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
             >
               <X className="w-6 h-6" />
             </button>
