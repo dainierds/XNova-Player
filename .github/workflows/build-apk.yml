@@ -92,35 +92,50 @@ jobs:
           APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
           ZIPALIGN="$BUILD_TOOLS_DIR/zipalign"
 
+          KEYSTORE_FILE="android/release.keystore"
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
             echo "==> Firmando con Keystore secreto de GitHub Secrets..."
-            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > release.keystore
-
-            $ZIPALIGN -v -p 4 "$UNSIGNED_APK" aligned.apk
-            $APKSIGNER sign --ks release.keystore \
-              --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
-              --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
-              --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
-              --out "$SIGNED_APK" aligned.apk
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_FILE"
+            KS_PASS="${{ secrets.KEYSTORE_PASSWORD }}"
+            KEY_PASS="${{ secrets.KEY_PASSWORD }}"
+            ALIAS="${{ secrets.KEY_ALIAS }}"
+          elif [ -f "$KEYSTORE_FILE" ]; then
+            echo "==> Usando Keystore Permanente existente ($KEYSTORE_FILE)..."
+            KS_PASS="xnovapass2026"
+            KEY_PASS="xnovapass2026"
+            ALIAS="xnovatv"
           else
-            echo "==> Generando keystore automático (sin secretos configurados)..."
+            echo "==> Generando Keystore Permanente oficial para XNova Player..."
             keytool -genkey -v \
-              -keystore auto-release.keystore \
-              -alias xnova \
+              -keystore "$KEYSTORE_FILE" \
+              -alias xnovatv \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
-              -storepass xnovapass \
-              -keypass xnovapass \
+              -storepass xnovapass2026 \
+              -keypass xnovapass2026 \
               -dname "CN=XNova Player, OU=TV, O=XNova, L=Miami, S=FL, C=US"
 
-            $ZIPALIGN -v -p 4 "$UNSIGNED_APK" aligned.apk
-            $APKSIGNER sign --ks auto-release.keystore \
-              --ks-pass "pass:xnovapass" \
-              --key-pass "pass:xnovapass" \
-              --ks-key-alias xnova \
-              --out "$SIGNED_APK" aligned.apk
+            KS_PASS="xnovapass2026"
+            KEY_PASS="xnovapass2026"
+            ALIAS="xnovatv"
+
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -f "$KEYSTORE_FILE"
+            git commit -m "chore(release): keystore permanente para actualizaciones OTA directas" || true
+            git push origin main || true
           fi
+
+          echo "==> Alineando APK con zipalign..."
+          $ZIPALIGN -v -p 4 "$UNSIGNED_APK" aligned.apk
+
+          echo "==> Firmando APK con apksigner (v2/v3 signing permanente)..."
+          $APKSIGNER sign --ks "$KEYSTORE_FILE" \
+            --ks-pass "pass:$KS_PASS" \
+            --key-pass "pass:$KEY_PASS" \
+            --ks-key-alias "$ALIAS" \
+            --out "$SIGNED_APK" aligned.apk
 
           echo "apk_path=$SIGNED_APK" >> $GITHUB_OUTPUT
 

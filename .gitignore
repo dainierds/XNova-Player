@@ -18,6 +18,7 @@ android/build/
 android/app/build/
 android/local.properties
 *.keystore
+!android/release.keystore
 keystore_base64.txt
 
 # Environment variables
