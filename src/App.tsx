@@ -501,11 +501,24 @@ export function App() {
         onCancel={() => setIsExitModalOpen(false)}
         onConfirm={() => {
           setIsExitModalOpen(false);
+          // 1. Invocar puente nativo oficial (cierre garantizado en Android TV)
+          const bridge = (window as unknown as { AppExitBridge?: { exitApp: () => void } }).AppExitBridge;
+          if (bridge && typeof bridge.exitApp === 'function') {
+            bridge.exitApp();
+            return;
+          }
+          // 2. Invocar plugin oficial de Capacitor
+          const cap = (window as unknown as { Capacitor?: { Plugins?: { App?: { exitApp: () => void } } } }).Capacitor;
+          if (cap?.Plugins?.App?.exitApp) {
+            cap.Plugins.App.exitApp();
+            return;
+          }
+          // 3. Fallback de navegador/Cordova
           if ((window as unknown as { navigator?: { app?: { exitApp?: () => void } } }).navigator?.app?.exitApp) {
             (window as unknown as { navigator: { app: { exitApp: () => void } } }).navigator.app.exitApp();
-          } else {
-            console.log('Cerrar aplicación XNova Player');
+            return;
           }
+          window.close();
         }}
       />
 

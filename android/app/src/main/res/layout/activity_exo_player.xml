@@ -69,12 +69,12 @@
                 android:id="@+id/btn_retry"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:backgroundTint="#22D3EE"
+                android:background="@drawable/btn_dialog_action_selector"
                 android:focusable="true"
                 android:paddingStart="24dp"
                 android:paddingEnd="24dp"
                 android:text="Reintentar"
-                android:textColor="#000000"
+                android:textColor="@color/btn_dialog_action_text_selector"
                 android:textStyle="bold" />
 
             <Button
@@ -82,24 +82,26 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
-                android:backgroundTint="#33FFFFFF"
+                android:background="@drawable/btn_dialog_action_selector"
                 android:focusable="true"
                 android:paddingStart="24dp"
                 android:paddingEnd="24dp"
                 android:text="Abrir con VLC"
-                android:textColor="#FFFFFF" />
+                android:textColor="@color/btn_dialog_action_text_selector"
+                android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btn_error_back"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
-                android:backgroundTint="#33FFFFFF"
+                android:background="@drawable/btn_dialog_action_selector"
                 android:focusable="true"
                 android:paddingStart="24dp"
                 android:paddingEnd="24dp"
                 android:text="Volver al Catálogo"
-                android:textColor="#FFFFFF" />
+                android:textColor="@color/btn_dialog_action_text_selector"
+                android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
 

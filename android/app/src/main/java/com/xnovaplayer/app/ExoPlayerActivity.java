@@ -35,6 +35,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
     private String streamUrl = "";
     private String title = "";
     private boolean isLive = false;
+    private boolean hasTriedAudioFallback = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -161,7 +162,35 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 @Override
                 public void onPlayerError(PlaybackException error) {
                     loadingSpinner.setVisibility(View.GONE);
-                    showError("Error de reproducción (" + error.getErrorCodeName() + "): " + error.getMessage());
+
+                    // Si el audio falló por códec no compatible en el chip del TV (ej. DTS 7.1 o AC3 multicanal),
+                    // intentar automáticamente forzar downmixing a 2 canales estéreo
+                    if (error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED && !hasTriedAudioFallback) {
+                        hasTriedAudioFallback = true;
+                        try {
+                            player.setTrackSelectionParameters(
+                                    player.getTrackSelectionParameters()
+                                            .buildUpon()
+                                            .setMaxAudioChannelCount(2)
+                                            .build()
+                            );
+                            player.prepare();
+                            player.play();
+                            return;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    boolean isDts = error.getMessage() != null && error.getMessage().toLowerCase().contains("dts");
+                    showError("Error de reproducción (" + error.getErrorCodeName() + "): " + 
+                            (isDts ? "Esta película contiene audio DTS multicanal no soportado por el chip de este televisor. Puedes abrirla directamente con VLC." : error.getMessage()));
+                    
+                    // Si es error de audio/códec, resaltar por defecto el botón "Abrir con VLC"
+                    Button btnExternal = findViewById(R.id.btn_error_external);
+                    if (btnExternal != null) {
+                        btnExternal.requestFocus();
+                    }
                 }
             });
 
@@ -180,9 +209,9 @@ public class ExoPlayerActivity extends AppCompatActivity {
         if (errorLayout != null && tvErrorMessage != null) {
             tvErrorMessage.setText(message);
             errorLayout.setVisibility(View.VISIBLE);
-            Button btnRetry = findViewById(R.id.btn_retry);
-            if (btnRetry != null) {
-                btnRetry.requestFocus();
+            Button btnExternal = findViewById(R.id.btn_error_external);
+            if (btnExternal != null) {
+                btnExternal.requestFocus();
             }
         }
     }
@@ -196,6 +225,15 @@ public class ExoPlayerActivity extends AppCompatActivity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // 🛑 SI EL DIÁLOGO DE ERROR ESTÁ VISIBLE, PERMITIR NAVEGACIÓN D-PAD NATIVA ENTRE LOS BOTONES
+        if (errorLayout != null && errorLayout.getVisibility() == View.VISIBLE) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                finish();
+                return true;
+            }
+            return super.onKeyDown(keyCode, event);
+        }
+
         if (player == null) {
             return super.onKeyDown(keyCode, event);
         }

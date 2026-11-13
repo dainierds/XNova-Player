@@ -69,6 +69,21 @@ public class MainActivity extends BridgeActivity {
                         return true;
                     }
                 }, "ExoPlayerBridge");
+
+                // 🛑 Puente nativo para cerrar la aplicación al confirmar en el modal de salida
+                webView.addJavascriptInterface(new Object() {
+                    @JavascriptInterface
+                    public void exitApp() {
+                        runOnUiThread(() -> {
+                            try {
+                                finishAffinity();
+                                System.exit(0);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        });
+                    }
+                }, "AppExitBridge");
             }
         } catch (Exception e) {
             e.printStackTrace();
