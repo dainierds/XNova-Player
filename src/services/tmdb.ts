@@ -37,7 +37,15 @@ const cache = new Map<string, MovieItem>();
 
 export class TmdbService {
   private static getApiKey(): string {
-    return import.meta.env.VITE_TMDB_API_KEY || '';
+    return import.meta.env.VITE_TMDB_API_KEY || '844dba0bfd8f3a4f3799f6130ef9e335';
+  }
+
+  public static cleanTitle(rawTitle: string): string {
+    return rawTitle
+      .replace(/\[.*?\]|\(.*?\)|«.*?»|<.*?>/g, '')
+      .replace(/\b(4K|2160p|1080p|720p|480p|HD|FHD|LATINO|CASTELLANO|SUB|ESP|P2P|PLEX|PROMO)\b/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
   }
 
   public static async enrichMovie(
@@ -45,11 +53,7 @@ export class TmdbService {
     fallbackPoster: string = '',
     fallbackStreamUrl: string = ''
   ): Promise<MovieItem> {
-    // Limpiar título de posibles tags de resolución (1080p, 4K, Latino, «PLEX», «P2P», etc.)
-    const cleanTitle = rawTitle
-      .replace(/\[.*?\]|\(.*?\)|«.*?»|<.*?>/g, '')
-      .replace(/\b(4K|1080p|720p|HD|FHD|LATINO|CASTELLANO|SUB|ESP|P2P|PLEX)\b/gi, '')
-      .trim();
+    const cleanTitle = this.cleanTitle(rawTitle);
 
     const cacheKey = cleanTitle.toLowerCase();
     if (cache.has(cacheKey)) {
@@ -86,7 +90,21 @@ export class TmdbService {
       if (!res.ok) throw new Error('Error al conectar con TMDb');
 
       const data = await res.json();
-      const firstResult: TmdbMovieResult | undefined = data.results?.[0];
+      let firstResult: TmdbMovieResult | undefined = data.results?.[0];
+
+      if (!firstResult) {
+        // Segundo intento en inglés/título original si la búsqueda en español no tuvo coincidencia
+        try {
+          const fallbackSearch = `https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(cleanTitle)}&page=1&include_adult=false`;
+          const res2 = await fetch(fallbackSearch);
+          if (res2.ok) {
+            const data2 = await res2.json();
+            firstResult = data2.results?.[0];
+          }
+        } catch {
+          // Continuar
+        }
+      }
 
       if (!firstResult) {
         throw new Error('Sin coincidencia en TMDb');
@@ -124,10 +142,10 @@ export class TmdbService {
         title: firstResult.title || cleanTitle,
         backdropUrl: firstResult.backdrop_path
           ? `https://image.tmdb.org/t/p/original${firstResult.backdrop_path}`
-          : fallbackPoster || 'https://images.unsplash.com/photo-1635863138275-d9b33299680b?q=80&w=1920&auto=format&fit=crop',
+          : fallbackPoster || '',
         posterUrl: firstResult.poster_path
           ? `https://image.tmdb.org/t/p/w500${firstResult.poster_path}`
-          : fallbackPoster || 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=600&auto=format&fit=crop',
+          : fallbackPoster || '',
         genres: genres.length > 0 ? genres : ['Aventura', 'Acción'],
         synopsis: firstResult.overview || 'Sin descripción disponible.',
         duration: durationStr,

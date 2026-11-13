@@ -29,12 +29,10 @@ const normalizeMediaUrl = (url?: string, serverBase?: string): string => {
   }
   
   if (trimmed.startsWith('/')) {
-    if (trimmed.match(/\.(jpg|jpeg|png|webp)/i)) {
-      return `https://image.tmdb.org/t/p/w500${trimmed}`;
-    }
     if (serverBase) {
       return `${serverBase.replace(/\/+$/, '')}${trimmed}`;
     }
+    return `https://image.tmdb.org/t/p/w500${trimmed}`;
   }
   
   return trimmed;
@@ -67,15 +65,61 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
   const initialCover = normalizeMediaUrl(rawCover, server);
 
   const [imgSrc, setImgSrc] = useState<string>(initialCover);
-  const [hasFailed, setHasFailed] = useState<boolean>(!initialCover);
+  const [hasFailed, setHasFailed] = useState<boolean>(false);
   const title = item.name || (item as any).title || 'Sin Título';
   const rating = item.rating || '7.0';
 
   useEffect(() => {
-    const updated = normalizeMediaUrl(rawCover, server);
-    setImgSrc(updated);
-    setHasFailed(!updated);
-  }, [rawCover, server]);
+    let isMounted = true;
+    const coverUrl = normalizeMediaUrl(rawCover, server);
+
+    if (coverUrl) {
+      setImgSrc(coverUrl);
+      setHasFailed(false);
+    } else {
+      // Si la lista Xtream no provee carátula, consultar automáticamente TMDb (igual que TiviMate)
+      const cleaned = TmdbService.cleanTitle(title);
+      if (cleaned && cleaned.length > 1) {
+        TmdbService.enrichMovie(cleaned)
+          .then((meta) => {
+            if (isMounted && meta?.posterUrl) {
+              setImgSrc(meta.posterUrl);
+              setHasFailed(false);
+            } else if (isMounted) {
+              setHasFailed(true);
+            }
+          })
+          .catch(() => {
+            if (isMounted) setHasFailed(true);
+          });
+      } else {
+        setHasFailed(true);
+      }
+    }
+
+    return () => { isMounted = false; };
+  }, [rawCover, server, title]);
+
+  const handleImageError = () => {
+    // Si la imagen del servidor IPTV falló, intentar fallback automático a TMDb (igual que TiviMate)
+    const cleaned = TmdbService.cleanTitle(title);
+    if (cleaned && cleaned.length > 1 && !imgSrc.includes('tmdb.org')) {
+      TmdbService.enrichMovie(cleaned)
+        .then((meta) => {
+          if (meta?.posterUrl && meta.posterUrl !== imgSrc) {
+            setImgSrc(meta.posterUrl);
+            setHasFailed(false);
+          } else {
+            setHasFailed(true);
+          }
+        })
+        .catch(() => {
+          setHasFailed(true);
+        });
+    } else {
+      setHasFailed(true);
+    }
+  };
 
   return (
     <div
@@ -92,11 +136,8 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
           <img
             src={imgSrc}
             alt={title}
-            loading="lazy"
             referrerPolicy="no-referrer"
-            onError={() => {
-              setHasFailed(true);
-            }}
+            onError={handleImageError}
             className="w-full h-full object-cover"
           />
         ) : (
