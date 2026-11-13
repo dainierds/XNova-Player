@@ -94,27 +94,10 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
             alt={title}
             loading="lazy"
             referrerPolicy="no-referrer"
-            crossOrigin="anonymous"
             onError={() => {
-              const cleanTitle = title
-                .replace(/\[.*?\]|\(.*?\)|«.*?»|<.*?>/g, '')
-                .replace(/\b(4K|1080p|720p|HD|FHD|LATINO|CASTELLANO|SUB|ESP|P2P|PLEX)\b/gi, '')
-                .trim();
-              if (cleanTitle && cleanTitle.length > 2) {
-                TmdbService.enrichMovie(cleanTitle)
-                  .then((tmdb) => {
-                    if (tmdb && tmdb.posterUrl && !tmdb.posterUrl.includes('unsplash')) {
-                      setImgSrc(tmdb.posterUrl);
-                    } else {
-                      setHasFailed(true);
-                    }
-                  })
-                  .catch(() => setHasFailed(true));
-              } else {
-                setHasFailed(true);
-              }
+              setHasFailed(true);
             }}
-            className="w-full h-full object-cover transition-opacity duration-300"
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0A0F1D]">
@@ -886,7 +869,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 src={focusedMetadata.backdropUrl}
                 alt={focusedMetadata.title}
                 referrerPolicy="no-referrer"
-                crossOrigin="anonymous"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}
@@ -1004,7 +986,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                           alt={title}
                           loading="lazy"
                           referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                           }}
@@ -1041,7 +1022,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 src={selectedMovieDetail.meta.backdropUrl}
                 alt={selectedMovieDetail.meta.title}
                 referrerPolicy="no-referrer"
-                crossOrigin="anonymous"
                 className="w-full h-full object-cover opacity-35 scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-[#070A12] via-[#070A12]/85 to-transparent" />
@@ -1170,7 +1150,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                   src={normalizeMediaUrl(selectedSeriesDetails.series.cover, server)}
                   alt={selectedSeriesDetails.series.name}
                   referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
                   className="w-20 h-28 object-cover rounded-xl border border-white/20 shadow-xl"
                 />
               )}
