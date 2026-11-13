@@ -141,11 +141,6 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           <div className="w-8 h-8 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
         </div>
       )}
-
-      {/* Indicador discreto para saltar animación */}
-      <div className="absolute bottom-6 right-8 text-[11px] font-semibold text-zinc-500 tracking-wider">
-        Presiona OK o Atrás para omitir
-      </div>
     </div>
   );
 };
