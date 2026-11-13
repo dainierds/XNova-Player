@@ -289,6 +289,11 @@ export function App() {
           } else if (focusedZone === 'sidebar') {
             if (focusedTab === 'settings') {
               setIsSettingsOpen(true);
+            } else if (focusedTab === 'logout') {
+              const { logout } = useAuthStore.getState();
+              logout();
+            } else {
+              handleSelectTab(focusedTab);
             }
           }
           break;

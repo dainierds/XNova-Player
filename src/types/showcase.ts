@@ -22,4 +22,5 @@ export type SidebarTabId =
   | 'live'
   | 'favorites'
   | 'library'
-  | 'settings';
+  | 'settings'
+  | 'logout';
