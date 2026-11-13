@@ -41,19 +41,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
+  const showControlsRef = useRef(true);
+  showControlsRef.current = showControls;
+
   const [audioTracks, setAudioTracks] = useState<{ id: number; name: string }[]>([]);
   const [currentAudio, setCurrentAudio] = useState(0);
   const hideTimerRef = useRef<number | null>(null);
 
-  // Reiniciar temporizador de ocultación de controles
+  // Reiniciar temporizador de ocultación de controles (3.5 segundos)
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
     if (hideTimerRef.current) {
       window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
     }
+    // Solo iniciar auto-ocultación si el video está reproduciéndose
     hideTimerRef.current = window.setTimeout(() => {
-      setShowControls(false);
-    }, 4500);
+      if (videoRef.current && !videoRef.current.paused) {
+        setShowControls(false);
+      }
+    }, 3500);
   }, []);
 
   // Formatear segundos a HH:MM:SS
@@ -161,7 +168,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const video = videoRef.current;
-      resetHideTimer();
+
+      // Si los controles están ocultos y el usuario presiona Enter/OK o Arriba/Abajo:
+      // Simplemente despertamos los controles OSD sin pausar la emisión
+      if (!showControlsRef.current) {
+        if (['Enter', ' ', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+          e.preventDefault();
+          resetHideTimer();
+          return;
+        }
+      }
 
       switch (e.key) {
         case ' ':
@@ -171,9 +187,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             if (video.paused) {
               video.play();
               setIsPlaying(true);
+              resetHideTimer();
             } else {
               video.pause();
               setIsPlaying(false);
+              setShowControls(true);
+              if (hideTimerRef.current) {
+                window.clearTimeout(hideTimerRef.current);
+                hideTimerRef.current = null;
+              }
               saveProgress();
             }
           }
@@ -181,6 +203,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         case 'ArrowLeft':
           e.preventDefault();
+          resetHideTimer();
           if (video && !isLive) {
             video.currentTime = Math.max(0, video.currentTime - 10);
           }
@@ -188,6 +211,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         case 'ArrowRight':
           e.preventDefault();
+          resetHideTimer();
           if (video && !isLive) {
             video.currentTime = Math.min(duration, video.currentTime + 10);
           }
@@ -195,6 +219,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         case 'ArrowUp':
           e.preventDefault();
+          resetHideTimer();
           if (isLive && onPrevChannel) {
             onPrevChannel();
           }
@@ -204,12 +229,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           e.preventDefault();
           if (isLive && onNextChannel) {
             onNextChannel();
+            resetHideTimer();
+          } else {
+            // Ocultar controles OSD inmediatamente para despejar la pantalla
+            setShowControls(false);
+            if (hideTimerRef.current) {
+              window.clearTimeout(hideTimerRef.current);
+              hideTimerRef.current = null;
+            }
           }
           break;
 
         case 'Escape':
         case 'Backspace':
+        case 'GoBack':
           e.preventDefault();
+          e.stopPropagation();
           saveProgress();
           onClose();
           break;
@@ -219,16 +254,36 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [duration, isLive, onClose, onNextChannel, onPrevChannel, resetHideTimer, saveProgress]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center overflow-hidden select-none">
+    <div 
+      className="fixed inset-0 z-50 bg-black flex items-center justify-center overflow-hidden select-none"
+      onMouseMove={resetHideTimer}
+      onClick={() => {
+        if (!showControls) {
+          resetHideTimer();
+        }
+      }}
+    >
       {/* Elemento de Video */}
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
+        onPlay={() => {
+          setIsPlaying(true);
+          resetHideTimer();
+        }}
+        onPause={() => {
+          setIsPlaying(false);
+          setShowControls(true);
+          if (hideTimerRef.current) {
+            window.clearTimeout(hideTimerRef.current);
+            hideTimerRef.current = null;
+          }
+        }}
         onTimeUpdate={() => {
           if (videoRef.current) {
             setCurrentTime(videoRef.current.currentTime);
