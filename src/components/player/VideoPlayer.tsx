@@ -40,6 +40,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(true);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
+  const [errorFocus, setErrorFocus] = useState<'retry' | 'back'>('retry');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
@@ -195,6 +196,48 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const video = videoRef.current;
+
+      // 🛑 SI HAY UN ERROR EN PANTALLA, EL CONTROL REMOTO ACTÚA EXCLUSIVAMENTE SOBRE EL MODAL DE ERROR
+      if (streamError) {
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' ', 'Escape', 'Backspace', 'GoBack'].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+
+        switch (e.key) {
+          case 'ArrowLeft':
+            setErrorFocus('retry');
+            break;
+          case 'ArrowRight':
+            setErrorFocus('back');
+            break;
+          case 'ArrowUp':
+          case 'ArrowDown':
+            setErrorFocus((prev) => (prev === 'retry' ? 'back' : 'retry'));
+            break;
+          case 'Enter':
+          case ' ':
+            if (errorFocus === 'retry') {
+              setStreamError(null);
+              setIsVideoReady(false);
+              if (video) {
+                video.load();
+                video.play().catch(() => {});
+              }
+            } else {
+              saveProgress();
+              onClose();
+            }
+            break;
+          case 'Escape':
+          case 'Backspace':
+          case 'GoBack':
+            saveProgress();
+            onClose();
+            break;
+        }
+        return;
+      }
 
       // Si los controles están ocultos y el usuario presiona Enter/OK o flechas:
       if (!showControlsRef.current) {
@@ -383,6 +426,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     currentAudio,
     subtitleTracks,
     currentSubtitle,
+    streamError,
+    errorFocus,
     getBottomControls,
   ]);
 
@@ -470,13 +515,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       {/* Cartel de Error si el flujo falla o no responde */}
       {streamError && (
-        <div className="absolute inset-0 z-40 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-8 space-y-4">
-          <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center border border-red-500/30">
-            <RotateCcw className="w-8 h-8" />
+        <div className="absolute inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-8 space-y-6 pointer-events-auto">
+          <div className="w-20 h-20 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center border-2 border-red-500/40 shadow-2xl shadow-red-500/20">
+            <RotateCcw className="w-10 h-10" />
           </div>
-          <h2 className="text-xl font-black text-white">Error de Reproducción</h2>
-          <p className="text-sm text-zinc-400 text-center max-w-md">{streamError}</p>
-          <div className="flex items-center space-x-4 pt-4">
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-black text-white tracking-wide">Error de Reproducción</h2>
+            <p className="text-sm text-zinc-400 text-center max-w-lg leading-relaxed">{streamError}</p>
+          </div>
+          <div className="flex items-center space-x-6 pt-4">
             <button
               onClick={() => {
                 setStreamError(null);
@@ -486,15 +533,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   videoRef.current.play().catch(() => {});
                 }
               }}
-              className="px-6 py-3 rounded-xl bg-cyan-500 text-black font-black text-xs hover:bg-cyan-400 transition"
+              className={`px-8 py-3.5 rounded-2xl font-black text-sm transition-all duration-200 flex items-center space-x-2.5 ${
+                errorFocus === 'retry'
+                  ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-105 shadow-2xl shadow-cyan-400/60 z-10'
+                  : 'bg-white/10 hover:bg-white/20 text-white border border-white/10'
+              }`}
             >
-              Reintentar
+              <RotateCcw className={`w-4 h-4 ${errorFocus === 'retry' ? 'text-black' : 'text-white'}`} />
+              <span>Reintentar</span>
             </button>
             <button
-              onClick={onClose}
-              className="px-6 py-3 rounded-xl bg-white/10 text-white font-bold text-xs hover:bg-white/20 transition"
+              onClick={() => {
+                saveProgress();
+                onClose();
+              }}
+              className={`px-8 py-3.5 rounded-2xl font-black text-sm transition-all duration-200 flex items-center space-x-2.5 ${
+                errorFocus === 'back'
+                  ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-105 shadow-2xl shadow-cyan-400/60 z-10'
+                  : 'bg-white/10 hover:bg-white/20 text-white border border-white/10'
+              }`}
             >
-              Volver al Catálogo
+              <ArrowLeft className={`w-4 h-4 ${errorFocus === 'back' ? 'text-black' : 'text-white'}`} />
+              <span>Volver al Catálogo</span>
             </button>
           </div>
         </div>
@@ -503,7 +563,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       {/* Capa de Controles OSD superpuesta: A pantalla completa sin márgenes ni cajas flotantes */}
       <div
         className={`absolute inset-0 flex flex-col justify-between p-0 transition-opacity duration-300 pointer-events-none ${
-          showControls ? 'opacity-100' : 'opacity-0'
+          showControls && !streamError ? 'opacity-100' : 'opacity-0'
         }`}
       >
         {/* Cabecera Superior del Reproductor (A todo lo ancho, fundida hacia el video) */}
