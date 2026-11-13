@@ -7,9 +7,11 @@ import {
   RotateCw, 
   Volume2, 
   Subtitles, 
-  ArrowLeft
+  ArrowLeft,
+  ExternalLink
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
+import { openExternalPlayer } from '../../utils/externalPlayer';
 
 interface VideoPlayerProps {
   streamUrl: string;
@@ -40,7 +42,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(true);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
-  const [errorFocus, setErrorFocus] = useState<'retry' | 'back'>('retry');
+  const [errorFocus, setErrorFocus] = useState<'retry' | 'external' | 'back'>('external');
+  const currentStreamUrl = streamUrl;
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
@@ -206,14 +209,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         switch (e.key) {
           case 'ArrowLeft':
-            setErrorFocus('retry');
+            if (errorFocus === 'back') setErrorFocus('external');
+            else if (errorFocus === 'external') setErrorFocus('retry');
             break;
           case 'ArrowRight':
-            setErrorFocus('back');
+            if (errorFocus === 'retry') setErrorFocus('external');
+            else if (errorFocus === 'external') setErrorFocus('back');
             break;
           case 'ArrowUp':
           case 'ArrowDown':
-            setErrorFocus((prev) => (prev === 'retry' ? 'back' : 'retry'));
+            setErrorFocus((prev) => (prev === 'retry' ? 'external' : prev === 'external' ? 'back' : 'retry'));
             break;
           case 'Enter':
           case ' ':
@@ -224,6 +229,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 video.load();
                 video.play().catch(() => {});
               }
+            } else if (errorFocus === 'external') {
+              openExternalPlayer(currentStreamUrl, title);
             } else {
               saveProgress();
               onClose();
@@ -542,6 +549,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <RotateCcw className={`w-4 h-4 ${errorFocus === 'retry' ? 'text-black' : 'text-white'}`} />
               <span>Reintentar</span>
             </button>
+
+            <button
+              onClick={() => openExternalPlayer(currentStreamUrl, title)}
+              className={`px-8 py-3.5 rounded-2xl font-black text-sm transition-all duration-200 flex items-center space-x-2.5 ${
+                errorFocus === 'external'
+                  ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-105 shadow-2xl shadow-cyan-400/60 z-10'
+                  : 'bg-white/10 hover:bg-white/20 text-white border border-white/10'
+              }`}
+            >
+              <ExternalLink className={`w-4 h-4 ${errorFocus === 'external' ? 'text-black' : 'text-white'}`} />
+              <span>Abrir en VLC / Reproductor Externo</span>
+            </button>
+
             <button
               onClick={() => {
                 saveProgress();

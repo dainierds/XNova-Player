@@ -138,6 +138,45 @@ export class XtreamService {
     return res.json();
   }
 
+  // Obtener información detallada de una película VOD (sinopsis, actores, director, backdrop, duración, etc.)
+  public static async getVodInfo(
+    serverUrl: string,
+    username: string,
+    password: string,
+    vodId: number | string
+  ): Promise<{
+    info?: {
+      name?: string;
+      o_name?: string;
+      cover_big?: string;
+      movie_image?: string;
+      releasedate?: string;
+      episode_run_time?: string | number;
+      youtube_trailer?: string;
+      director?: string;
+      actors?: string;
+      cast?: string;
+      description?: string;
+      plot?: string;
+      rating?: string;
+      genre?: string;
+      backdrop_path?: string[];
+      duration_secs?: number;
+      duration?: string;
+      container_extension?: string;
+    };
+    movie_data?: {
+      stream_id?: number | string;
+      name?: string;
+      container_extension?: string;
+    };
+  }> {
+    const base = this.normalizeUrl(serverUrl);
+    const url = `${base}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_vod_info&vod_id=${encodeURIComponent(vodId)}`;
+    const res = await fetch(url);
+    return res.json();
+  }
+
   public static async getLiveCategories(
     serverUrl: string,
     username: string,

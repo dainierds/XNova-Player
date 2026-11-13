@@ -1,8 +1,11 @@
 package com.xnovaplayer.app;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.KeyEvent;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
@@ -28,6 +31,22 @@ public class MainActivity extends BridgeActivity {
                         return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
                     }
                 });
+
+                // Puente nativo para abrir reproductores externos (VLC, MX Player, Just Player) en Android TV
+                webView.addJavascriptInterface(new Object() {
+                    @JavascriptInterface
+                    public void openExternalPlayer(String url, String title) {
+                        try {
+                            Intent intent = new Intent(Intent.ACTION_VIEW);
+                            intent.setDataAndType(Uri.parse(url), "video/*");
+                            intent.putExtra("title", title);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(Intent.createChooser(intent, "Reproducir con..."));
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }, "NativePlayerLauncher");
             }
         } catch (Exception e) {
             e.printStackTrace();
