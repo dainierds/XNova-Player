@@ -47,6 +47,28 @@ public class MainActivity extends BridgeActivity {
                         }
                     }
                 }, "NativePlayerLauncher");
+
+                // 🚀 Puente nativo oficial para reproducir con Google Media3 ExoPlayer (motor idéntico a TiviMate)
+                webView.addJavascriptInterface(new Object() {
+                    @JavascriptInterface
+                    public void playExoPlayer(String url, String title, String posterUrl, boolean isLive) {
+                        try {
+                            Intent intent = new Intent(MainActivity.this, ExoPlayerActivity.class);
+                            intent.putExtra("url", url);
+                            intent.putExtra("title", title);
+                            intent.putExtra("posterUrl", posterUrl);
+                            intent.putExtra("isLive", isLive);
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    @JavascriptInterface
+                    public boolean isAvailable() {
+                        return true;
+                    }
+                }, "ExoPlayerBridge");
             }
         } catch (Exception e) {
             e.printStackTrace();

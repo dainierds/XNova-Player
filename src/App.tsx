@@ -13,6 +13,7 @@ import { TvLoginScreen } from './components/auth/TvLoginScreen';
 import { AdminPanelModal } from './components/admin/AdminPanelModal';
 import { UpdateModal } from './components/common/UpdateModal';
 import { FullCatalogExplorer } from './components/explorer/FullCatalogExplorer';
+import { playWithNativePlayer } from './utils/nativePlayer';
 import { SHOWCASE_MOVIES, SHOWCASE_SERIES } from './mock/showcaseData';
 import type { SidebarTabId, ShowcaseItem } from './types/showcase';
 import type { MovieItem } from './types';
@@ -311,6 +312,13 @@ export function App() {
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenSearch={() => setIsSearchOpen(true)}
             onPlayMedia={(media) => {
+              if (media.streamUrl && playWithNativePlayer({
+                streamUrl: media.streamUrl,
+                title: media.title,
+                posterUrl: media.posterUrl,
+              })) {
+                return;
+              }
               setPlayingItem({
                 id: media.id,
                 title: media.title,
@@ -362,7 +370,16 @@ export function App() {
                   setCarouselIndex(idx);
                   setFocusedZone('thumbnails');
                 }}
-                onPlay={() => setPlayingItem(activeItem)}
+                onPlay={() => {
+                  if (activeItem.streamUrl && playWithNativePlayer({
+                    streamUrl: activeItem.streamUrl,
+                    title: activeItem.title,
+                    posterUrl: activeItem.backdropUrl,
+                  })) {
+                    return;
+                  }
+                  setPlayingItem(activeItem);
+                }}
                 onOpenTrailer={() => console.log('Abrir trailer de:', activeItem.title)}
               />
             </div>
@@ -505,6 +522,17 @@ export function App() {
               setFocusedZone('thumbnails');
             }}
             onPlayStream={(stream) => {
+              // 🚀 1. Intentar reproducir con Google Media3 ExoPlayer nativo (el mismo motor de TiviMate)
+              if (playWithNativePlayer({
+                streamUrl: stream.streamUrl,
+                title: stream.title,
+                posterUrl: stream.posterUrl,
+                isLive: stream.isLive,
+              })) {
+                return;
+              }
+
+              // 2. Si se ejecuta en navegador web de escritorio, usar reproductor web de respaldo
               setPlayingItem({
                 id: stream.id,
                 title: stream.title,

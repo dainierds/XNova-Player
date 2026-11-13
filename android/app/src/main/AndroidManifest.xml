@@ -49,6 +49,14 @@
 
         </activity>
 
+        <!-- Reproductor Nativo de Video ExoPlayer (Motor Media3 idéntico a TiviMate) -->
+        <activity
+            android:name=".ExoPlayerActivity"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@style/AppTheme.NoActionBar"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
