@@ -30,8 +30,6 @@ public class ExoPlayerActivity extends AppCompatActivity {
     private PlayerView playerView;
     private ProgressBar loadingSpinner;
     private LinearLayout errorLayout;
-    private TextView tvTitle;
-    private TextView tvSubtitle;
     private TextView tvErrorMessage;
 
     private String streamUrl = "";
@@ -44,7 +42,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_exo_player);
 
-        // Obtener datos del intent
+        // Obtener datos pasados desde la interfaz web
         Intent intent = getIntent();
         if (intent != null) {
             streamUrl = intent.getStringExtra("url");
@@ -52,31 +50,18 @@ public class ExoPlayerActivity extends AppCompatActivity {
             isLive = intent.getBooleanExtra("isLive", false);
         }
 
-        // Vincular vistas
+        // Vincular vistas de la pantalla
         playerView = findViewById(R.id.player_view);
         loadingSpinner = findViewById(R.id.loading_spinner);
         errorLayout = findViewById(R.id.error_layout);
-        tvTitle = findViewById(R.id.tv_title);
-        tvSubtitle = findViewById(R.id.tv_subtitle);
         tvErrorMessage = findViewById(R.id.tv_error_message);
 
-        ImageButton btnBack = findViewById(R.id.btn_back);
         Button btnRetry = findViewById(R.id.btn_retry);
         Button btnErrorExternal = findViewById(R.id.btn_error_external);
         Button btnErrorBack = findViewById(R.id.btn_error_back);
 
-        if (title != null && !title.isEmpty()) {
-            tvTitle.setText(title);
-        }
-        if (isLive) {
-            tvSubtitle.setText("Transmisión en Directo • Motor Nativo ExoPlayer");
-        } else {
-            tvSubtitle.setText("Película / Serie VOD • Motor Nativo ExoPlayer");
-        }
-
-        btnBack.setOnClickListener(v -> finish());
+        // Configurar botones del diálogo de error
         btnErrorBack.setOnClickListener(v -> finish());
-
         btnRetry.setOnClickListener(v -> {
             errorLayout.setVisibility(View.GONE);
             loadingSpinner.setVisibility(View.VISIBLE);
@@ -95,7 +80,35 @@ public class ExoPlayerActivity extends AppCompatActivity {
             }
         });
 
+        // Configurar textos y botones de la cabecera dentro del controlador personalizado
+        setupCustomControllerViews();
+
         initPlayer();
+    }
+
+    private void setupCustomControllerViews() {
+        if (playerView == null) return;
+
+        ImageButton btnBack = playerView.findViewById(R.id.btn_back);
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> finish());
+        }
+
+        TextView tvTitle = playerView.findViewById(R.id.tv_title);
+        if (tvTitle != null && title != null && !title.isEmpty()) {
+            tvTitle.setText(title);
+        }
+
+        TextView tvSubtitle = playerView.findViewById(R.id.tv_subtitle);
+        if (tvSubtitle != null) {
+            tvSubtitle.setText(isLive ? "Transmisión en Vivo • Motor Nativo" : "Película / Serie VOD • Motor Nativo");
+        }
+
+        // Ocultar barra de tiempo si es emisión en directo
+        View bottomBar = playerView.findViewById(R.id.bottom_bar);
+        if (bottomBar != null && isLive) {
+            bottomBar.setVisibility(View.GONE);
+        }
     }
 
     private void initPlayer() {
@@ -107,11 +120,12 @@ public class ExoPlayerActivity extends AppCompatActivity {
         releasePlayer();
 
         try {
-            // Configurar fábrica de renderers con preferencia de extensiones de códecs
+            // Habilitar fallback automático de decodificadores de hardware a software para evitar pantalla negra
             DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(this)
-                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER);
+                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+                    .setEnableDecoderFallback(true);
 
-            // User-Agent idéntico a reproductores IPTV líderes (TiviMate) para evitar bloqueos de servidor
+            // User-Agent de alta compatibilidad (idéntico a TiviMate) para evitar rechazos de servidores IPTV
             DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
                     .setUserAgent("TiviMate/4.7.0 (Linux; Android 11; Media3)")
                     .setConnectTimeoutMs(15000)
@@ -125,6 +139,10 @@ public class ExoPlayerActivity extends AppCompatActivity {
                     .build();
 
             playerView.setPlayer(player);
+            playerView.setControllerShowTimeoutMs(3500);
+
+            // Re-vincular vistas del controlador tras asignar el reproductor
+            setupCustomControllerViews();
 
             player.addListener(new Player.Listener() {
                 @Override
@@ -187,10 +205,19 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 finish();
                 return true;
 
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                if (playerView != null && !playerView.isControllerFullyVisible()) {
+                    playerView.showController();
+                    return true;
+                }
+                break;
+
             case KeyEvent.KEYCODE_DPAD_LEFT:
                 if (!isLive && player.isCurrentMediaItemSeekable()) {
                     long current = player.getCurrentPosition();
                     player.seekTo(Math.max(0, current - 10000));
+                    if (playerView != null) playerView.showController();
                     return true;
                 }
                 break;
@@ -199,6 +226,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 if (!isLive && player.isCurrentMediaItemSeekable()) {
                     long current = player.getCurrentPosition();
                     player.seekTo(current + 10000);
+                    if (playerView != null) playerView.showController();
                     return true;
                 }
                 break;
@@ -211,6 +239,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
                     } else {
                         player.play();
                     }
+                    playerView.showController();
                     return true;
                 }
                 break;

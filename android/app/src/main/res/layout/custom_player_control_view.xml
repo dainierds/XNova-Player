@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@null">
+
+    <!-- ── 1. CABECERA SUPERIOR CINEMÁTICA CON DEGRADADO FUNDIDO ── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="@drawable/bg_player_top_gradient"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="32dp"
+        android:paddingTop="24dp"
+        android:paddingEnd="32dp"
+        android:paddingBottom="48dp">
+
+        <ImageButton
+            android:id="@+id/btn_back"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/btn_player_control_selector"
+            android:contentDescription="Volver"
+            android:focusable="true"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@android:drawable/ic_menu_revert"
+            app:tint="#FFFFFF" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="XNova Player"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Película VOD • Motor Nativo ExoPlayer"
+                android:textColor="#22D3EE"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/badge_quality"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/badge_quality_bg"
+            android:paddingStart="12dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="5dp"
+            android:text="1080p FHD"
+            android:textColor="#22D3EE"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- ── 2. CONTROLES CENTRALES DE REPRODUCCIÓN (PLAY / PAUSE / SEEK) ── -->
+    <LinearLayout
+        android:id="@+id/center_controls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <!-- Retroceder 10 segundos -->
+        <ImageButton
+            android:id="@id/exo_rew"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:background="@drawable/btn_player_control_selector"
+            android:contentDescription="Retroceder 10s"
+            android:focusable="true"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:src="@android:drawable/ic_media_rew"
+            app:tint="#FFFFFF" />
+
+        <!-- Botón Central Play / Pausa -->
+        <FrameLayout
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="24dp">
+
+            <ImageButton
+                android:id="@id/exo_play"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/btn_player_center_play_selector"
+                android:contentDescription="Reproducir"
+                android:focusable="true"
+                android:padding="18dp"
+                android:scaleType="fitCenter"
+                android:src="@android:drawable/ic_media_play"
+                app:tint="#000000" />
+
+            <ImageButton
+                android:id="@id/exo_pause"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/btn_player_center_play_selector"
+                android:contentDescription="Pausar"
+                android:focusable="true"
+                android:padding="18dp"
+                android:scaleType="fitCenter"
+                android:src="@android:drawable/ic_media_pause"
+                app:tint="#000000" />
+        </FrameLayout>
+
+        <!-- Adelantar 10 segundos -->
+        <ImageButton
+            android:id="@id/exo_ffwd"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:background="@drawable/btn_player_control_selector"
+            android:contentDescription="Adelantar 10s"
+            android:focusable="true"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:src="@android:drawable/ic_media_ff"
+            app:tint="#FFFFFF" />
+    </LinearLayout>
+
+    <!-- ── 3. BARRA INFERIOR DE PROGRESO Y TIEMPO ── -->
+    <LinearLayout
+        android:id="@+id/bottom_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_player_bottom_gradient"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="36dp"
+        android:paddingTop="48dp"
+        android:paddingEnd="36dp"
+        android:paddingBottom="24dp">
+
+        <TextView
+            android:id="@id/exo_position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="00:00"
+            android:textColor="#E4E4E7"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <androidx.media3.ui.DefaultTimeBar
+            android:id="@id/exo_progress"
+            android:layout_width="0dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_weight="1"
+            android:focusable="true"
+            app:bar_height="4dp"
+            app:buffered_color="#66FFFFFF"
+            app:played_color="#22D3EE"
+            app:scrubber_color="#22D3EE"
+            app:scrubber_dragged_size="16dp"
+            app:scrubber_enabled_size="12dp"
+            app:unplayed_color="#33FFFFFF" />
+
+        <TextView
+            android:id="@id/exo_duration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="00:00"
+            android:textColor="#A1A1AA"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</FrameLayout>

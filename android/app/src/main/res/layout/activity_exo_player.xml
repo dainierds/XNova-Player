@@ -7,99 +7,34 @@
     android:background="#000000"
     android:keepScreenOn="true">
 
-    <!-- Visor de Video Nativo ExoPlayer (Media3) -->
+    <!-- Visor de Video Nativo ExoPlayer (Media3) con TextureView para evitar pantalla negra -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:use_controller="true"
+        app:show_timeout="3500"
         app:show_buffering="when_playing"
+        app:surface_type="texture_view"
         app:resize_mode="fit"
-        app:surface_type="surface_view" />
+        app:controller_layout_id="@layout/custom_player_control_view" />
 
-    <!-- Barra de Carga / Buffering -->
+    <!-- Barra de Carga / Buffering central -->
     <ProgressBar
         android:id="@+id/loading_spinner"
         android:layout_width="64dp"
         android:layout_height="64dp"
         android:layout_gravity="center"
         android:indeterminate="true"
+        android:indeterminateTint="#22D3EE"
         android:visibility="gone" />
 
-    <!-- Barra Superior con Título y Botón Volver -->
-    <LinearLayout
-        android:id="@+id/header_layout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top"
-        android:background="#B3000000"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="32dp"
-        android:paddingTop="20dp"
-        android:paddingEnd="32dp"
-        android:paddingBottom="20dp">
-
-        <ImageButton
-            android:id="@+id/btn_back"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Volver"
-            android:focusable="true"
-            android:src="@android:drawable/ic_menu_revert"
-            android:tint="#FFFFFF" />
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/tv_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="Cargando reproducción..."
-                android:textColor="#FFFFFF"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tv_subtitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="XNova Player • Motor Nativo ExoPlayer"
-                android:textColor="#22D3EE"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/badge_quality"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="#3322D3EE"
-            android:paddingStart="10dp"
-            android:paddingTop="4dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="4dp"
-            android:text="FHD 1080p"
-            android:textColor="#22D3EE"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <!-- Diálogo de Error si el servidor no responde -->
+    <!-- Diálogo de Error elegante si el servidor IPTV no responde -->
     <LinearLayout
         android:id="@+id/error_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#E6000000"
+        android:background="#F2070A12"
         android:gravity="center"
         android:orientation="vertical"
         android:padding="32dp"
@@ -110,16 +45,16 @@
             android:layout_height="wrap_content"
             android:text="Error de Reproducción"
             android:textColor="#FFFFFF"
-            android:textSize="22sp"
+            android:textSize="24sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tv_error_message"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:gravity="center"
-            android:maxWidth="500dp"
+            android:maxWidth="520dp"
             android:text="No se pudo conectar al flujo de video. El servidor IPTV puede estar ocupado."
             android:textColor="#A1A1AA"
             android:textSize="14sp" />
@@ -127,7 +62,7 @@
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="28dp"
             android:orientation="horizontal">
 
             <Button
@@ -136,6 +71,8 @@
                 android:layout_height="wrap_content"
                 android:backgroundTint="#22D3EE"
                 android:focusable="true"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
                 android:text="Reintentar"
                 android:textColor="#000000"
                 android:textStyle="bold" />
@@ -147,6 +84,8 @@
                 android:layout_marginStart="16dp"
                 android:backgroundTint="#33FFFFFF"
                 android:focusable="true"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
                 android:text="Abrir con VLC"
                 android:textColor="#FFFFFF" />
 
@@ -157,6 +96,8 @@
                 android:layout_marginStart="16dp"
                 android:backgroundTint="#33FFFFFF"
                 android:focusable="true"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
                 android:text="Volver al Catálogo"
                 android:textColor="#FFFFFF" />
         </LinearLayout>
