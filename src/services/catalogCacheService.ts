@@ -1,5 +1,6 @@
 import { get, set, del } from 'idb-keyval';
-import type { XtreamStream, XtreamSeries } from './xtream';
+import { XtreamService, type XtreamStream, type XtreamSeries } from './xtream';
+import { ImagePreloadService } from './imagePreloadService';
 
 /**
  * Item ultra-compacto optimizado para búsqueda instantánea en memoria (0-15ms).
@@ -214,6 +215,124 @@ export const CatalogCacheService = {
     } catch (err) {
       console.warn('[CatalogCache] Error en findBestMatch:', err);
       return null;
+    }
+  },
+
+  getCacheKeyCategories(playlistId: string, type: 'movies' | 'series' | 'live'): string {
+    return `xnova_compact_cats_${playlistId}_${type}`;
+  },
+
+  async getCategories(playlistId: string, type: 'movies' | 'series' | 'live'): Promise<any[] | null> {
+    try {
+      const envelope = await get<{ timestamp: number; categories: any[] }>(this.getCacheKeyCategories(playlistId, type));
+      if (!envelope || !envelope.categories) return null;
+      return envelope.categories;
+    } catch {
+      return null;
+    }
+  },
+
+  async setCategories(playlistId: string, type: 'movies' | 'series' | 'live', categories: any[]): Promise<void> {
+    try {
+      await set(this.getCacheKeyCategories(playlistId, type), {
+        timestamp: Date.now(),
+        categories,
+      });
+    } catch (e) {
+      console.warn('[CatalogCache] Error guardando categorías:', e);
+    }
+  },
+
+  /**
+   * Verifica si la lista ya cuenta con un caché completo en disco (IndexedDB).
+   * Si ya existe, la aplicación puede entrar en 0ms sin pantallas de carga.
+   */
+  async hasCompleteCache(playlistId: string): Promise<boolean> {
+    try {
+      const [m, l] = await Promise.all([
+        get<CacheEnvelope>(this.getCacheKey(playlistId, 'movies')),
+        get<CacheEnvelope>(this.getCacheKey(playlistId, 'live')),
+      ]);
+      return !!((m?.items && m.items.length > 0) || (l?.items && l.items.length > 0));
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * ⚡ Sincronización Completa del Catálogo en Local con Barra de Progreso
+   * Descarga de una sola vez todas las categorías, películas, series y canales,
+   * y los comprime en memoria IndexedDB para que toda la navegación posterior sea instantánea.
+   */
+  async syncFullCatalog(
+    playlist: { id: string; serverUrl?: string; username?: string; password?: string },
+    onProgress?: (step: string, percent: number) => void
+  ): Promise<{ moviesCount: number; seriesCount: number; liveCount: number }> {
+    const server = playlist.serverUrl || '';
+    const user = playlist.username || '';
+    const pass = playlist.password || '';
+
+    if (!server || !user || !pass) {
+      return { moviesCount: 0, seriesCount: 0, liveCount: 0 };
+    }
+
+    try {
+      onProgress?.('Conectando al servidor y cargando categorías...', 10);
+      const [vodCats, seriesCats, liveCats] = await Promise.all([
+        XtreamService.getVodCategories(server, user, pass).catch(() => []),
+        XtreamService.getSeriesCategories(server, user, pass).catch(() => []),
+        XtreamService.getLiveCategories(server, user, pass).catch(() => []),
+      ]);
+
+      await Promise.all([
+        this.setCategories(playlist.id, 'movies', vodCats || []),
+        this.setCategories(playlist.id, 'series', seriesCats || []),
+        this.setCategories(playlist.id, 'live', liveCats || []),
+      ]);
+
+      onProgress?.('Descargando catálogo completo de Películas...', 30);
+      const rawMovies = await XtreamService.getVodStreams(server, user, pass).catch(() => []);
+      let moviesCount = 0;
+      if (rawMovies && rawMovies.length > 0) {
+        const compactMovies = await this.set(playlist.id, 'movies', rawMovies);
+        moviesCount = compactMovies.length;
+      }
+
+      onProgress?.('Descargando catálogo completo de Series...', 60);
+      const rawSeries = await XtreamService.getSeries(server, user, pass).catch(() => []);
+      let seriesCount = 0;
+      if (rawSeries && rawSeries.length > 0) {
+        const compactSeries = await this.set(playlist.id, 'series', rawSeries);
+        seriesCount = compactSeries.length;
+      }
+
+      onProgress?.('Descargando Canales de TV en Vivo...', 80);
+      const rawLive = await XtreamService.getLiveStreams(server, user, pass).catch(() => []);
+      let liveCount = 0;
+      if (rawLive && rawLive.length > 0) {
+        const compactLive = await this.set(playlist.id, 'live', rawLive);
+        liveCount = compactLive.length;
+      }
+
+      onProgress?.('Optimizando carátulas para navegación 100% instantánea...', 95);
+      const topUrls: string[] = [];
+      if (rawMovies) {
+        rawMovies.slice(0, 50).forEach((m: any) => {
+          if (m.stream_icon) topUrls.push(m.stream_icon);
+        });
+      }
+      if (rawSeries) {
+        rawSeries.slice(0, 30).forEach((s: any) => {
+          if (s.cover) topUrls.push(s.cover);
+        });
+      }
+      ImagePreloadService.preloadBatch(topUrls);
+
+      onProgress?.('¡Catálogo sincronizado exitosamente!', 100);
+      return { moviesCount, seriesCount, liveCount };
+    } catch (err) {
+      console.error('[CatalogCache] Error en syncFullCatalog:', err);
+      throw err;
     }
   },
 

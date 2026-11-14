@@ -26,6 +26,7 @@ interface SettingsModalProps {
   currentTheme?: 'cinematic' | 'serivia';
   onThemeChange?: (theme: 'cinematic' | 'serivia') => void;
   onOpenAdminPanel?: () => void;
+  onForceSync?: () => void;
 }
 
 interface FocusItem {
@@ -39,6 +40,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   currentTheme = 'serivia',
   onThemeChange,
   onOpenAdminPanel,
+  onForceSync,
 }) => {
   const { currentUser, isAdmin, logout } = useAuthStore();
   const {
@@ -601,7 +603,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <button
                     ref={(el) => { itemRefs.current['sync'] = el; }}
-                    onClick={() => syncCurrentPlaylist()}
+                    onClick={() => {
+                      if (onForceSync) {
+                        onClose();
+                        onForceSync();
+                      } else {
+                        syncCurrentPlaylist();
+                      }
+                    }}
                     disabled={isLoading}
                     className={`flex items-center space-x-2 px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-bold transition disabled:opacity-50 ${getFocusClass('sync')}`}
                   >

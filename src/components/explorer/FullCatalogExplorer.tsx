@@ -343,6 +343,19 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         }
         setLoading(false);
       } else {
+        // 🚀 A. Intentar leer categorías desde IndexedDB en 0ms
+        const localCats = await CatalogCacheService.getCategories(playlist.id, contentType);
+        if (localCats && localCats.length > 0) {
+          globalCategoriesCache.set(cacheKey, localCats);
+          if (isMounted) {
+            setCategories(localCats);
+            if (!selectedCategoryId) {
+              setSelectedCategoryId(String(localCats[0].category_id));
+            }
+            setLoading(false);
+          }
+          return;
+        }
         setLoading(true);
       }
 
@@ -427,6 +440,33 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     }
 
     const loadStreams = async () => {
+      // 🚀 A. Intentar filtrar en 0ms desde la caché local en memoria IndexedDB (Sin esperas ni red)
+      try {
+        const fullCached = await CatalogCacheService.get(playlist.id, contentType, true);
+        if (fullCached && fullCached.length > 0) {
+          setAllSectionStreams(fullCached as any);
+          const filtered = selectedCategoryId === 'all'
+            ? fullCached
+            : fullCached.filter((it: any) => String(it.cat) === String(selectedCategoryId));
+
+          globalCategoryStreamsCache.set(streamsKey, filtered as any);
+
+          if (isMounted) {
+            setStreams(filtered as any);
+            setLoadingStreams(false);
+            setFocusedGridIndex(0);
+
+            const urls = filtered.slice(0, 60).map((item: any) => {
+              return normalizeMediaUrl(item.icon, server);
+            });
+            ImagePreloadService.preloadBatch(urls);
+          }
+          return;
+        }
+      } catch (cacheErr) {
+        console.warn('Error leyendo caché local en Explorer:', cacheErr);
+      }
+
       setLoadingStreams(true);
       try {
         let validItems: (XtreamStream | XtreamSeries)[] = [];

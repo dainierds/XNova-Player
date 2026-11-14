@@ -32,6 +32,8 @@ import { useFavoritesStore } from './store/useFavoritesStore';
 import { useAdminFeaturedStore } from './store/useAdminFeaturedStore';
 import { QuickFavoriteModal, type QuickFavoriteItem } from './components/common/QuickFavoriteModal';
 import { HoldProgressIndicator } from './components/common/HoldProgressIndicator';
+import { InitialSyncOverlay } from './components/common/InitialSyncOverlay';
+import { CatalogCacheService } from './services/catalogCacheService';
 
 type FocusSection = 'sidebar' | 'hero_buttons' | 'thumbnails';
 
@@ -42,7 +44,8 @@ export function App() {
     liveStreams, 
     vodMovies,
     loadStoredPlaylists, 
-    loadUserPlaylists 
+    loadUserPlaylists,
+    syncCurrentPlaylist
   } = usePlaylistStore();
 
   const { featuredItems: adminFeaturedItems, loadFeaturedItems } = useAdminFeaturedStore();
@@ -291,6 +294,28 @@ export function App() {
   const [explorerType, setExplorerType] = useState<'movies' | 'series' | 'live'>('movies');
   const [playingItem, setPlayingItem] = useState<ShowcaseItem | null>(null);
   const [activeTheme, setActiveTheme] = useState<'cinematic' | 'serivia'>('cinematic');
+  const [needsInitialSync, setNeedsInitialSync] = useState(false);
+
+  // ⚡ Verificación inteligente de Caché Local en Disco (IndexedDB)
+  // Si no está completo, descarga todo con barra de progreso; si ya existe, entra en 0ms
+  useEffect(() => {
+    if (!isAuthenticated || !activePlaylist || !activePlaylist.serverUrl) {
+      return;
+    }
+
+    const checkCache = async () => {
+      try {
+        const hasCache = await CatalogCacheService.hasCompleteCache(activePlaylist.id);
+        if (!hasCache) {
+          setNeedsInitialSync(true);
+        }
+      } catch {
+        setNeedsInitialSync(false);
+      }
+    };
+
+    checkCache();
+  }, [isAuthenticated, activePlaylist?.id]);
 
   // 🎬 Modal de Tráiler Oficial de YouTube / Próximamente
   const [isTrailerOpen, setIsTrailerOpen] = useState(false);
@@ -820,6 +845,17 @@ export function App() {
         <SplashScreen onFinish={() => setIsSplashVisible(false)} />
       )}
 
+      {/* 🚀 Sincronización Inicial con Barra de Progreso (Solo en la primera apertura) */}
+      {needsInitialSync && activePlaylist && !isSplashVisible && (
+        <InitialSyncOverlay
+          playlist={activePlaylist}
+          onFinished={() => {
+            setNeedsInitialSync(false);
+            syncCurrentPlaylist();
+          }}
+        />
+      )}
+
       {/* 2. Pantalla de Bienvenida y Login para TV (Si no hay sesión activa y terminó el splash) */}
       {!isSplashVisible && !isAuthenticated && (
         <TvLoginScreen 
@@ -971,6 +1007,7 @@ export function App() {
         currentTheme={activeTheme}
         onThemeChange={(newTheme) => setActiveTheme(newTheme)}
         onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+        onForceSync={() => setNeedsInitialSync(true)}
         onClose={() => {
           setIsSettingsOpen(false);
           setFocusedZone('sidebar');
