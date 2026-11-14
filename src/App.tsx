@@ -764,6 +764,11 @@ export function App() {
         e.keyCode === 66;
 
       if (isOk) {
+        // 🛑 Si la tecla no se presionó inicialmente en esta pantalla (ej. venía del reproductor), IGNORAR
+        if (!isHoldingOkRef.current) {
+          return;
+        }
+
         if (holdTimerRef.current) {
           clearTimeout(holdTimerRef.current);
           holdTimerRef.current = null;

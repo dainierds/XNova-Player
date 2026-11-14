@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Film, 
+  Tv,
   Plus, 
   Trash2, 
   ArrowUp, 
@@ -40,8 +41,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
     addFeaturedItem, 
     removeFeaturedItem, 
     updateBadge, 
-    reorderItems,
-    clearAll 
+    reorderItems
   } = useAdminFeaturedStore();
 
   const { activePlaylist, playlists } = usePlaylistStore();
@@ -49,6 +49,15 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
   // 📡 Listas recopiladas de todo el sistema (clientes y almacenamiento)
   const [availablePlaylists, setAvailablePlaylists] = useState<PlaylistAccount[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>('');
+
+  // 🎬 / 📺 Pestaña activa: Películas de Portada (hasta 5) o Series de Portada (hasta 5)
+  const [activeSectionTab, setActiveSectionTab] = useState<'movies' | 'series'>('movies');
+
+  const movieItems = useMemo(() => featuredItems.filter((i) => i.type === 'movie'), [featuredItems]);
+  const seriesItems = useMemo(() => featuredItems.filter((i) => i.type === 'series'), [featuredItems]);
+  const currentItems = activeSectionTab === 'movies' ? movieItems : seriesItems;
+  const currentCount = currentItems.length;
+  const isLimitReached = currentCount >= 5;
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -309,6 +318,16 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
   const handleConfirmAdd = async () => {
     if (!selectedItem) return;
 
+    // Determinar tipo según el ítem o la sección activa
+    const targetType: 'movie' | 'series' = selectedItem.type || (activeSectionTab === 'movies' ? 'movie' : 'series');
+    const existingTargetCount = targetType === 'series' ? seriesItems.length : movieItems.length;
+
+    const isAlreadyAdded = featuredItems.some((f) => f.id === selectedItem.id);
+    if (!isAlreadyAdded && existingTargetCount >= 5) {
+      showToast(`Ya tienes 5 ${targetType === 'series' ? 'series' : 'películas'} fijadas. Elimina una antes de añadir otra.`);
+      return;
+    }
+
     // Si es de TMDb y se marca como PRÓXIMAMENTE, intentar resolver trailer oficial
     let trailerKey = selectedItem.trailerYoutubeKey;
     if (selectedBadge === 'PRÓXIMAMENTE' && !trailerKey && selectedItem.streamId) {
@@ -324,7 +343,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
       id: selectedItem.id,
       streamId: selectedItem.streamId,
       title: selectedItem.title,
-      type: selectedItem.type,
+      type: targetType,
       badge: selectedBadge,
       posterUrl: selectedItem.posterUrl || '',
       backdropUrl: selectedItem.backdropUrl || selectedItem.posterUrl || '',
@@ -336,7 +355,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
       trailerYoutubeKey: trailerKey,
     });
 
-    showToast(`"${selectedItem.title}" fijada como [${selectedBadge}] en la Pantalla Principal`);
+    showToast(`"${selectedItem.title}" fijada como [${selectedBadge}] en ${targetType === 'series' ? 'Series de Portada' : 'Películas de Portada'}`);
     setShowAddModal(false);
     setSelectedItem(null);
     setSearchQuery('');
@@ -345,20 +364,46 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
 
   const handleMoveUp = (index: number) => {
     if (index === 0) return;
-    const next = [...featuredItems];
-    const temp = next[index - 1];
-    next[index - 1] = next[index];
-    next[index] = temp;
-    reorderItems(next);
+    if (activeSectionTab === 'movies') {
+      const next = [...movieItems];
+      const temp = next[index - 1];
+      next[index - 1] = next[index];
+      next[index] = temp;
+      reorderItems([...next, ...seriesItems]);
+    } else {
+      const next = [...seriesItems];
+      const temp = next[index - 1];
+      next[index - 1] = next[index];
+      next[index] = temp;
+      reorderItems([...movieItems, ...next]);
+    }
   };
 
   const handleMoveDown = (index: number) => {
-    if (index === featuredItems.length - 1) return;
-    const next = [...featuredItems];
-    const temp = next[index + 1];
-    next[index + 1] = next[index];
-    next[index] = temp;
-    reorderItems(next);
+    if (index === currentItems.length - 1) return;
+    if (activeSectionTab === 'movies') {
+      const next = [...movieItems];
+      const temp = next[index + 1];
+      next[index + 1] = next[index];
+      next[index] = temp;
+      reorderItems([...next, ...seriesItems]);
+    } else {
+      const next = [...seriesItems];
+      const temp = next[index + 1];
+      next[index + 1] = next[index];
+      next[index] = temp;
+      reorderItems([...movieItems, ...next]);
+    }
+  };
+
+  const handleOpenAddModal = () => {
+    if (isLimitReached) {
+      showToast(`Ya has alcanzado el límite de 5 ${activeSectionTab === 'movies' ? 'películas' : 'series'} de portada.`);
+      return;
+    }
+    setSearchFilter(activeSectionTab === 'movies' ? 'movies' : 'series');
+    setSelectedItem(null);
+    setShowAddModal(true);
   };
 
   return (
@@ -371,27 +416,97 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
         </div>
       )}
 
+      {/* Pestañas de Navegación: Películas vs Series (Hasta 5 cada una) */}
+      <div className="flex items-center space-x-3 mb-4 shrink-0 bg-[#0A0E1A]/80 p-1.5 rounded-2xl border border-white/10 w-fit">
+        <button
+          onClick={() => setActiveSectionTab('movies')}
+          className={`flex items-center space-x-2.5 px-5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeSectionTab === 'movies'
+              ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/25 font-black'
+              : 'text-zinc-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Film className="w-4 h-4" />
+          <span>Películas de Portada</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+            activeSectionTab === 'movies' ? 'bg-black/25 text-black' : 'bg-cyan-500/20 text-cyan-300'
+          }`}>
+            {movieItems.length} / 5
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveSectionTab('series')}
+          className={`flex items-center space-x-2.5 px-5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeSectionTab === 'series'
+              ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25 font-black'
+              : 'text-zinc-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Tv className="w-4 h-4" />
+          <span>Series de Portada</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+            activeSectionTab === 'series' ? 'bg-black/30 text-white' : 'bg-purple-500/20 text-purple-300'
+          }`}>
+            {seriesItems.length} / 5
+          </span>
+        </button>
+      </div>
+
+      {/* Barra informativa de estado del límite */}
+      {isLimitReached ? (
+        <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs px-4 py-2.5 rounded-xl flex items-center space-x-2 shrink-0">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>
+            ✓ Has completado el cupo de 5 {activeSectionTab === 'movies' ? 'películas' : 'series'} de portada. Se mostrarán en primer lugar en la pantalla principal.
+          </span>
+        </div>
+      ) : (
+        <div className="mb-4 bg-white/5 border border-white/10 text-zinc-300 text-xs px-4 py-2.5 rounded-xl flex items-center justify-between shrink-0">
+          <div className="flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span>
+              Tienes <strong className="text-white">{currentCount} de 5</strong> {activeSectionTab === 'movies' ? 'películas' : 'series'} fijadas. Puedes añadir {5 - currentCount} más.
+            </span>
+          </div>
+          <span className="text-[11px] text-zinc-400">Total global fijado: {featuredItems.length}/10</span>
+        </div>
+      )}
+
       {/* Barra de Controles y Resumen */}
       <div className="flex items-center justify-between pb-4 border-b border-white/10 shrink-0">
         <div>
           <h2 className="text-base font-bold text-white flex items-center space-x-2">
-            <span>Contenido Destacado en Pantalla Principal</span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-              {featuredItems.length} / 5 títulos
+            <span>
+              {activeSectionTab === 'movies' ? 'Películas Destacadas en Portada' : 'Series Destacadas en Portada'}
+            </span>
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${
+              activeSectionTab === 'movies'
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+            }`}>
+              {currentCount} / 5 títulos
             </span>
           </h2>
           <p className="text-xs text-zinc-400 mt-0.5">
-            Las películas y series que fijes aquí (hasta 5) aparecerán en primer lugar en el carrusel de inicio. Al tocarlas, van directo a la raíz del contenido.
+            {activeSectionTab === 'movies'
+              ? 'Las películas fijadas aquí aparecerán primero en la portada y carrusel de Películas.'
+              : 'Las series fijadas aquí aparecerán primero en la portada y carrusel de Series.'}
           </p>
         </div>
 
         <div className="flex items-center space-x-3">
-          {featuredItems.length > 0 && (
+          {currentItems.length > 0 && (
             <button
               onClick={() => {
-                if (confirm('¿Restablecer y vaciar la portada fija? La app volverá a mostrar las últimas del servidor automáticamente.')) {
-                  clearAll();
-                  showToast('Portada restablecida al modo automático del servidor.');
+                const targetName = activeSectionTab === 'movies' ? 'las películas' : 'las series';
+                if (confirm(`¿Restablecer ${targetName} de portada a automático? Se eliminarán de la lista fija.`)) {
+                  if (activeSectionTab === 'movies') {
+                    reorderItems(seriesItems);
+                  } else {
+                    reorderItems(movieItems);
+                  }
+                  showToast(`Portada de ${targetName} restablecida al modo automático.`);
                 }
               }}
               className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white text-xs font-semibold border border-white/10 transition cursor-pointer"
@@ -401,43 +516,53 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           )}
 
           <button
-            onClick={() => {
-              if (featuredItems.length >= 5) {
-                showToast('Ya has alcanzado el límite de 5 contenidos para el carrusel de portada. Elimina uno para añadir otro.');
-                return;
-              }
-              setShowAddModal(true);
-              setSelectedItem(null);
-            }}
-            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs shadow-lg shadow-cyan-500/30 transition transform active:scale-95 cursor-pointer"
+            onClick={handleOpenAddModal}
+            disabled={isLimitReached}
+            className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-black text-xs shadow-lg transition transform active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+              activeSectionTab === 'movies'
+                ? 'bg-cyan-500 hover:bg-cyan-400 text-black shadow-cyan-500/30'
+                : 'bg-purple-500 hover:bg-purple-400 text-white shadow-purple-500/30'
+            }`}
           >
             <Plus className="w-4 h-4" />
-            <span>AÑADIR A PORTADA ({featuredItems.length}/5)</span>
+            <span>
+              AÑADIR {activeSectionTab === 'movies' ? 'PELÍCULA' : 'SERIE'} ({currentCount}/5)
+            </span>
           </button>
         </div>
       </div>
 
       {/* Lista de Contenidos Fijados */}
       <div className="flex-1 overflow-y-auto py-4 space-y-3 pr-2">
-        {featuredItems.length === 0 ? (
+        {currentItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-white/10 rounded-2xl p-8 bg-black/20">
-            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-4">
-              <Film className="w-8 h-8" />
+            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 ${
+              activeSectionTab === 'movies'
+                ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400'
+                : 'bg-purple-500/10 border border-purple-500/20 text-purple-400'
+            }`}>
+              {activeSectionTab === 'movies' ? <Film className="w-8 h-8" /> : <Tv className="w-8 h-8" />}
             </div>
-            <h3 className="text-base font-bold text-white">No has fijado ningún título manualmente</h3>
+            <h3 className="text-base font-bold text-white">
+              No has fijado ninguna {activeSectionTab === 'movies' ? 'película' : 'serie'} manualmente
+            </h3>
             <p className="text-xs text-zinc-400 max-w-md mt-1 mb-5">
-              Actualmente la pantalla principal muestra automáticamente las últimas películas y series añadidas a tu lista Xtream.
+              Actualmente la sección de {activeSectionTab === 'movies' ? 'Películas' : 'Series'} muestra automáticamente las últimas del catálogo Xtream.
             </p>
             <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs shadow-lg shadow-cyan-500/25 transition cursor-pointer"
+              onClick={handleOpenAddModal}
+              className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl font-black text-xs shadow-lg transition cursor-pointer ${
+                activeSectionTab === 'movies'
+                  ? 'bg-cyan-500 hover:bg-cyan-400 text-black shadow-cyan-500/25'
+                  : 'bg-purple-500 hover:bg-purple-400 text-white shadow-purple-500/25'
+              }`}
             >
               <Plus className="w-4 h-4" />
-              <span>Añadir la Primera Película o Serie</span>
+              <span>Añadir Primera {activeSectionTab === 'movies' ? 'Película' : 'Serie'}</span>
             </button>
           </div>
         ) : (
-          featuredItems.map((item, idx) => (
+          currentItems.map((item, idx) => (
             <div
               key={item.id}
               className="flex items-center justify-between p-3.5 rounded-2xl bg-[#0E1526] border border-white/10 hover:border-white/20 transition shadow-md"
@@ -543,7 +668,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
 
                 {/* Bajar en orden */}
                 <button
-                  disabled={idx === featuredItems.length - 1}
+                  disabled={idx === currentItems.length - 1}
                   onClick={() => handleMoveDown(idx)}
                   className="p-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 text-zinc-300 hover:text-white transition cursor-pointer"
                   title="Mover abajo"

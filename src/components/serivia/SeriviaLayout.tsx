@@ -563,6 +563,11 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         e.keyCode === 66;
 
       if (isOk) {
+        // 🛑 Si la tecla no se presionó en esta pantalla (ej. venía del reproductor), ignorar keyup
+        if (!isHoldingOkRef.current) {
+          return;
+        }
+
         if (holdTimerRef.current) {
           clearTimeout(holdTimerRef.current);
           holdTimerRef.current = null;

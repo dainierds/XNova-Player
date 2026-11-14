@@ -148,9 +148,9 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
         </div>
       </div>
 
-      {/* Zona Inferior: Carrusel de Miniaturas con Altura Proporcional para que NUNCA se corte abajo */}
+      {/* Zona Inferior: Carrusel de Miniaturas con Proporción de Cartelera 2:3 para que las fotos NUNCA se corten */}
       <div className="relative z-10 w-full flex flex-col space-y-2 pb-2">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3.5">
           {items.map((thumbItem, index) => {
             const isSelected = index === selectedIndex;
             const isFocused = focusedZone === 'thumbnails' && isSelected;
@@ -165,12 +165,12 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                   }
                 }}
                 className={`
-                  relative w-28 h-32 md:w-32 md:h-36 rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shrink-0 bg-gradient-to-br from-zinc-800 to-zinc-950 border border-white/10
+                  relative w-24 md:w-28 aspect-[2/3] rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 shrink-0 bg-gradient-to-br from-zinc-800 to-zinc-950 border border-white/10 shadow-lg
                   ${isFocused
                     ? 'scale-105 ring-4 ring-cyan-400 shadow-2xl shadow-cyan-500/60 z-20 -translate-y-1'
                     : isSelected
                       ? 'ring-2 ring-white opacity-100'
-                      : 'opacity-60 hover:opacity-95 scale-95'}
+                      : 'opacity-70 hover:opacity-95 scale-95'}
                 `}
               >
                 <img
@@ -183,13 +183,13 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                       target.src = FALLBACK_POSTER;
                     }
                   }}
-                  className="w-full h-full object-cover transition-opacity duration-300"
+                  className="w-full h-full object-cover object-top transition-transform duration-300"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent flex flex-col justify-end p-2.5">
-                  <span className="text-[11px] font-bold text-white truncate drop-shadow">
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent flex flex-col justify-end p-2 pt-6">
+                  <span className="text-[11px] font-bold text-white truncate drop-shadow leading-tight">
                     {thumbItem.title}
                   </span>
-                  <span className="text-[9px] text-zinc-300 font-semibold">
+                  <span className="text-[9px] text-zinc-300 font-semibold leading-tight mt-0.5">
                     {thumbItem.releaseDateText}
                   </span>
                 </div>

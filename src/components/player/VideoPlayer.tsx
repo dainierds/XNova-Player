@@ -37,6 +37,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onPrevChannel,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(true);
@@ -58,6 +59,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [subtitleTracks, setSubtitleTracks] = useState<{ id: number; name: string }[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<number>(-1); // -1 = desactivados
   const hideTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    containerRef.current?.focus();
+  }, []);
 
   // Lista dinámica de controles disponibles en la barra inferior
   const getBottomControls = useCallback((): PlayerControl[] => {
@@ -195,14 +200,58 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     });
   }, [contentId, title, posterUrl, duration, streamUrl, isLive]);
 
+  // Alternar Reproducción / Pausa de manera infalible
+  const handleTogglePlayPause = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play().catch(() => {});
+      setIsPlaying(true);
+      setShowControls(true);
+      setFocusedControl('play_pause');
+      resetHideTimer();
+    } else {
+      video.pause();
+      setIsPlaying(false);
+      setShowControls(true);
+      setFocusedControl('play_pause');
+      if (hideTimerRef.current) {
+        window.clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      saveProgress();
+    }
+  }, [resetHideTimer, saveProgress]);
+
   // Manejo de eventos del teclado (Control Remoto TV / D-pad completo)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const video = videoRef.current;
 
+      const isOk =
+        e.key === 'Enter' ||
+        e.key === ' ' ||
+        e.key === 'Select' ||
+        e.key === 'Ok' ||
+        e.key === 'MediaPlayPause' ||
+        e.key === 'MediaPlay' ||
+        e.key === 'MediaPause' ||
+        e.keyCode === 13 ||
+        e.keyCode === 23 ||
+        e.keyCode === 66;
+
+      const isBack =
+        e.key === 'Escape' ||
+        e.key === 'Backspace' ||
+        e.key === 'GoBack' ||
+        e.key === 'Back' ||
+        e.keyCode === 27 ||
+        e.keyCode === 4;
+
       // 🛑 SI HAY UN ERROR EN PANTALLA, EL CONTROL REMOTO ACTÚA EXCLUSIVAMENTE SOBRE EL MODAL DE ERROR
       if (streamError) {
-        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' ', 'Escape', 'Backspace', 'GoBack'].includes(e.key)) {
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' ', 'Escape', 'Backspace', 'GoBack'].includes(e.key) || isOk || isBack) {
           e.preventDefault();
           e.stopPropagation();
         }
@@ -220,35 +269,38 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           case 'ArrowDown':
             setErrorFocus((prev) => (prev === 'retry' ? 'external' : prev === 'external' ? 'back' : 'retry'));
             break;
-          case 'Enter':
-          case ' ':
-            if (errorFocus === 'retry') {
-              setStreamError(null);
-              setIsVideoReady(false);
-              if (video) {
-                video.load();
-                video.play().catch(() => {});
+          default:
+            if (isOk) {
+              if (errorFocus === 'retry') {
+                setStreamError(null);
+                setIsVideoReady(false);
+                if (video) {
+                  video.load();
+                  video.play().catch(() => {});
+                }
+              } else if (errorFocus === 'external') {
+                openExternalPlayer(currentStreamUrl, title);
+              } else {
+                saveProgress();
+                onClose();
               }
-            } else if (errorFocus === 'external') {
-              openExternalPlayer(currentStreamUrl, title);
-            } else {
+            } else if (isBack) {
               saveProgress();
               onClose();
             }
-            break;
-          case 'Escape':
-          case 'Backspace':
-          case 'GoBack':
-            saveProgress();
-            onClose();
             break;
         }
         return;
       }
 
-      // Si los controles están ocultos y el usuario presiona Enter/OK o flechas:
+      // Si los controles están ocultos y el usuario presiona Enter/OK/Espacio: alternar pausa de inmediato
       if (!showControlsRef.current) {
-        if (['Enter', ' ', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        if (isOk) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleTogglePlayPause();
+          return;
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
           e.preventDefault();
           e.stopPropagation();
           setShowControls(true);
@@ -275,7 +327,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setFocusedControl(isLive ? 'play_pause' : 'forward');
           resetHideTimer();
           return;
-        } else if (['Escape', 'Backspace', 'GoBack'].includes(e.key)) {
+        } else if (isBack) {
           e.preventDefault();
           e.stopPropagation();
           saveProgress();
@@ -286,6 +338,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       // Si los controles están visibles, mantenemos despierto el temporizador con cada pulsación
       resetHideTimer();
+
+      if (isBack) {
+        e.preventDefault();
+        e.stopPropagation();
+        saveProgress();
+        onClose();
+        return;
+      }
 
       switch (e.key) {
         // --- FLECHA ARRIBA ---
@@ -353,92 +413,56 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
           break;
 
-        // --- ENTER / OK / ESPACIO ---
-        case 'Enter':
-        case ' ':
-        case 'Select':
-          e.preventDefault();
-          e.stopPropagation();
-          if (!showControls) {
-            if (video) {
-              if (video.paused) {
-                video.play();
-                setIsPlaying(true);
-                resetHideTimer();
-              } else {
-                video.pause();
-                setIsPlaying(false);
-                setShowControls(true);
-                setFocusedControl('play_pause');
-                if (hideTimerRef.current) {
-                  window.clearTimeout(hideTimerRef.current);
-                  hideTimerRef.current = null;
-                }
-                saveProgress();
+        default:
+          if (isOk) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (focusedControl === 'back') {
+              saveProgress();
+              onClose();
+            } else if (focusedControl === 'rewind') {
+              if (video && !isLive) {
+                video.currentTime = Math.max(0, video.currentTime - 10);
               }
-            }
-          } else if (focusedControl === 'back') {
-            saveProgress();
-            onClose();
-          } else if (focusedControl === 'rewind') {
-            if (video && !isLive) {
-              video.currentTime = Math.max(0, video.currentTime - 10);
-            }
-          } else if (focusedControl === 'play_pause') {
-            if (video) {
-              if (video.paused) {
-                video.play();
-                setIsPlaying(true);
-                resetHideTimer();
-              } else {
-                video.pause();
-                setIsPlaying(false);
-                setShowControls(true);
-                if (hideTimerRef.current) {
-                  window.clearTimeout(hideTimerRef.current);
-                  hideTimerRef.current = null;
-                }
-                saveProgress();
+            } else if (focusedControl === 'forward') {
+              if (video && !isLive) {
+                video.currentTime = Math.min(duration, video.currentTime + 10);
               }
-            }
-          } else if (focusedControl === 'forward') {
-            if (video && !isLive) {
-              video.currentTime = Math.min(duration, video.currentTime + 10);
-            }
-          } else if (focusedControl === 'audio') {
-            if (hlsRef.current && audioTracks.length > 1) {
-              const nextAudio = (currentAudio + 1) % audioTracks.length;
-              hlsRef.current.audioTrack = nextAudio;
-              setCurrentAudio(nextAudio);
-            }
-          } else if (focusedControl === 'subtitles') {
-            if (hlsRef.current && subtitleTracks.length > 0) {
-              const nextSub = currentSubtitle + 1 >= subtitleTracks.length ? -1 : currentSubtitle + 1;
-              hlsRef.current.subtitleTrack = nextSub;
-              setCurrentSubtitle(nextSub);
+            } else if (focusedControl === 'audio') {
+              if (hlsRef.current && audioTracks.length > 1) {
+                const nextAudio = (currentAudio + 1) % audioTracks.length;
+                hlsRef.current.audioTrack = nextAudio;
+                setCurrentAudio(nextAudio);
+              }
+            } else if (focusedControl === 'subtitles') {
+              if (hlsRef.current && subtitleTracks.length > 0) {
+                const nextSub = currentSubtitle + 1 >= subtitleTracks.length ? -1 : currentSubtitle + 1;
+                hlsRef.current.subtitleTrack = nextSub;
+                setCurrentSubtitle(nextSub);
+              } else {
+                setCurrentSubtitle((prev) => (prev === -1 ? 0 : -1));
+              }
             } else {
-              setCurrentSubtitle((prev) => (prev === -1 ? 0 : -1));
+              // 'play_pause' o cualquier otro control: alternar play/pause
+              handleTogglePlayPause();
             }
           }
-          break;
-
-        // --- BOTÓN ATRÁS (Escape / Backspace / GoBack) ---
-        case 'Escape':
-        case 'Backspace':
-        case 'GoBack':
-          e.preventDefault();
-          e.stopPropagation();
-          saveProgress();
-          onClose();
-          break;
-
-        default:
           break;
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
     window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+    };
   }, [
     duration,
     isLive,
@@ -447,6 +471,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     onPrevChannel,
     resetHideTimer,
     saveProgress,
+    handleTogglePlayPause,
     focusedControl,
     audioTracks,
     currentAudio,
@@ -459,12 +484,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black flex items-center justify-center overflow-hidden select-none"
+      ref={containerRef}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 bg-black flex items-center justify-center overflow-hidden select-none outline-none"
       onMouseMove={resetHideTimer}
       onClick={() => {
-        if (!showControls) {
-          resetHideTimer();
-        }
+        handleTogglePlayPause();
       }}
     >
       {/* Pantalla de Carga Cinemática: Fondo oscuro con póster desenfocado y spinner mientras conecta */}
@@ -609,7 +634,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <div className="w-full bg-gradient-to-b from-black/95 via-black/75 to-transparent px-10 pt-8 pb-16 flex items-center justify-between pointer-events-auto">
           <div className="flex items-center space-x-5">
             <button
-              onClick={() => {
+              type="button"
+              tabIndex={-1}
+              onClick={(e) => {
+                e.stopPropagation();
                 saveProgress();
                 onClose();
               }}
@@ -664,7 +692,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               {/* Botón: Retroceder 10s */}
               {!isLive && (
                 <button
-                  onClick={() => {
+                  type="button"
+                  tabIndex={-1}
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (videoRef.current) {
                       videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
                     }
@@ -682,17 +713,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
               {/* Botón: Play / Pausa */}
               <button
-                onClick={() => {
-                  const video = videoRef.current;
-                  if (video) {
-                    if (video.paused) {
-                      video.play();
-                      setIsPlaying(true);
-                    } else {
-                      video.pause();
-                      setIsPlaying(false);
-                    }
-                  }
+                type="button"
+                tabIndex={-1}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTogglePlayPause();
                 }}
                 className={`p-4 rounded-full shadow-2xl transition-all duration-200 ${
                   focusedControl === 'play_pause'
@@ -711,7 +736,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               {/* Botón: Adelantar 10s */}
               {!isLive && (
                 <button
-                  onClick={() => {
+                  type="button"
+                  tabIndex={-1}
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (videoRef.current) {
                       videoRef.current.currentTime = Math.min(duration, videoRef.current.currentTime + 10);
                     }
@@ -732,7 +760,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <div className="flex items-center space-x-4">
               {/* Botón: Pistas de Audio */}
               <button
-                onClick={() => {
+                type="button"
+                tabIndex={-1}
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (hlsRef.current && audioTracks.length > 1) {
                     const nextTrack = (currentAudio + 1) % audioTracks.length;
                     hlsRef.current.audioTrack = nextTrack;
@@ -752,7 +783,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
               {/* Botón: Subtítulos */}
               <button
-                onClick={() => {
+                type="button"
+                tabIndex={-1}
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (hlsRef.current && subtitleTracks.length > 0) {
                     const nextSub = currentSubtitle + 1 >= subtitleTracks.length ? -1 : currentSubtitle + 1;
                     hlsRef.current.subtitleTrack = nextSub;
