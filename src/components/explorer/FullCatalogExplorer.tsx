@@ -140,7 +140,6 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
           <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0A0F1D]">
             <Film className="w-10 h-10 text-cyan-400/60 mb-3" />
             <span className="text-xs font-bold text-zinc-300 line-clamp-3 leading-tight">{title}</span>
-            <span className="text-[10px] text-cyan-400 font-semibold mt-2 uppercase tracking-wider">{contentType === 'series' ? 'Serie' : 'Película'}</span>
           </div>
         )}
 
@@ -468,7 +467,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       rating: item.rating || '7.0',
       year: (item as any).releaseDate ? (item as any).releaseDate.substring(0, 4) : '2025',
       duration: undefined,
-      genres: (item as any).genre || (contentType === 'movies' ? 'Película VOD' : contentType === 'series' ? 'Serie' : 'TV en Vivo'),
+      genres: (item as any).genre || '',
       cast: 'Cargando información...',
       director: 'Cargando información...',
       plot: (item as any).plot || 'Cargando sinopsis oficial...',
@@ -553,7 +552,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         posterUrl: vod.stream_icon,
         backdropUrl: vod.stream_icon,
         rating: vod.rating || '7.0',
-        genres: 'Película',
+        genres: '',
         plot: 'Presiona reproducir para iniciar la película.',
         containerExtension: vod.container_extension || 'mp4',
       };
@@ -1154,7 +1153,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               )}
               {focusedMetadata?.year && <span>{focusedMetadata.year}</span>}
               {focusedMetadata?.duration && <span>• {focusedMetadata.duration}</span>}
-              {focusedMetadata?.genres && <span className="text-cyan-400">• {focusedMetadata.genres}</span>}
+              {focusedMetadata?.genres && !focusedMetadata.genres.includes('VOD') && !focusedMetadata.genres.includes('Película') && (
+                <span className="text-zinc-400">• {focusedMetadata.genres}</span>
+              )}
             </div>
 
             {/* Reparto (Cast) */}
@@ -1293,10 +1294,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                       <h4 className={`text-xs font-bold truncate ${isFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>
                         {title}
                       </h4>
-                      <span className="text-[10px] text-zinc-500 font-semibold flex items-center space-x-1 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Canal #{stream.stream_id}</span>
-                      </span>
                     </div>
                   </div>
                 );

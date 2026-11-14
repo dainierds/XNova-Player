@@ -632,9 +632,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 )}
                 <h1 className="text-2xl font-black text-white drop-shadow-lg tracking-wide">{title}</h1>
               </div>
-              <p className="text-xs text-zinc-300 mt-0.5">
-                {isLive ? 'Transmisión en Vivo (HLS Directo)' : 'Película VOD'}
-              </p>
             </div>
           </div>
 
