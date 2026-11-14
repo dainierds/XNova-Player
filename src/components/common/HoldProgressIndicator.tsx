@@ -41,7 +41,7 @@ export const HoldProgressIndicator: React.FC<HoldProgressIndicatorProps> = ({ pr
 
       <div className="flex flex-col text-left">
         <span className="text-xs font-black text-white flex items-center space-x-1">
-          <span>Mantén presionado para Favoritos</span>
+          <span>Mantén para opciones</span>
         </span>
         {title && (
           <span className="text-[10px] text-cyan-300 font-bold truncate max-w-[180px]">

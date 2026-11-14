@@ -14,8 +14,7 @@ import {
   Star,
   Check,
   Clock,
-  Trash2,
-  MoreVertical
+  Trash2
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
@@ -63,7 +62,6 @@ interface CatalogPosterCardProps {
   server: string;
   onSelect: () => void;
   innerRef: (el: HTMLDivElement | null) => void;
-  onRemove?: () => void;
 }
 
 const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
@@ -73,7 +71,6 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
   server,
   onSelect,
   innerRef,
-  onRemove,
 }) => {
   const isSeries = contentType === 'series';
   const rawCover = isSeries
@@ -186,21 +183,6 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
           <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-cyan-600/90 backdrop-blur-md text-[11px] font-black text-white shadow-md border border-cyan-400/40">
             {rating}
           </div>
-        )}
-
-        {/* Botón directo de eliminar de Continuar Viendo (Clic rápido / Táctil / Ratón) */}
-        {onRemove && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onRemove();
-            }}
-            title="Eliminar de Continuar Viendo"
-            className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-red-600/90 hover:bg-red-500 text-white backdrop-blur-md shadow-lg border border-white/20 transition-all z-30 hover:scale-110 active:scale-95 cursor-pointer"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
         )}
 
         {/* Barra de progreso de reproducción para Continuar Viendo */}
@@ -1520,25 +1502,39 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             }
           }
         } else if (focusZone === 'grid') {
-          // Iniciar temporizador ágil de 1.2s para Menú Rápido / Continuar Viendo / Favoritos
+          // Iniciar temporizador ágil de 1.1s para Menú Rápido / Continuar Viendo / Favoritos
           if (e.repeat) return; // Evitar reinicios por eventos de repetición del mando
           if (!isHoldingOkRef.current) {
             isHoldingOkRef.current = true;
             hasTriggeredLongPressRef.current = false;
             const currentItem = displayedStreams[focusedGridIndex];
 
-            const HOLD_DURATION = 1200; // 1.2 segundos (mucho más receptivo en Android TV)
+            const HOLD_DURATION = 1100; // 1.1 segundos
             const startTime = Date.now();
             if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
             holdIntervalRef.current = window.setInterval(() => {
               const elapsed = Date.now() - startTime;
-              setHoldProgress(Math.min(100, Math.round((elapsed / HOLD_DURATION) * 100)));
-            }, 40);
+              if (elapsed >= HOLD_DURATION) {
+                if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+                if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+                holdIntervalRef.current = null;
+                holdTimerRef.current = null;
+                hasTriggeredLongPressRef.current = true;
+                setHoldProgress(0);
+                if (currentItem) {
+                  openQuickMenu(currentItem);
+                }
+              } else {
+                setHoldProgress(Math.min(100, Math.round((elapsed / HOLD_DURATION) * 100)));
+              }
+            }, 30);
 
             if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
             holdTimerRef.current = window.setTimeout(() => {
-              hasTriggeredLongPressRef.current = true;
               if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+              holdIntervalRef.current = null;
+              holdTimerRef.current = null;
+              hasTriggeredLongPressRef.current = true;
               setHoldProgress(0);
 
               if (currentItem) {
@@ -1661,7 +1657,19 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
     const handleKeyUp = (e: KeyboardEvent) => {
       // 🛑 Si el modal de favoritos / continuar viendo está abierto, ceder el control total al modal
-      if (isQuickFavOpen) return;
+      if (isQuickFavOpen) {
+        isHoldingOkRef.current = false;
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        if (holdIntervalRef.current) {
+          clearInterval(holdIntervalRef.current);
+          holdIntervalRef.current = null;
+        }
+        setHoldProgress(0);
+        return;
+      }
 
       const isOk =
         e.key === 'Enter' ||
@@ -1952,42 +1960,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             )}
           </div>
 
-          {/* Opciones directas para Continuar Viendo (Eliminación inmediata y Opciones) */}
-          {selectedCategoryId === 'continue_watching' && displayedStreams.length > 0 && (
-            <div className="flex items-center space-x-3">
-              <span className="hidden md:inline text-[11px] text-zinc-400 font-medium">
-                💡 Pulsa <kbd className="px-1.5 py-0.5 bg-zinc-800 rounded border border-white/20 text-cyan-300 font-bold">MENU ☰</kbd> o mantén OK
-              </span>
-              <button
-                onClick={() => {
-                  const currentItem = displayedStreams[focusedGridIndex];
-                  if (currentItem) {
-                    const rawId = (currentItem as any).stream_id ?? (currentItem as any).series_id ?? (currentItem as any).id;
-                    removeFromContinueWatching(rawId, (currentItem as any).streamUrl, currentItem.name || (currentItem as any).title);
-                  }
-                }}
-                className="px-3.5 py-1.5 rounded-xl bg-red-600/80 hover:bg-red-500 text-white text-xs font-bold transition flex items-center space-x-1.5 shadow-md border border-red-500/40 cursor-pointer active:scale-95"
-                title="Eliminar elemento seleccionado de Continuar Viendo"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Quitar Seleccionado</span>
-              </button>
-              <button
-                onClick={() => {
-                  const currentItem = displayedStreams[focusedGridIndex];
-                  if (currentItem) {
-                    openQuickMenu(currentItem);
-                  }
-                }}
-                className="px-3.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-bold transition flex items-center space-x-1.5 border border-cyan-400/40 cursor-pointer active:scale-95"
-                title="Abrir menú de opciones del elemento"
-              >
-                <MoreVertical className="w-3.5 h-3.5" />
-                <span>Opciones</span>
-              </button>
-            </div>
-          )}
-
           {(loadingStreams || loadingSeriesModal || loadingSearchAll) && (
             <div className="flex items-center space-x-2 text-xs text-cyan-400">
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -2072,14 +2044,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                     handleItemSelect(item);
                   }}
                   innerRef={(el) => { gridItemRefs.current[idx] = el; }}
-                  onRemove={
-                    selectedCategoryId === 'continue_watching' || (item as any).isContinueWatchingItem
-                      ? () => {
-                          const rawId = (item as any).stream_id ?? (item as any).series_id ?? (item as any).id;
-                          removeFromContinueWatching(rawId, (item as any).streamUrl, item.name || (item as any).title);
-                        }
-                      : undefined
-                  }
                 />
               ))}
             </div>
@@ -2131,20 +2095,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                         </span>
                       )}
                     </div>
-                    {(selectedCategoryId === 'continue_watching' || (live as any).isContinueWatchingItem) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          const rawId = stream.stream_id ?? (stream as any).id;
-                          removeFromContinueWatching(String(rawId), (stream as any).streamUrl, title);
-                        }}
-                        title="Quitar de Continuar Viendo"
-                        className="p-1.5 rounded-full bg-red-600/80 hover:bg-red-500 text-white ml-2 transition hover:scale-110 active:scale-95 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
                   </div>
                 );
               })}
@@ -2533,12 +2483,19 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         </div>
       )}
 
-      {/* ⭐ Menú Rápido de Favoritos / Continuar Viendo por pulsación de 3 segundos en Catálogo */}
+      {/* ⭐ Menú Rápido de Favoritos / Continuar Viendo por pulsación en Catálogo */}
       <QuickFavoriteModal
         isOpen={isQuickFavOpen}
         item={quickFavItem}
         isFavorite={quickFavItem ? isFavorite(quickFavItem.id) : false}
-        isContinueWatching={selectedCategoryId === 'continue_watching'}
+        isContinueWatching={
+          selectedCategoryId === 'continue_watching' || 
+          Boolean(quickFavItem && continueWatchingList.some(cw => 
+            String(cw.id) === String(quickFavItem.id) || 
+            cw.streamUrl === quickFavItem.streamUrl || 
+            cw.title === quickFavItem.title
+          ))
+        }
         onRemoveFromContinueWatching={() => {
           if (quickFavItem) {
             removeFromContinueWatching(quickFavItem.id, quickFavItem.streamUrl, quickFavItem.title);

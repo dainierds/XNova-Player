@@ -34,10 +34,37 @@ export const QuickFavoriteModal: React.FC<QuickFavoriteModalProps> = ({
 }) => {
   const maxButtons = isContinueWatching ? 4 : 3;
   const [focusedBtnIdx, setFocusedBtnIdx] = useState<number>(0);
+  const canAcceptEnterRef = React.useRef(false);
 
   useEffect(() => {
     if (isOpen) {
       setFocusedBtnIdx(0);
+      canAcceptEnterRef.current = false;
+
+      // Desbloquear confirmación por Enter después de 350ms o en cuanto el usuario suelte la tecla mantenida
+      const timer = window.setTimeout(() => {
+        canAcceptEnterRef.current = true;
+      }, 350);
+
+      const handleWindowKeyUp = (e: KeyboardEvent) => {
+        const isOk =
+          e.key === 'Enter' ||
+          e.key === ' ' ||
+          e.key === 'Select' ||
+          e.key === 'Ok' ||
+          e.keyCode === 13 ||
+          e.keyCode === 23 ||
+          e.keyCode === 66;
+        if (isOk) {
+          canAcceptEnterRef.current = true;
+        }
+      };
+
+      window.addEventListener('keyup', handleWindowKeyUp, true);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('keyup', handleWindowKeyUp, true);
+      };
     }
   }, [isOpen]);
 
@@ -81,6 +108,11 @@ export const QuickFavoriteModal: React.FC<QuickFavoriteModalProps> = ({
       } else if (isOk) {
         e.preventDefault();
         e.stopPropagation();
+
+        // 🛑 Evitar que el Enter residual de la pulsación de 1.2s cierre o active inmediatamente el modal
+        if (!canAcceptEnterRef.current) {
+          return;
+        }
 
         if (isContinueWatching) {
           // 0: Continuar Viendo / Ver ahora
