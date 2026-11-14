@@ -83,41 +83,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [cacheProgress, setCacheProgress] = useState<{ step: string; percent: number } | null>(null);
 
   useEffect(() => {
-    if (isOpen && activePlaylist?.id) {
-      CatalogCacheService.getStats(activePlaylist.id).then((st) => setCacheStats(st));
+    const plId = activePlaylist?.id || playlists[0]?.id || currentUser?.playlists?.[0]?.id;
+    if (isOpen && plId) {
+      CatalogCacheService.getStats(plId).then((st) => setCacheStats(st));
     }
-  }, [isOpen, activePlaylist?.id]);
+  }, [isOpen, activePlaylist?.id, playlists, currentUser]);
 
   const handleClearCache = async () => {
-    if (!activePlaylist?.id) return;
+    const effectiveId = activePlaylist?.id || playlists[0]?.id || currentUser?.playlists?.[0]?.id;
+    if (!effectiveId) return;
     setIsClearingCache(true);
-    await CatalogCacheService.clear(activePlaylist.id);
+    await CatalogCacheService.clear(effectiveId);
     setCacheStats({ movies: 0, series: 0, live: 0, lastUpdated: null });
     setIsClearingCache(false);
   };
 
+  const [cacheError, setCacheError] = useState<string | null>(null);
+
   const handleUpdateCache = async () => {
-    if (!activePlaylist?.id || activePlaylist.type !== 'xtream') return;
+    const effectivePlaylist = 
+      activePlaylist || 
+      playlists.find((p) => p.isActive) || 
+      playlists[0] || 
+      currentUser?.playlists?.find((p) => p.isActive) || 
+      currentUser?.playlists?.[0];
+
+    if (!effectivePlaylist) {
+      setCacheError('No se encontró ninguna lista IPTV activa.');
+      return;
+    }
+
+    const server = effectivePlaylist.serverUrl || '';
+    const user = effectivePlaylist.username || '';
+    const pass = effectivePlaylist.password || '';
+
+    if (!server || !user || !pass) {
+      setCacheError('La lista actual no cuenta con servidor, usuario y contraseña de Xtream Codes.');
+      return;
+    }
+
+    setCacheError(null);
     setIsUpdatingCache(true);
-    setCacheProgress({ step: 'Iniciando...', percent: 0 });
+    setCacheProgress({ step: 'Conectando al servidor Xtream...', percent: 5 });
+
     try {
       const result = await CatalogCacheService.syncFullCatalog(
         {
-          id: activePlaylist.id,
-          serverUrl: activePlaylist.serverUrl,
-          username: activePlaylist.username,
-          password: activePlaylist.password,
+          id: effectivePlaylist.id,
+          serverUrl: server,
+          username: user,
+          password: pass,
         },
         (step, percent) => setCacheProgress({ step, percent })
       );
+
       setCacheStats({
         movies: result.moviesCount,
         series: result.seriesCount,
         live: result.liveCount,
         lastUpdated: Date.now(),
       });
-    } catch (err) {
+
+      // Refrescar el catálogo en el store global para que toda la interfaz se actualice de inmediato
+      await syncCurrentPlaylist();
+    } catch (err: any) {
       console.error('[Settings] Error actualizando caché:', err);
+      setCacheError(err?.message ? `Error: ${err.message}` : 'Error al conectar con el servidor. Verifica tu conexión.');
     } finally {
       setIsUpdatingCache(false);
       setCacheProgress(null);
@@ -756,6 +787,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           ⚠ Caché vacía — pulsa "Actualizar" para descargar el catálogo
                         </p>
                       )}
+                      {cacheError && (
+                        <p className="text-[11px] text-rose-400 pt-0.5 font-semibold">
+                          ⚠ {cacheError}
+                        </p>
+                      )}
                     </div>
 
                     {/* Botones */}
@@ -763,7 +799,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <button
                         ref={(el) => { itemRefs.current['update_cache'] = el; }}
                         onClick={handleUpdateCache}
-                        disabled={isUpdatingCache || isClearingCache || !activePlaylist || activePlaylist.type !== 'xtream'}
+                        disabled={isUpdatingCache || isClearingCache || !activePlaylist}
                         className={`px-3.5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white border border-cyan-500/50 transition flex items-center space-x-2 cursor-pointer ${getFocusClass('update_cache')}`}
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${isUpdatingCache ? 'animate-spin' : ''}`} />

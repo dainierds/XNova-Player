@@ -128,6 +128,10 @@ export const CatalogCacheService = {
     rawItems: (XtreamStream | XtreamSeries)[]
   ): Promise<CompactCatalogItem[]> {
     try {
+      if (!Array.isArray(rawItems)) {
+        console.warn(`[CatalogCache] rawItems no es un array válido para ${type}:`, rawItems);
+        return [];
+      }
       const items: CompactCatalogItem[] = rawItems.map((item) =>
         compressXtreamItem(item, type)
       );
@@ -143,7 +147,7 @@ export const CatalogCacheService = {
       return items;
     } catch (err) {
       console.warn('[CatalogCache] Error al guardar caché:', err);
-      return rawItems.map((item) => compressXtreamItem(item, type));
+      return Array.isArray(rawItems) ? rawItems.map((item) => compressXtreamItem(item, type)) : [];
     }
   },
 
@@ -293,7 +297,7 @@ export const CatalogCacheService = {
       onProgress?.('Descargando catálogo completo de Películas...', 30);
       const rawMovies = await XtreamService.getVodStreams(server, user, pass).catch(() => []);
       let moviesCount = 0;
-      if (rawMovies && rawMovies.length > 0) {
+      if (Array.isArray(rawMovies) && rawMovies.length > 0) {
         const compactMovies = await this.set(playlist.id, 'movies', rawMovies);
         moviesCount = compactMovies.length;
       }
@@ -301,7 +305,7 @@ export const CatalogCacheService = {
       onProgress?.('Descargando catálogo completo de Series...', 60);
       const rawSeries = await XtreamService.getSeries(server, user, pass).catch(() => []);
       let seriesCount = 0;
-      if (rawSeries && rawSeries.length > 0) {
+      if (Array.isArray(rawSeries) && rawSeries.length > 0) {
         const compactSeries = await this.set(playlist.id, 'series', rawSeries);
         seriesCount = compactSeries.length;
       }
@@ -309,21 +313,21 @@ export const CatalogCacheService = {
       onProgress?.('Descargando Canales de TV en Vivo...', 80);
       const rawLive = await XtreamService.getLiveStreams(server, user, pass).catch(() => []);
       let liveCount = 0;
-      if (rawLive && rawLive.length > 0) {
+      if (Array.isArray(rawLive) && rawLive.length > 0) {
         const compactLive = await this.set(playlist.id, 'live', rawLive);
         liveCount = compactLive.length;
       }
 
       onProgress?.('Optimizando carátulas para navegación 100% instantánea...', 95);
       const topUrls: string[] = [];
-      if (rawMovies) {
+      if (Array.isArray(rawMovies)) {
         rawMovies.slice(0, 50).forEach((m: any) => {
-          if (m.stream_icon) topUrls.push(m.stream_icon);
+          if (m && m.stream_icon) topUrls.push(m.stream_icon);
         });
       }
-      if (rawSeries) {
+      if (Array.isArray(rawSeries)) {
         rawSeries.slice(0, 30).forEach((s: any) => {
-          if (s.cover) topUrls.push(s.cover);
+          if (s && s.cover) topUrls.push(s.cover);
         });
       }
       ImagePreloadService.preloadBatch(topUrls);
