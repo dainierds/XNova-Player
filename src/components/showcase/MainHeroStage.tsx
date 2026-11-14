@@ -37,8 +37,17 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
     setBackdropSrc(item.backdropUrl || FALLBACK_BACKDROP);
   }, [item.backdropUrl]);
 
+  // 📏 Ajuste inteligente del tamaño del título según longitud para que NUNCA desconfigure la pantalla
+  const titleLength = item.title?.length || 0;
+  const titleSizeClass = 
+    titleLength > 45
+      ? 'text-2xl md:text-3xl lg:text-4xl'
+      : titleLength > 24
+        ? 'text-3xl md:text-4xl lg:text-5xl'
+        : 'text-4xl md:text-5xl lg:text-6xl';
+
   return (
-    <div className="relative flex-1 w-full h-full flex flex-col justify-between px-12 pb-6 pt-0 select-none overflow-hidden font-sans">
+    <div className="relative flex-1 w-full h-full flex flex-col justify-between px-8 md:px-12 pb-4 pt-0 select-none overflow-hidden font-sans">
       {/* Fondo panorámico con personaje dominante a la derecha y desvanecimiento a la izquierda */}
       <div className="absolute inset-0 z-0 bg-[#0A0E1A]">
         <img
@@ -59,8 +68,8 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
         <div className="absolute -top-20 -left-20 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* Zona Central de Información del Título */}
-      <div className="relative z-10 max-w-xl flex flex-col justify-end space-y-3 pt-4">
+      {/* Zona Central de Información del Título (Flexible, centrada y protegida contra desbordamientos) */}
+      <div className="relative z-10 max-w-2xl lg:max-w-4xl flex-1 flex flex-col justify-center space-y-2 md:space-y-2.5 min-h-0 pt-2 pb-1">
         {/* Fila Superior: Fecha / Badge + Géneros */}
         <div className="flex items-center space-x-4 text-xs md:text-sm font-medium text-zinc-300">
           <div className="flex items-center space-x-2">
@@ -89,13 +98,13 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
           </span>
         </div>
 
-        {/* Título Monumental en Mayúsculas (Ej. DUNE: MESSIAH) */}
-        <h1 className="text-5xl md:text-6xl font-black text-white tracking-wider leading-none drop-shadow-2xl">
+        {/* Título Monumental en Mayúsculas con límite estricto de 2 líneas */}
+        <h1 className={`${titleSizeClass} font-black text-white tracking-wider leading-tight drop-shadow-2xl line-clamp-2`}>
           {item.title}
         </h1>
 
-        {/* Subtítulo descriptivo y año */}
-        <p className="text-sm md:text-base text-zinc-300 font-normal tracking-wide drop-shadow line-clamp-2">
+        {/* Subtítulo descriptivo / Géneros en una sola línea */}
+        <p className="text-xs md:text-sm text-zinc-300 font-normal tracking-wide drop-shadow line-clamp-1 max-w-2xl">
           {item.subtitle}
         </p>
 
@@ -148,8 +157,8 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
         </div>
       </div>
 
-      {/* Zona Inferior: Carrusel de Miniaturas con Proporción de Cartelera 2:3 para que las fotos NUNCA se corten */}
-      <div className="relative z-10 w-full flex flex-col space-y-2 pb-2">
+      {/* Zona Inferior: Carrusel de Miniaturas con Proporción de Cartelera 2:3 (Fijo y protegido con shrink-0) */}
+      <div className="relative z-10 w-full flex flex-col space-y-2 pb-1 shrink-0">
         <div className="flex items-center space-x-3.5">
           {items.map((thumbItem, index) => {
             const isSelected = index === selectedIndex;

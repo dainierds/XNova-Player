@@ -134,7 +134,9 @@ export function App() {
       ? adminFeaturedItems.filter((i) => i.type === 'series').map((s) => ({
           id: s.id,
           title: s.title.toUpperCase(),
-          subtitle: `${s.title} (${s.year || '2026'})`,
+          subtitle: s.synopsis && s.synopsis.length > 15 && !s.synopsis.startsWith('Disfruta')
+            ? s.synopsis
+            : (s.genresText ? `${s.genresText} • ${s.year || '2026'}` : (s.title.includes(String(s.year || '')) ? s.title : `${s.title} (${s.year || '2026'})`)),
           backdropUrl: s.backdropUrl || s.posterUrl,
           thumbnailUrl: s.posterUrl,
           releaseDateText: s.badge === 'ESTRENO' ? 'Estreno' : s.badge === 'PRÓXIMAMENTE' ? 'Próximamente' : 'Recién Añadida',
@@ -171,7 +173,9 @@ export function App() {
       ? adminFeaturedItems.filter((i) => i.type === 'movie').map((m) => ({
           id: m.id,
           title: m.title.toUpperCase(),
-          subtitle: `${m.title} (${m.year || '2026'})`,
+          subtitle: m.synopsis && m.synopsis.length > 15 && !m.synopsis.startsWith('Disfruta')
+            ? m.synopsis
+            : (m.genresText ? `${m.genresText} • ${m.year || '2026'}` : (m.title.includes(String(m.year || '')) ? m.title : `${m.title} (${m.year || '2026'})`)),
           backdropUrl: m.backdropUrl || m.posterUrl,
           thumbnailUrl: m.posterUrl,
           releaseDateText: m.badge === 'ESTRENO' ? 'Estreno' : m.badge === 'PRÓXIMAMENTE' ? 'Próximamente' : 'Recién Añadida',
@@ -189,7 +193,9 @@ export function App() {
       ? homeFeed.featuredMovies.map((m) => ({
           id: m.id,
           title: m.title.toUpperCase(),
-          subtitle: `${m.title} (${m.year || '2026'})`,
+          subtitle: m.synopsis && m.synopsis.length > 15 && !m.synopsis.startsWith('Disfruta')
+            ? m.synopsis
+            : (m.genres?.length ? `${m.genres.join(', ')} • ${m.year || '2026'}` : (m.title.includes(String(m.year || '')) ? m.title : `${m.title} (${m.year || '2026'})`)),
           backdropUrl: m.backdropUrl,
           thumbnailUrl: m.posterUrl,
           releaseDateText: tagToReleaseDateText(m.tag),
@@ -208,7 +214,9 @@ export function App() {
         ? vodMovies.map((m: any) => ({
             id: `vod_${m.id}`,
             title: (m.title || 'PELÍCULA').toUpperCase(),
-            subtitle: `${m.title} (${m.year || '2026'})`,
+            subtitle: m.synopsis && m.synopsis.length > 15 && !m.synopsis.startsWith('Disfruta')
+            ? m.synopsis
+            : (m.genresText ? `${m.genresText} • ${m.year || '2026'}` : (m.title.includes(String(m.year || '')) ? m.title : `${m.title} (${m.year || '2026'})`)),
             backdropUrl: m.backdropUrl,
             thumbnailUrl: m.posterUrl,
             releaseDateText: 'Recién Añadido',
@@ -263,7 +271,9 @@ export function App() {
           ? homeFeed.featuredMovies.map((m) => ({
               id: m.id,
               title: m.title.toUpperCase(),
-              subtitle: `${m.title} (${m.year || '2026'})`,
+              subtitle: m.synopsis && m.synopsis.length > 15 && !m.synopsis.startsWith('Disfruta')
+            ? m.synopsis
+            : (m.genres?.length ? `${m.genres.join(', ')} • ${m.year || '2026'}` : (m.title.includes(String(m.year || '')) ? m.title : `${m.title} (${m.year || '2026'})`)),
               backdropUrl: m.backdropUrl,
               thumbnailUrl: m.posterUrl,
               releaseDateText: tagToReleaseDateText(m.tag),
