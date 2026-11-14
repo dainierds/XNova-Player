@@ -51,7 +51,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const showControlsRef = useRef(true);
   showControlsRef.current = showControls;
 
-  type PlayerControl = 'back' | 'rewind' | 'play_pause' | 'forward' | 'audio' | 'subtitles';
+  type PlayerControl = 'rewind' | 'play_pause' | 'forward' | 'audio' | 'subtitles';
   const [focusedControl, setFocusedControl] = useState<PlayerControl>('play_pause');
 
   const [audioTracks, setAudioTracks] = useState<{ id: number; name: string }[]>([]);
@@ -352,11 +352,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         case 'ArrowUp':
           e.preventDefault();
           e.stopPropagation();
-          if (focusedControl === 'back') {
-            if (isLive && onPrevChannel) onPrevChannel();
+          if (isLive && onPrevChannel) {
+            onPrevChannel();
           } else {
-            // Subir al botón Volver (Atrás) en la cabecera
-            setFocusedControl('back');
+            // Asegurar que los controles estén visibles y enfocados en play/pause
+            setShowControls(true);
+            setFocusedControl('play_pause');
+            resetHideTimer();
           }
           break;
 
@@ -364,9 +366,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         case 'ArrowDown':
           e.preventDefault();
           e.stopPropagation();
-          if (focusedControl === 'back') {
-            // Bajar a la fila de controles inferiores
-            setFocusedControl('play_pause');
+          if (isLive && onNextChannel) {
+            onNextChannel();
           } else {
             // Ocultar controles OSD inmediatamente para disfrutar a pantalla completa
             setShowControls(false);
@@ -381,9 +382,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         case 'ArrowLeft':
           e.preventDefault();
           e.stopPropagation();
-          if (focusedControl === 'back') {
-            // Mantenerse en el botón volver
-          } else {
+          {
             const bottom = getBottomControls();
             const curIdx = bottom.indexOf(focusedControl);
             if (curIdx > 0) {
@@ -399,9 +398,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         case 'ArrowRight':
           e.preventDefault();
           e.stopPropagation();
-          if (focusedControl === 'back') {
-            // Mantenerse en el botón volver
-          } else {
+          {
             const bottom = getBottomControls();
             const curIdx = bottom.indexOf(focusedControl);
             if (curIdx < bottom.length - 1) {
@@ -418,10 +415,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             e.preventDefault();
             e.stopPropagation();
 
-            if (focusedControl === 'back') {
-              saveProgress();
-              onClose();
-            } else if (focusedControl === 'rewind') {
+            if (focusedControl === 'rewind') {
               if (video && !isLive) {
                 video.currentTime = Math.max(0, video.currentTime - 10);
               }
@@ -444,7 +438,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 setCurrentSubtitle((prev) => (prev === -1 ? 0 : -1));
               }
             } else {
-              // 'play_pause' o cualquier otro control: alternar play/pause
+              // 'play_pause' por defecto: alternar play/pause de forma 100% garantizada
               handleTogglePlayPause();
             }
           }
@@ -641,14 +635,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 saveProgress();
                 onClose();
               }}
-              className={`p-3 rounded-full transition-all duration-200 shadow-lg ${
-                focusedControl === 'back'
-                  ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-110 shadow-cyan-400/60 z-20'
-                  : 'bg-white/10 hover:bg-white/20 text-white'
-              }`}
+              className="p-3 rounded-full transition-all duration-200 bg-white/10 hover:bg-white/20 text-white shadow-lg cursor-pointer"
               title="Volver (o botón Atrás del mando)"
             >
-              <ArrowLeft className={`w-6 h-6 ${focusedControl === 'back' ? 'text-black font-black' : 'text-white'}`} />
+              <ArrowLeft className="w-6 h-6 text-white" />
             </button>
 
             <div>
@@ -719,10 +709,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   e.stopPropagation();
                   handleTogglePlayPause();
                 }}
-                className={`p-4 rounded-full shadow-2xl transition-all duration-200 ${
+                className={`p-4 rounded-full shadow-2xl transition-all duration-200 cursor-pointer ${
                   focusedControl === 'play_pause'
-                    ? 'bg-white text-black ring-4 ring-cyan-400 scale-115 shadow-cyan-400/70 z-20'
-                    : 'bg-cyan-500 hover:bg-cyan-400 text-white shadow-cyan-500/50'
+                    ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-125 shadow-2xl shadow-cyan-400/80 z-20'
+                    : 'bg-white/15 hover:bg-white/25 text-white shadow-lg'
                 }`}
                 title={isPlaying ? 'Pausar' : 'Reproducir'}
               >
