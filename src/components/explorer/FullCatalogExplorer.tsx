@@ -13,8 +13,7 @@ import {
   Heart,
   Star,
   Check,
-  Clock,
-  Trash2
+  Clock
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
@@ -1294,14 +1293,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
       // ── CASO 1: PANTALLA COMPLETA DE DETALLES DE PELÍCULA ──
       if (focusZone === 'movie_detail' && selectedMovieDetail) {
-        const isMovieInContinue = continueWatchingList.some(
-          (cw) =>
-            String(cw.id) === String(selectedMovieDetail.item.stream_id) ||
-            String(cw.id) === `vod_${selectedMovieDetail.item.stream_id}` ||
-            cw.streamUrl === selectedMovieDetail.streamUrl ||
-            cw.title === selectedMovieDetail.meta.title
-        );
-
         if (isOk) {
           e.preventDefault();
           if (detailBtnIndex === 0) {
@@ -1334,19 +1325,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             } else {
               window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedMovieDetail.meta.title + ' trailer')}`, '_blank');
             }
-          } else if (detailBtnIndex === 3 && isMovieInContinue) {
-            // Botón 3: Quitar de Continuar Viendo
-            removeFromContinueWatching(
-              String(selectedMovieDetail.item.stream_id),
-              selectedMovieDetail.streamUrl,
-              selectedMovieDetail.meta.title
-            );
-            if (initialSelectedItem) {
-              onClose();
-            } else {
-              setSelectedMovieDetail(null);
-              setFocusZone('grid');
-            }
           }
           return;
         }
@@ -1363,7 +1341,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           return;
         }
 
-        const maxBtnIndex = isMovieInContinue ? 3 : 2;
+        const maxBtnIndex = 2;
         switch (e.key) {
           case 'ArrowLeft':
             setDetailBtnIndex((prev) => Math.max(0, prev - 1));
@@ -2244,40 +2222,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               <span>Ver Tráiler</span>
             </button>
 
-            {/* 3b. Botón Quitar de Continuar Viendo si está presente */}
-            {continueWatchingList.some(
-              (cw) =>
-                String(cw.id) === String(selectedMovieDetail.item.stream_id) ||
-                String(cw.id) === `vod_${selectedMovieDetail.item.stream_id}` ||
-                cw.streamUrl === selectedMovieDetail.streamUrl ||
-                cw.title === selectedMovieDetail.meta.title
-            ) && (
-              <button
-                onClick={() => {
-                  removeFromContinueWatching(
-                    String(selectedMovieDetail.item.stream_id),
-                    selectedMovieDetail.streamUrl,
-                    selectedMovieDetail.meta.title
-                  );
-                  if (initialSelectedItem) {
-                    onClose();
-                  } else {
-                    setSelectedMovieDetail(null);
-                    setFocusZone('grid');
-                  }
-                }}
-                className={`px-6 py-3.5 rounded-xl font-bold text-sm transition-all duration-200 flex items-center space-x-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 border border-red-500/40 cursor-pointer shadow-lg active:scale-95 ${
-                  detailBtnIndex === 3
-                    ? 'bg-red-600 text-white ring-4 ring-red-400 scale-105 shadow-2xl shadow-red-500/50'
-                    : ''
-                }`}
-                title="Quitar esta película de la lista Continuar Viendo"
-              >
-                <Trash2 className="w-4 h-4 text-red-400" />
-                <span>Quitar de Continuar Viendo</span>
-              </button>
-            )}
-
             {/* 4. Botón Poner en Portada (Solo Administrador) */}
             {isAdmin && (
               <button
@@ -2341,35 +2285,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             </div>
 
             <div className="flex items-center space-x-3">
-              {/* Botón Quitar de Continuar Viendo si la serie está presente */}
-              {continueWatchingList.some(
-                (cw) =>
-                  String(cw.id) === String(selectedSeriesDetails.series.series_id) ||
-                  String(cw.id) === `series_${selectedSeriesDetails.series.series_id}` ||
-                  cw.title === selectedSeriesDetails.series.name
-              ) && (
-                <button
-                  onClick={() => {
-                    removeFromContinueWatching(
-                      String(selectedSeriesDetails.series.series_id),
-                      undefined,
-                      selectedSeriesDetails.series.name
-                    );
-                    if (initialSelectedItem) {
-                      onClose();
-                    } else {
-                      setSelectedSeriesDetails(null);
-                      setFocusZone('grid');
-                    }
-                  }}
-                  className="px-4 py-2.5 rounded-xl bg-red-600/30 hover:bg-red-600/50 text-red-300 border border-red-500/40 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-md active:scale-95"
-                  title="Quitar esta serie de la lista Continuar Viendo"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                  <span>Quitar de Continuar Viendo</span>
-                </button>
-              )}
-
               {isAdmin && (
                 <button
                   onClick={() => setAdminPinModalItem({
