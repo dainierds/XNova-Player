@@ -140,8 +140,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     // 1. Botón cerrar
     items.push({ id: 'close', onSelect: onClose });
 
-    // 2. Si es Admin: Botón panel admin
-    if (isAdmin && onOpenAdminPanel) {
+    // 2. Botón panel admin (Accesible para admin o con PIN maestro)
+    if (onOpenAdminPanel) {
       items.push({
         id: 'admin_panel',
         onSelect: () => {
@@ -358,15 +358,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Contenido principal: Lista de cuentas o Formulario de edición */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
-          {/* 1. Acceso a Panel de Administración (Si es Admin) */}
-          {isAdmin && onOpenAdminPanel && (
+          {/* 1. Acceso a Panel de Administración y Portada (Para Admin o con PIN de seguridad 8888) */}
+          {onOpenAdminPanel && (
             <div className="p-4 rounded-xl bg-purple-950/40 border border-purple-500/40 mb-6 flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <ShieldCheck className="w-6 h-6 text-purple-400" />
+                <ShieldCheck className="w-6 h-6 text-purple-400 shrink-0" />
                 <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Modo Administrador Activo</h4>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                    {isAdmin ? 'Modo Administrador Activo' : 'Panel de Administración y Portada'}
+                  </h4>
                   <p className="text-[11px] text-zinc-300">
-                    Crea nuevos clientes, edita contraseñas, asigna paquetes (Basic, Gold, Premium) y listas IPTV
+                    {isAdmin 
+                      ? 'Crea nuevos clientes, edita contraseñas, asigna paquetes y personaliza la pantalla principal' 
+                      : 'Gestiona estrenos de portada, clientes y listas IPTV (Requiere PIN maestro: 8888)'}
                   </p>
                 </div>
               </div>
@@ -376,9 +380,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClose();
                   onOpenAdminPanel();
                 }}
-                className={`px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs shadow-md transition ${getFocusClass('admin_panel')}`}
+                className={`px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs shadow-md transition shrink-0 ${getFocusClass('admin_panel')}`}
               >
-                Abrir Panel de Control
+                Abrir Panel
               </button>
             </div>
           )}
