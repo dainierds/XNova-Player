@@ -26,8 +26,13 @@ export interface WatchProgressItem {
   currentTime: number;
   duration: number;
   streamUrl: string;
-  type: 'movie' | 'series';
+  type: 'movie' | 'series' | 'live';
   updatedAt: number;
+  backdropUrl?: string;
+  progressPercent?: number;
+  year?: string;
+  rating?: string;
+  genresText?: string;
 }
 
 export interface SavedFavoriteItem {
@@ -88,9 +93,15 @@ export const StorageService = {
 
   async saveWatchProgress(item: WatchProgressItem): Promise<void> {
     const list = await this.getWatchProgress();
-    const filtered = list.filter((p) => p.id !== item.id);
+    const filtered = list.filter((p) => String(p.id) !== String(item.id) && p.streamUrl !== item.streamUrl);
     filtered.unshift(item); // Al inicio los más recientes
-    await set(KEYS.WATCH_PROGRESS, filtered.slice(0, 30)); // Guardar hasta 30
+    await set(KEYS.WATCH_PROGRESS, filtered.slice(0, 50)); // Guardar hasta 50
+  },
+
+  async removeWatchProgress(id: string): Promise<void> {
+    const list = await this.getWatchProgress();
+    const filtered = list.filter((p) => String(p.id) !== String(id) && p.streamUrl !== id);
+    await set(KEYS.WATCH_PROGRESS, filtered);
   },
 
   // --- Favoritos ---

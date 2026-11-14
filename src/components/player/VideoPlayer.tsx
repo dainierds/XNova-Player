@@ -11,6 +11,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
+import { recordWatchItem } from '../../store/useContinueWatchingStore';
 import { openExternalPlayer } from '../../utils/externalPlayer';
 
 interface VideoPlayerProps {
@@ -187,16 +188,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Guardar progreso al salir o pausar
   const saveProgress = useCallback(() => {
-    if (isLive || !videoRef.current || duration <= 0) return;
-    StorageService.saveWatchProgress({
+    if (!videoRef.current) return;
+    const curTime = videoRef.current.currentTime;
+    const dur = duration > 0 ? duration : videoRef.current.duration || 0;
+
+    recordWatchItem({
       id: contentId,
       title,
       posterUrl,
-      currentTime: videoRef.current.currentTime,
-      duration,
+      currentTime: curTime,
+      duration: dur,
       streamUrl,
-      type: 'movie',
-      updatedAt: Date.now(),
+      type: isLive ? 'live' : 'movie',
     });
   }, [contentId, title, posterUrl, duration, streamUrl, isLive]);
 

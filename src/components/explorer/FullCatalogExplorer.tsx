@@ -12,7 +12,8 @@ import {
   RotateCw,
   Heart,
   Star,
-  Check
+  Check,
+  Clock
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
@@ -24,6 +25,7 @@ import { usePlaylistStore } from '../../store/usePlaylistStore';
 import { useFavoritesStore } from '../../store/useFavoritesStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAdminFeaturedStore, type FeaturedBadge } from '../../store/useAdminFeaturedStore';
+import { useContinueWatchingStore } from '../../store/useContinueWatchingStore';
 import { QuickFavoriteModal, type QuickFavoriteItem } from '../common/QuickFavoriteModal';
 import { HoldProgressIndicator } from '../common/HoldProgressIndicator';
 
@@ -181,6 +183,16 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
             {rating}
           </div>
         )}
+
+        {/* Barra de progreso de reproducción para Continuar Viendo */}
+        {typeof (item as any).progressPercent === 'number' && (item as any).progressPercent > 0 && (
+          <div className="absolute bottom-0 inset-x-0 h-1.5 bg-black/75 overflow-hidden">
+            <div
+              className="h-full bg-cyan-400 shadow-sm"
+              style={{ width: `${Math.min(100, Math.max(5, (item as any).progressPercent))}%` }}
+            />
+          </div>
+        )}
       </div>
 
       <h3 className={`text-xs font-bold mt-2 truncate transition ${
@@ -273,6 +285,40 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   const [streams, setStreams] = useState<(XtreamStream | XtreamSeries)[]>(initialCachedStreams);
   const [loading, setLoading] = useState(initialCachedCats.length === 0);
   const [loadingStreams, setLoadingStreams] = useState(initialCachedStreams.length === 0);
+
+  // ⏱️ Historial / Continuar Viendo persistente
+  const {
+    items: continueWatchingList,
+    loadItems: loadContinueWatching,
+    removeItem: removeFromContinueWatching,
+  } = useContinueWatchingStore();
+
+  useEffect(() => {
+    loadContinueWatching();
+  }, [loadContinueWatching]);
+
+  const sectionContinueWatching = useMemo(() => {
+    return continueWatchingList.filter((item) => {
+      if (contentType === 'movies') return item.type === 'movie' || !item.type;
+      if (contentType === 'series') return item.type === 'series';
+      if (contentType === 'live') return item.type === 'live';
+      return true;
+    });
+  }, [continueWatchingList, contentType]);
+
+  // Carpeta "Continuar Viendo" siempre ubicada antes de la primera categoría
+  const continueWatchingCategory: XtreamCategory = useMemo(
+    () => ({
+      category_id: 'continue_watching',
+      category_name: 'Continuar Viendo',
+      parent_id: 0,
+    }),
+    []
+  );
+
+  const allCategories = useMemo(() => {
+    return [continueWatchingCategory, ...categories];
+  }, [continueWatchingCategory, categories]);
 
   // 👑 Modo Administrador: fijar contenido en Portada y control por ratón
   const { isAdmin } = useAuthStore();
@@ -421,6 +467,10 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     let isMounted = true;
     if (!selectedCategoryId || selectedCategoryId.trim() === '') return;
 
+    if (selectedCategoryId === 'continue_watching') {
+      return;
+    }
+
     const streamsKey = `${server}_${user}_${contentType}_${selectedCategoryId}`;
 
     // 🚀 Si ya tenemos los streams de esta carpeta en RAM, mostrarlos inmediatamente en 0ms
@@ -506,6 +556,35 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     loadStreams();
     return () => { isMounted = false; };
   }, [selectedCategoryId, contentType, server, user, pass]);
+
+  // 2b. Cargar / actualizar contenidos reactivos de "Continuar Viendo"
+  useEffect(() => {
+    if (selectedCategoryId === 'continue_watching') {
+      const mappedStreams = sectionContinueWatching.map((item) => ({
+        stream_id: item.id,
+        series_id: item.id,
+        id: item.id,
+        name: item.title,
+        title: item.title,
+        stream_icon: item.posterUrl,
+        cover: item.posterUrl,
+        icon: item.posterUrl,
+        poster: item.posterUrl,
+        rating: item.rating || '7.0',
+        year: item.year,
+        progressPercent: item.progressPercent,
+        currentTime: item.currentTime,
+        duration: item.duration,
+        streamUrl: item.streamUrl,
+        type: item.type,
+        isContinueWatchingItem: true,
+      } as any));
+
+      setStreams(mappedStreams);
+      setLoadingStreams(false);
+      setFocusedGridIndex(0);
+    }
+  }, [selectedCategoryId, sectionContinueWatching]);
 
   // 🚀 Precarga suave de pósters en memoria RAM (estilo Glide en Kai TV)
   useEffect(() => {
@@ -729,17 +808,17 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       const vod = item as XtreamStream;
       const streamId = vod.stream_id || (vod as any).id;
       const meta = metadataCacheRef.current.get(streamId) || focusedMetadata || {
-        title: vod.name || 'Película',
-        posterUrl: vod.stream_icon,
-        backdropUrl: vod.stream_icon,
+        title: vod.name || (vod as any).title || 'Película',
+        posterUrl: vod.stream_icon || (vod as any).cover || (vod as any).poster,
+        backdropUrl: (vod as any).backdropUrl || vod.stream_icon || (vod as any).cover,
         rating: vod.rating || '7.0',
-        genres: '',
+        genres: (vod as any).genresText || '',
         plot: 'Presiona reproducir para iniciar la película.',
         containerExtension: vod.container_extension || 'mp4',
       };
 
       const ext = meta.containerExtension || vod.container_extension || 'mp4';
-      const streamUrl = XtreamService.buildVodStreamUrl(server, user, pass, streamId, ext);
+      const streamUrl = (item as any).streamUrl || XtreamService.buildVodStreamUrl(server, user, pass, streamId, ext);
 
       // Abrir pantalla completa de detalles (Imagen 2)
       setSelectedMovieDetail({
@@ -755,15 +834,15 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       const streamId = (live as any).stream_id ?? (live as any).id;
       const rawExt = (live as any).container_extension || (live as any).extension || (live as any).ext || 'ts';
       const cleanExt = String(rawExt).replace(/^\.+/, '').trim() || 'ts';
-      const streamUrl = (live as any).direct_source && String((live as any).direct_source).startsWith('http')
+      const streamUrl = (live as any).streamUrl || ((live as any).direct_source && String((live as any).direct_source).startsWith('http')
         ? (live as any).direct_source
-        : XtreamService.buildLiveStreamUrl(server, user, pass, streamId, cleanExt);
+        : XtreamService.buildLiveStreamUrl(server, user, pass, streamId, cleanExt));
 
       onPlayStream({
         id: `live_${streamId}`,
-        title: live.name || 'Canal de TV',
+        title: live.name || (live as any).title || 'Canal de TV',
         streamUrl,
-        posterUrl: live.stream_icon,
+        posterUrl: live.stream_icon || (live as any).icon,
         isLive: true,
       });
     } else {
@@ -1052,15 +1131,15 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         } else if (focusZone === 'sidebar_search') {
           searchInputRef.current?.focus();
         } else if (focusZone === 'categories') {
-          if (categories[focusedCatIndex]) {
-            setSelectedCategoryId(categories[focusedCatIndex].category_id);
+          if (allCategories[focusedCatIndex]) {
+            setSelectedCategoryId(allCategories[focusedCatIndex].category_id);
             if (displayedStreams.length > 0) {
               setFocusZone('grid');
               setFocusedGridIndex(0);
             }
           }
         } else if (focusZone === 'grid') {
-          // Iniciar temporizador de 2.5s para Favoritos en el catálogo
+          // Iniciar temporizador de 3s para Menú Rápido / Continuar Viendo / Favoritos en el catálogo
           if (!isHoldingOkRef.current) {
             isHoldingOkRef.current = true;
             hasTriggeredLongPressRef.current = false;
@@ -1069,7 +1148,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             const startTime = Date.now();
             holdIntervalRef.current = window.setInterval(() => {
               const elapsed = Date.now() - startTime;
-              setHoldProgress(Math.min(100, Math.round((elapsed / 2500) * 100)));
+              setHoldProgress(Math.min(100, Math.round((elapsed / 3000) * 100)));
             }, 50);
 
             holdTimerRef.current = window.setTimeout(() => {
@@ -1078,24 +1157,24 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               setHoldProgress(0);
 
               if (currentItem) {
-                const isLive = contentType === 'live';
-                const isSeries = contentType === 'series';
-                const id = isLive
-                  ? `live_${(currentItem as any).stream_id ?? (currentItem as any).id}`
-                  : isSeries
-                  ? `series_${(currentItem as any).series_id ?? (currentItem as any).id}`
-                  : `vod_${(currentItem as any).stream_id ?? (currentItem as any).id}`;
+                const isLive = contentType === 'live' || (currentItem as any).type === 'live';
+                const isSeries = contentType === 'series' || (currentItem as any).type === 'series';
+                const rawId = (currentItem as any).stream_id ?? (currentItem as any).series_id ?? (currentItem as any).id;
+                const id = String(rawId).startsWith('live_') || String(rawId).startsWith('series_') || String(rawId).startsWith('vod_')
+                  ? String(rawId)
+                  : (isLive ? `live_${rawId}` : isSeries ? `series_${rawId}` : `vod_${rawId}`);
 
                 setQuickFavItem({
                   id,
                   title: currentItem.name || (currentItem as any).title || 'Sin Título',
-                  posterUrl: (currentItem as any).stream_icon || (currentItem as any).cover,
-                  backdropUrl: (currentItem as any).cover || (currentItem as any).stream_icon,
+                  posterUrl: (currentItem as any).stream_icon || (currentItem as any).cover || (currentItem as any).poster,
+                  backdropUrl: (currentItem as any).cover || (currentItem as any).stream_icon || (currentItem as any).backdropUrl,
                   type: isLive ? 'live' : isSeries ? 'series' : 'movie',
+                  streamUrl: (currentItem as any).streamUrl,
                 });
                 setIsQuickFavOpen(true);
               }
-            }, 2500);
+            }, 3000);
           }
           return;
         }
@@ -1168,8 +1247,8 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             if (focusedCatIndex > 0) {
               const nextIdx = focusedCatIndex - 1;
               setFocusedCatIndex(nextIdx);
-              if (categories[nextIdx]) {
-                setSelectedCategoryId(categories[nextIdx].category_id);
+              if (allCategories[nextIdx]) {
+                setSelectedCategoryId(allCategories[nextIdx].category_id);
               }
             } else {
               // Subir a la barra de búsqueda de la sección
@@ -1192,11 +1271,11 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             setFocusedCatIndex(0);
             searchInputRef.current?.blur();
           } else if (focusZone === 'categories') {
-            if (focusedCatIndex < categories.length - 1) {
+            if (focusedCatIndex < allCategories.length - 1) {
               const nextIdx = focusedCatIndex + 1;
               setFocusedCatIndex(nextIdx);
-              if (categories[nextIdx]) {
-                setSelectedCategoryId(categories[nextIdx].category_id);
+              if (allCategories[nextIdx]) {
+                setSelectedCategoryId(allCategories[nextIdx].category_id);
               }
             }
           } else if (focusZone === 'grid') {
@@ -1261,6 +1340,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     focusedCatIndex,
     focusedGridIndex,
     categories,
+    allCategories,
     streams,
     displayedStreams,
     searchQuery,
@@ -1275,7 +1355,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     currentSeasonEpisodes,
   ]);
 
-  const activeCategory = categories.find((c) => c.category_id === selectedCategoryId);
+  const activeCategory = allCategories.find((c) => c.category_id === selectedCategoryId);
 
   return (
     <div className="fixed inset-0 z-50 bg-[#070A12] text-white flex overflow-hidden select-none font-sans">
@@ -1359,14 +1439,15 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
         {/* Encabezado de la lista */}
         <div className="px-5 pt-3 pb-2 text-[11px] font-black uppercase tracking-wider text-zinc-400">
-          Categorías ({categories.length})
+          Categorías ({allCategories.length})
         </div>
 
         {/* Lista de Carpetas/Categorías */}
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 scroll-smooth">
-          {categories.map((cat, idx) => {
+          {allCategories.map((cat, idx) => {
             const isSelected = selectedCategoryId === cat.category_id;
             const isFocused = focusZone === 'categories' && focusedCatIndex === idx;
+            const isContinue = cat.category_id === 'continue_watching';
 
             return (
               <button
@@ -1379,14 +1460,35 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 }}
                 className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all duration-200 flex items-center space-x-3 ${
                   isFocused
-                    ? 'bg-white text-black font-black ring-4 ring-cyan-400 scale-102 shadow-2xl shadow-cyan-500/50 z-10'
+                    ? isContinue
+                      ? 'bg-amber-400 text-black font-black ring-4 ring-amber-300 scale-102 shadow-2xl shadow-amber-500/50 z-10'
+                      : 'bg-white text-black font-black ring-4 ring-cyan-400 scale-102 shadow-2xl shadow-cyan-500/50 z-10'
                     : isSelected
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                      : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                      ? isContinue
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                        : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      : isContinue
+                        ? 'text-amber-300/90 hover:text-amber-200 hover:bg-white/5 bg-amber-500/5'
+                        : 'text-zinc-400 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <Folder className={`w-4 h-4 shrink-0 ${isFocused ? 'text-black fill-black' : isSelected ? 'text-cyan-400' : 'text-zinc-500'}`} />
+                {isContinue ? (
+                  <Clock className={`w-4 h-4 shrink-0 ${isFocused ? 'text-black fill-black' : isSelected ? 'text-amber-400' : 'text-amber-400'}`} />
+                ) : (
+                  <Folder className={`w-4 h-4 shrink-0 ${isFocused ? 'text-black fill-black' : isSelected ? 'text-cyan-400' : 'text-zinc-500'}`} />
+                )}
                 <span className="truncate flex-1">{cat.category_name}</span>
+                {isContinue && sectionContinueWatching.length > 0 && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                    isFocused
+                      ? 'bg-black text-amber-300'
+                      : isSelected
+                        ? 'bg-amber-500 text-black'
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  }`}>
+                    {sectionContinueWatching.length}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -1497,20 +1599,34 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           ref={gridScrollContainerRef}
           className="flex-1 overflow-y-auto px-10 pt-4 pb-12 flex flex-col scroll-smooth"
         >
-          {/* Estado Vacío de Búsqueda */}
+          {/* Estado Vacío de Búsqueda o Continuar Viendo */}
           {displayedStreams.length === 0 && !loadingStreams && !loadingSearchAll && (
             <div className="flex-1 flex flex-col items-center justify-center py-20 text-zinc-500">
-              <Search className="w-12 h-12 mb-3 text-zinc-600 opacity-60" />
-              <p className="text-sm font-bold text-zinc-300">
-                {searchQuery.trim() 
-                  ? `No se encontraron resultados para "${searchQuery}"` 
-                  : 'No hay contenidos disponibles en esta categoría'}
-              </p>
-              <p className="text-xs mt-1 text-zinc-500">
-                {searchQuery.trim() 
-                  ? 'Intenta buscar con otra palabra clave en esta sección.' 
-                  : 'Selecciona otra categoría en el menú lateral.'}
-              </p>
+              {selectedCategoryId === 'continue_watching' ? (
+                <>
+                  <Clock className="w-16 h-16 mb-4 text-amber-400/60" />
+                  <p className="text-base font-black text-white">
+                    Sin contenidos en Continuar Viendo
+                  </p>
+                  <p className="text-xs mt-1.5 text-zinc-400 max-w-sm text-center">
+                    Las películas, series o canales que reproduzcas o dejes a medias aparecerán aquí automáticamente para que los retomes cuando quieras.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Search className="w-12 h-12 mb-3 text-zinc-600 opacity-60" />
+                  <p className="text-sm font-bold text-zinc-300">
+                    {searchQuery.trim() 
+                      ? `No se encontraron resultados para "${searchQuery}"` 
+                      : 'No hay contenidos disponibles en esta categoría'}
+                  </p>
+                  <p className="text-xs mt-1 text-zinc-500">
+                    {searchQuery.trim() 
+                      ? 'Intenta buscar con otra palabra clave en esta sección.' 
+                      : 'Selecciona otra categoría en el menú lateral.'}
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -1593,6 +1709,11 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                       <h4 className={`text-xs font-bold truncate ${isFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>
                         {title}
                       </h4>
+                      {(live as any).isContinueWatchingItem && (
+                        <span className="text-[10px] text-amber-400 font-semibold flex items-center space-x-1 mt-0.5">
+                          <Clock className="w-3 h-3 mr-1 inline" /> Visto recientemente
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -1886,11 +2007,22 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         </div>
       )}
 
-      {/* ⭐ Menú Rápido de Favoritos por pulsación de 3 segundos en Catálogo */}
+      {/* ⭐ Menú Rápido de Favoritos / Continuar Viendo por pulsación de 3 segundos en Catálogo */}
       <QuickFavoriteModal
         isOpen={isQuickFavOpen}
         item={quickFavItem}
         isFavorite={quickFavItem ? isFavorite(quickFavItem.id) : false}
+        isContinueWatching={selectedCategoryId === 'continue_watching'}
+        onRemoveFromContinueWatching={() => {
+          if (quickFavItem) {
+            const rawId = quickFavItem.id.replace(/^(vod_|series_|live_)/, '');
+            removeFromContinueWatching(quickFavItem.id);
+            removeFromContinueWatching(rawId);
+            if (quickFavItem.streamUrl) {
+              removeFromContinueWatching(quickFavItem.streamUrl);
+            }
+          }
+        }}
         onToggleFavorite={() => {
           if (quickFavItem) {
             toggleFavorite(quickFavItem);

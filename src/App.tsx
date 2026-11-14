@@ -28,6 +28,7 @@ import { ImagePreloadService } from './services/imagePreloadService';
 import { TrailerModal } from './components/player/TrailerModal';
 import { TmdbService } from './services/tmdb';
 import { XtreamService } from './services/xtream';
+import { recordWatchItem } from './store/useContinueWatchingStore';
 import { useFavoritesStore } from './store/useFavoritesStore';
 import { useAdminFeaturedStore } from './store/useAdminFeaturedStore';
 import { QuickFavoriteModal, type QuickFavoriteItem } from './components/common/QuickFavoriteModal';
@@ -380,6 +381,14 @@ export function App() {
             );
             const epTitle = `${item.title} - T${firstSeason}:E${firstEp.episode_num || 1} ${firstEp.title || ''}`;
 
+            recordWatchItem({
+              id: item.id || epTitle,
+              title: epTitle,
+              posterUrl: item.thumbnailUrl || item.backdropUrl,
+              streamUrl: epUrl,
+              type: 'series',
+            });
+
             if (
               playWithNativePlayer({
                 streamUrl: epUrl,
@@ -414,6 +423,14 @@ export function App() {
       item.streamUrl &&
       !item.streamUrl.includes('test-streams.mux.dev')
     ) {
+      recordWatchItem({
+        id: item.id || item.title,
+        title: item.title,
+        posterUrl: item.backdropUrl || item.thumbnailUrl,
+        streamUrl: item.streamUrl,
+        type: 'movie',
+      });
+
       if (
         playWithNativePlayer({
           streamUrl: item.streamUrl,
@@ -437,6 +454,14 @@ export function App() {
       });
 
       if (match.isMatch && match.resolvedUrl) {
+        recordWatchItem({
+          id: item.id || item.title,
+          title: match.matchedItem?.name || item.title,
+          posterUrl: match.matchedItem?.icon || item.backdropUrl,
+          streamUrl: match.resolvedUrl,
+          type: 'movie',
+        });
+
         if (
           playWithNativePlayer({
             streamUrl: match.resolvedUrl,
@@ -917,6 +942,16 @@ export function App() {
               !isTrailerOpen
             }
             onPlayMedia={async (media) => {
+              if (media.streamUrl) {
+                recordWatchItem({
+                  id: media.id || media.title,
+                  title: media.title,
+                  posterUrl: media.posterUrl,
+                  streamUrl: media.streamUrl,
+                  type: media.isLive ? 'live' : 'movie',
+                });
+              }
+
               // 🚀 1. Si ya tiene streamUrl directo Xtream, reproducir de inmediato con ExoPlayer nativo
               if (media.streamUrl && playWithNativePlayer({
                 streamUrl: media.streamUrl,
@@ -933,6 +968,15 @@ export function App() {
                   streamUrl: media.streamUrl,
                 });
                 const urlToPlay = (match.isMatch && match.resolvedUrl) ? match.resolvedUrl : media.streamUrl;
+                if (urlToPlay) {
+                  recordWatchItem({
+                    id: media.id || media.title,
+                    title: match.matchedItem?.name || media.title,
+                    posterUrl: match.matchedItem?.icon || media.posterUrl,
+                    streamUrl: urlToPlay,
+                    type: media.isLive ? 'live' : 'movie',
+                  });
+                }
                 if (urlToPlay && playWithNativePlayer({
                   streamUrl: urlToPlay,
                   title: match.matchedItem?.name || media.title,
@@ -1181,6 +1225,15 @@ export function App() {
               setFocusedZone('sidebar');
             }}
             onPlayStream={(stream) => {
+              const watchType = stream.isLive ? 'live' : stream.id.startsWith('series_') ? 'series' : 'movie';
+              recordWatchItem({
+                id: stream.id,
+                title: stream.title,
+                posterUrl: stream.posterUrl,
+                streamUrl: stream.streamUrl,
+                type: watchType,
+              });
+
               // 🚀 1. Intentar reproducir con Google Media3 ExoPlayer nativo (el mismo motor de TiviMate)
               if (playWithNativePlayer({
                 streamUrl: stream.streamUrl,
