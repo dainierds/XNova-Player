@@ -231,11 +231,11 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           <h2 className="text-base font-bold text-white flex items-center space-x-2">
             <span>Contenido Destacado en Pantalla Principal</span>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-              {featuredItems.length} títulos
+              {featuredItems.length} / 5 títulos
             </span>
           </h2>
           <p className="text-xs text-zinc-400 mt-0.5">
-            Las películas y series que fijes aquí aparecerán en primer lugar en el carrusel de inicio. Al tocarlas, van directo a la raíz del contenido.
+            Las películas y series que fijes aquí (hasta 5) aparecerán en primer lugar en el carrusel de inicio. Al tocarlas, van directo a la raíz del contenido.
           </p>
         </div>
 
@@ -256,13 +256,17 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
 
           <button
             onClick={() => {
+              if (featuredItems.length >= 5) {
+                showToast('Ya has alcanzado el límite de 5 contenidos para el carrusel de portada. Elimina uno para añadir otro.');
+                return;
+              }
               setShowAddModal(true);
               setSelectedItem(null);
             }}
             className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs shadow-lg shadow-cyan-500/30 transition transform active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>AÑADIR A PORTADA</span>
+            <span>AÑADIR A PORTADA ({featuredItems.length}/5)</span>
           </button>
         </div>
       </div>

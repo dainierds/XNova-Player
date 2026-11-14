@@ -116,50 +116,60 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   const genreRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const catalogRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // 🌟 Fuente de datos real con fallback (priorizando los seleccionados por el Administrador)
+  // 🌟 Fuente de datos real con fallback (priorizando los seleccionados por el Administrador hasta 5)
   const heroList = useMemo(() => {
     const adminMovies = adminFeaturedItems.filter((i) => i.type === 'movie');
     const adminSeries = adminFeaturedItems.filter((i) => i.type === 'series');
 
     if (sectionType === 'movies') {
       if (adminMovies.length > 0) {
-        return adminMovies.map((m) => ({
+        return adminMovies.slice(0, 5).map((m) => ({
           id: m.id,
           title: m.title,
           streamUrl: m.streamUrl,
           backdropUrl: m.backdropUrl || m.posterUrl,
           posterUrl: m.posterUrl,
-          year: m.year,
-          rating: m.rating,
+          thumbnailUrl: m.backdropUrl || m.posterUrl,
+          year: m.year || '2026',
+          rating: m.rating || '8.5',
           ageRating: m.badge,
+          badge: m.badge,
           synopsis: m.synopsis,
+          genre: m.genresText,
+          duration: m.duration || 'Película',
+          trailerYoutubeKey: m.trailerYoutubeKey,
         }));
       }
       if (homeFeed?.featuredMovies && homeFeed.featuredMovies.length > 0) {
-        return homeFeed.featuredMovies;
+        return homeFeed.featuredMovies.slice(0, 5);
       }
       if (homeFeed?.recientes && homeFeed.recientes.length > 0) {
-        return homeFeed.recientes;
+        return homeFeed.recientes.slice(0, 5);
       }
-      return SERIVIA_HERO_MOVIES;
+      return SERIVIA_HERO_MOVIES.slice(0, 5);
     } else {
       if (adminSeries.length > 0) {
-        return adminSeries.map((s) => ({
+        return adminSeries.slice(0, 5).map((s) => ({
           id: s.id,
           title: s.title,
           streamUrl: s.streamUrl,
           backdropUrl: s.backdropUrl || s.posterUrl,
           posterUrl: s.posterUrl,
-          year: s.year,
-          rating: s.rating,
+          thumbnailUrl: s.backdropUrl || s.posterUrl,
+          year: s.year || '2026',
+          rating: s.rating || '8.5',
           ageRating: s.badge,
+          badge: s.badge,
           synopsis: s.synopsis,
+          genre: s.genresText,
+          duration: s.duration || 'Serie',
+          trailerYoutubeKey: s.trailerYoutubeKey,
         }));
       }
       if (homeFeed?.featuredSeries && homeFeed.featuredSeries.length > 0) {
-        return homeFeed.featuredSeries;
+        return homeFeed.featuredSeries.slice(0, 5);
       }
-      return SERIVIA_HERO_SERIES;
+      return SERIVIA_HERO_SERIES.slice(0, 5);
     }
   }, [sectionType, homeFeed, adminFeaturedItems]);
 
@@ -206,7 +216,6 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
 
   const currentHero = heroList[heroIndex] || heroList[0] || {};
   const nextHero1 = heroList[(heroIndex + 1) % heroList.length] || currentHero;
-  const nextHero2 = heroList[(heroIndex + 2) % heroList.length] || currentHero;
 
   // Rotación automática del carrusel superior
   useEffect(() => {
@@ -664,9 +673,9 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
       </aside>
 
       {/* 2. ÁREA DE CONTENIDO PRINCIPAL */}
-      <main className="flex-1 h-full flex flex-col justify-between overflow-hidden px-8 py-5">
+      <main className="flex-1 h-full flex flex-col justify-start overflow-hidden px-8 pt-3 pb-3 space-y-2.5">
         {/* Cabecera Superior: Selector de Sección + Buscador + Perfil de Usuario */}
-        <header className="flex items-center justify-between gap-4 mb-3">
+        <header className="flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center space-x-3">
             {/* 0: Selector Películas / Series */}
             <button
@@ -702,12 +711,12 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
           <div className="flex items-center space-x-4">
             {/* Puntos del Carrusel */}
             <div className="flex items-center space-x-1.5 mr-2">
-              {heroList.map((_, idx) => (
+              {heroList.slice(0, 5).map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => setHeroIndex(idx)}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
-                    idx === heroIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/30 hover:bg-white/60'
+                    idx === heroIndex ? 'w-5 bg-cyan-400 shadow-sm shadow-cyan-400' : 'w-1.5 bg-white/30 hover:bg-white/60'
                   }`}
                 />
               ))}
@@ -749,114 +758,125 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
           </div>
         </header>
 
-        {/* 3. VISTA DE CARRUSEL DE CARTAS SUPERIOR */}
-        <div className="relative w-full h-[40vh] min-h-[260px] max-h-[350px] flex items-center overflow-visible mb-3">
-          {/* Carta 1: Principal Activa */}
-          <div className="relative flex-1 h-full rounded-3xl overflow-hidden shadow-2xl bg-zinc-900 border border-white/15 flex flex-col justify-between p-6 z-10 transition-all duration-500">
+        {/* 3. VISTA DE CARRUSEL SUPERIOR (COMPACTO, CINEMÁTICO Y ELEGANTE) */}
+        <div className="relative w-full h-44 md:h-48 lg:h-52 shrink-0 flex items-center space-x-3.5">
+          {/* Carta 1: Principal Activa (Panorámica con degradado suave) */}
+          <div className="relative flex-1 h-full rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl bg-zinc-950 border border-white/15 flex flex-col justify-between p-4 md:p-5 z-10 transition-all duration-500">
             <img
               key={currentHero.backdropUrl || currentHero.thumbnailUrl}
               src={currentHero.backdropUrl || currentHero.thumbnailUrl || ''}
               alt={currentHero.title || 'XNova Premiere'}
               className="absolute inset-0 w-full h-full object-cover object-center animate-fadeIn"
             />
-            {/* Gradientes cinematográficos */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/30" />
+            {/* Gradientes cinematográficos horizontales y verticales */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/75 to-black/30" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
 
-            {/* Fila Superior de Badges */}
+            {/* Fila Superior: Badges e Información de Calidad */}
             <div className="relative z-10 flex items-center space-x-2">
-              <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-xs font-semibold text-zinc-200 border border-white/10">
-                {currentHero.duration || (sectionType === 'movies' ? '2h 10m' : 'Temporada 1')}
+              {currentHero.badge && (
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/25 border border-cyan-400 text-[10px] font-black tracking-wider text-cyan-300 uppercase shadow-sm">
+                  ⭐ {currentHero.badge}
+                </span>
+              )}
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-[10px] font-bold text-amber-300 flex items-center space-x-1">
+                <Star className="w-3 h-3 fill-amber-400" />
+                <span>{currentHero.rating || '8.5'}</span>
               </span>
-              <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-xs font-semibold text-zinc-200 border border-white/10">
-                {currentHero.genre || currentHero.genresText || (sectionType === 'movies' ? 'Acción' : 'Drama')}
-              </span>
-              <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-xs font-semibold text-zinc-200 border border-white/10">
-                {sectionType === 'movies' ? 'Película' : 'Serie'}
-              </span>
-              <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-xs font-semibold text-zinc-200 border border-white/10">
+              <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-semibold text-zinc-300 border border-white/10">
                 {currentHero.year || '2026'}
               </span>
-              <span className="px-2.5 py-1 rounded-full bg-cyan-500/20 backdrop-blur-md text-xs font-bold text-cyan-300 border border-cyan-500/30">
-                {currentHero.ageRating || currentHero.rating || '13+'}
+              <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-semibold text-zinc-300 border border-white/10">
+                {currentHero.duration || (sectionType === 'movies' ? 'Película' : 'Serie')}
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-semibold text-zinc-300 border border-white/10">
+                {currentHero.genre || currentHero.genresText || (sectionType === 'movies' ? 'Acción' : 'Drama')}
               </span>
             </div>
 
-            {/* Fila Inferior: Título + Botón Play + Tráiler + Corazón */}
-            <div className="relative z-10 flex items-end justify-between">
-              <div className="flex items-center space-x-4">
+            {/* Fila Inferior: Título, Sinopsis breve y Botones de Acción */}
+            <div className="relative z-10 flex items-end justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg md:text-2xl font-black text-white drop-shadow-md truncate">
+                  {currentHero.title || 'Estreno XNova'}
+                </h2>
+                <p className="text-xs text-zinc-300/90 drop-shadow line-clamp-1 mt-0.5 max-w-xl">
+                  {currentHero.synopsis || (currentHero.trailerYoutubeKey ? 'Pulsa Reproducir para ver ahora o abrir el tráiler oficial.' : 'Disponible en máxima resolución con audio envolvente.')}
+                </p>
+              </div>
+
+              {/* Botones de Acción (Play + Favorito) */}
+              <div className="flex items-center space-x-2.5 shrink-0">
                 {/* 0: Botón Reproducir */}
                 <button
                   onClick={handlePlayHero}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl ${
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all duration-300 shadow-xl ${
                     focusZone === 'hero' && focusedHeroBtn === 0
-                      ? 'bg-cyan-400 text-black scale-120 ring-4 ring-cyan-300 ring-offset-2 ring-offset-black shadow-cyan-400/50'
+                      ? 'bg-cyan-400 text-black scale-108 ring-4 ring-cyan-300 ring-offset-2 ring-offset-black shadow-cyan-400/50'
                       : 'bg-white text-black hover:scale-105'
                   }`}
                 >
-                  <Play className="w-5 h-5 fill-current ml-0.5" />
+                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                  <span className="text-xs font-black">Ver Ahora</span>
                 </button>
 
-                <div>
-                  <h2 className="text-xl md:text-2xl font-black text-white drop-shadow-md">
-                    {currentHero.title || 'Estreno XNova'}
-                  </h2>
-                  <p className="text-xs text-zinc-300 drop-shadow">
-                    {currentHero.trailerText || (currentHero.trailerYoutubeKey ? 'Ver Tráiler Oficial' : 'Disponible en Máxima Calidad')}
-                  </p>
-                </div>
+                {/* 1: Botón Favorito circular */}
+                <button
+                  onClick={() => setIsFavoriteHero((prev) => !prev)}
+                  className={`w-9 h-9 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
+                    focusZone === 'hero' && focusedHeroBtn === 1
+                      ? 'ring-3 ring-cyan-400 scale-110 shadow-lg shadow-cyan-500/30 bg-white/20'
+                      : isFavoriteHero
+                      ? 'bg-red-600/40 border-red-500 text-red-400'
+                      : 'bg-black/50 border-white/20 text-white hover:bg-white/20'
+                  }`}
+                  title={isFavoriteHero ? 'En Favoritos' : 'Añadir a Favoritos'}
+                >
+                  <Heart className={`w-4 h-4 ${isFavoriteHero ? 'fill-red-500 text-red-500' : ''}`} />
+                </button>
               </div>
-
-              {/* 1: Botón Favorito circular */}
-              <button
-                onClick={() => setIsFavoriteHero((prev) => !prev)}
-                className={`w-11 h-11 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
-                  focusZone === 'hero' && focusedHeroBtn === 1
-                    ? 'ring-3 ring-cyan-400 scale-115 shadow-lg shadow-cyan-500/30 bg-white/20'
-                    : isFavoriteHero
-                    ? 'bg-red-600/40 border-red-500 text-red-400'
-                    : 'bg-black/50 border-white/20 text-white hover:bg-white/20'
-                }`}
-              >
-                <Heart className={`w-4 h-4 ${isFavoriteHero ? 'fill-red-500 text-red-500' : ''}`} />
-              </button>
             </div>
           </div>
 
-          {/* Carta 2: Asomándose a la Derecha (2: Siguiente hero card) */}
+          {/* Carta 2: Siguiente en el carrusel (Tarjeta de Avance compacta y elegante) */}
           <div
             onClick={handleNextHero}
-            className={`relative w-40 lg:w-48 h-[92%] rounded-3xl overflow-hidden cursor-pointer transition-all duration-300 -ml-4 z-5 shadow-xl border shrink-0 ${
+            className={`relative w-44 md:w-56 h-full rounded-2xl md:rounded-3xl overflow-hidden cursor-pointer transition-all duration-300 shrink-0 border shadow-xl flex flex-col justify-between p-3 ${
               focusZone === 'hero' && focusedHeroBtn === 2
-                ? 'opacity-100 ring-3 ring-cyan-400 scale-105 shadow-2xl shadow-cyan-500/40 border-cyan-400'
-                : 'opacity-85 hover:opacity-100 border-white/10 hover:scale-102'
+                ? 'opacity-100 ring-3 ring-cyan-400 scale-[1.03] shadow-2xl shadow-cyan-500/40 border-cyan-400'
+                : 'opacity-85 hover:opacity-100 border-white/10 hover:scale-[1.02] bg-zinc-900'
             }`}
           >
             <img
               src={nextHero1.backdropUrl || nextHero1.thumbnailUrl || ''}
               alt={nextHero1.title || ''}
-              className="w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent flex items-end p-3">
-              <p className="text-xs font-bold text-white truncate">{nextHero1.title}</p>
-            </div>
-          </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/30" />
 
-          {/* Carta 3: Asomándose al Fondo */}
-          <div
-            onClick={() => setHeroIndex((prev) => (prev + 2) % heroList.length)}
-            className="relative w-28 lg:w-36 h-[84%] rounded-3xl overflow-hidden cursor-pointer opacity-50 hover:opacity-80 transition-all duration-300 -ml-6 z-0 shadow-lg border border-white/5 shrink-0"
-          >
-            <img
-              src={nextHero2.backdropUrl || nextHero2.thumbnailUrl || ''}
-              alt={nextHero2.title || ''}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-black/60" />
+            {/* Cabecera del Preview Siguiente */}
+            <div className="relative z-10 flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase tracking-wider text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-500/30">
+                Siguiente
+              </span>
+              <span className="text-[10px] font-mono font-bold text-zinc-300 bg-black/60 px-1.5 py-0.5 rounded border border-white/10">
+                {((heroIndex + 1) % heroList.length) + 1} / {heroList.length}
+              </span>
+            </div>
+
+            {/* Pie del Preview Siguiente con Título y Flecha */}
+            <div className="relative z-10">
+              <p className="text-xs font-black text-white truncate drop-shadow">{nextHero1.title}</p>
+              <div className="flex items-center space-x-1 text-[10px] text-cyan-300 font-semibold mt-0.5">
+                <span>Rotar</span>
+                <ChevronRight className="w-3 h-3" />
+              </div>
+            </div>
           </div>
         </div>
 
         {/* 4. FILA DE PÍLDORAS DE GÉNERO / CATEGORÍAS */}
-        <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
             {genresList.map((genre, idx) => {
               const isSelected = selectedGenre === genre;
@@ -914,7 +934,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         </div>
 
         {/* 5. FILA INFERIOR DE CARÁTULAS DE PELÍCULAS/SERIES CON PUNTUACIONES */}
-        <div className="flex-1 overflow-x-auto no-scrollbar flex items-center space-x-4 py-1">
+        <div className="flex-1 overflow-x-auto no-scrollbar flex items-start space-x-4 py-2 px-1">
           {catalogList.map((card: any, idx: number) => {
             const isFocused = focusZone === 'catalog' && focusedCatalogIdx === idx;
             const poster = card.posterUrl || card.thumbnailUrl || card.backdropUrl;
@@ -930,17 +950,17 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
                   setFocusedCatalogIdx(idx);
                   handlePlayCard(card);
                 }}
-                className={`group flex-shrink-0 cursor-pointer transition-all duration-200 w-36 md:w-44 ${
+                className={`group flex-shrink-0 cursor-pointer transition-all duration-200 w-36 md:w-40 ${
                   isFocused
-                    ? 'scale-108 z-20'
+                    ? 'scale-105 z-20'
                     : 'hover:scale-102'
                 }`}
               >
                 <div 
                   className={`w-full aspect-[2/3] rounded-2xl overflow-hidden bg-zinc-900 border shadow-lg relative mb-2 transition-all ${
                     isFocused
-                      ? 'border-cyan-400 ring-3 ring-cyan-400/60 shadow-2xl shadow-cyan-500/30'
-                      : 'border-white/10'
+                      ? 'border-cyan-400 ring-4 ring-cyan-400/70 shadow-2xl shadow-cyan-500/40'
+                      : 'border-white/10 group-hover:border-white/30'
                   }`}
                 >
                   <img
