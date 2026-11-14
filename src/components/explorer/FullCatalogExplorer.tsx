@@ -996,6 +996,22 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
   // Manejar cuando el usuario pulsa OK/Enter en una tarjeta
   const handleItemSelect = async (item: XtreamStream | XtreamSeries) => {
+    // 0. Si es un elemento de "Continuar Viendo", continuar la reproducción directamente de inmediato
+    if ((item as any).isContinueWatchingItem || selectedCategoryId === 'continue_watching') {
+      const rawStreamUrl = (item as any).streamUrl;
+      if (rawStreamUrl) {
+        const streamId = (item as any).stream_id || (item as any).id || (item as any).series_id || `item_${(item as any).id}`;
+        onPlayStream({
+          id: String(streamId),
+          title: item.name || (item as any).title || 'Continuar Viendo',
+          streamUrl: rawStreamUrl,
+          posterUrl: (item as any).stream_icon || (item as any).cover || (item as any).poster,
+          isLive: contentType === 'live',
+        });
+        return;
+      }
+    }
+
     if (contentType === 'movies') {
       const vod = item as XtreamStream;
       const streamId = vod.stream_id || (vod as any).id;
@@ -1040,13 +1056,39 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     } else {
       // Para Series, abrir modal de episodios
       const series = item as XtreamSeries;
-      const seriesId = series.series_id || (series as any).id;
+      const rawSeriesId = series.series_id || (series as any).id;
       setLoadingSeriesModal(true);
       try {
-        const details = await XtreamService.getSeriesInfo(server, user, pass, seriesId);
-        const seasons = details.seasons || [];
-        const episodes = details.episodes || {};
-        const seasonKeys = Object.keys(episodes);
+        let seriesId: string | number = rawSeriesId;
+        // Si no es numérico puro, buscar en el catálogo por nombre
+        if (!/^\d+$/.test(String(rawSeriesId))) {
+          const cleanTitle = (series.name || (series as any).title || '').replace(/ - T\d+:?E\d+.*$/, '');
+          const match = await CatalogCacheService.findBestMatch(playlist.id, cleanTitle, undefined, 'series');
+          if (match && match.id) {
+            seriesId = match.id;
+          }
+        }
+
+        let details = await XtreamService.getSeriesInfo(server, user, pass, seriesId);
+        let seasons = details.seasons || [];
+        let episodes = details.episodes || {};
+        let seasonKeys = Object.keys(episodes);
+
+        // Si la consulta devolvió 0 episodios, reintentar con búsqueda por título
+        if (seasonKeys.length === 0) {
+          const cleanTitle = (series.name || (series as any).title || '').replace(/ - T\d+:?E\d+.*$/, '');
+          const match = await CatalogCacheService.findBestMatch(playlist.id, cleanTitle, undefined, 'series');
+          if (match && match.id && String(match.id) !== String(seriesId)) {
+            const retryDetails = await XtreamService.getSeriesInfo(server, user, pass, match.id);
+            if (retryDetails.episodes && Object.keys(retryDetails.episodes).length > 0) {
+              details = retryDetails;
+              seasons = details.seasons || [];
+              episodes = details.episodes || {};
+              seasonKeys = Object.keys(episodes);
+              seriesId = match.id;
+            }
+          }
+        }
 
         if (seasonKeys.length > 0) {
           const firstSeasonNum = Number(seasonKeys[0]) || 1;
@@ -1064,17 +1106,27 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           setSeriesFocusZone('episodes');
           setFocusZone('series_modal');
         } else {
-          const streamUrl = XtreamService.buildSeriesStreamUrl(server, user, pass, seriesId, 'mp4');
+          // Si no tiene episodios pero tiene streamUrl o id, reproducir
+          const streamUrl = (item as any).streamUrl || XtreamService.buildSeriesStreamUrl(server, user, pass, seriesId, 'mp4');
           onPlayStream({
             id: `series_${seriesId}`,
-            title: series.name || 'Serie',
+            title: series.name || (series as any).title || 'Serie',
             streamUrl,
-            posterUrl: series.cover,
+            posterUrl: series.cover || (series as any).stream_icon,
             isLive: false,
           });
         }
       } catch (err) {
         console.error('Error al cargar episodios:', err);
+        if ((item as any).streamUrl) {
+          onPlayStream({
+            id: `series_${rawSeriesId}`,
+            title: series.name || (series as any).title || 'Serie',
+            streamUrl: (item as any).streamUrl,
+            posterUrl: series.cover || (series as any).stream_icon,
+            isLive: false,
+          });
+        }
       } finally {
         setLoadingSeriesModal(false);
       }
