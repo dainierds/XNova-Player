@@ -6,6 +6,7 @@ import {
   Video, 
   Settings 
 } from 'lucide-react';
+import { BRANDING } from '../../config/branding';
 
 interface SidebarDockProps {
   activeTab: SidebarTabId;
@@ -60,6 +61,13 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
           );
         })}
       </nav>
+
+      {/* Versión oficial de la app en la base del dock */}
+      <div className="absolute bottom-5 text-center pointer-events-none">
+        <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/10 shadow-sm">
+          v{BRANDING.version}
+        </span>
+      </div>
     </aside>
   );
 };

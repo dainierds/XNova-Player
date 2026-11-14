@@ -12,13 +12,16 @@ export const TopSearchBar: React.FC<TopSearchBarProps> = ({
 }) => {
   return (
     <header className="relative z-20 w-full px-12 pt-6 pb-2 flex items-center justify-between select-none">
-      {/* Logotipo Oficial XNova Player a la izquierda */}
-      <div className="flex items-center space-x-4">
+      {/* Logotipo Oficial XNova Player a la izquierda + Badge de Versión */}
+      <div className="flex items-center space-x-3">
         <img
           src={BRANDING.assets.logo}
           alt={BRANDING.name}
           className="h-10 w-auto object-contain drop-shadow-lg"
         />
+        <span className="text-[11px] font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-500/30 px-2.5 py-0.5 rounded-full shadow-sm">
+          v{BRANDING.version}
+        </span>
       </div>
 
       {/* Indicadores Elegantes a la derecha: Estado de Suscripción y Vencimiento */}

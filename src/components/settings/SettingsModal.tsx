@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { StorageService } from '../../services/storage';
 import { BRANDING } from '../../config/branding';
 import { PLAN_CONFIGS } from '../../types/auth';
+import { CatalogCacheService } from '../../services/catalogCacheService';
 import { 
   Plus, 
   Trash2, 
@@ -14,7 +15,8 @@ import {
   X,
   AlertCircle,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  Database
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 
@@ -67,6 +69,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [selectedTheme, setSelectedTheme] = useState<'cinematic' | 'serivia'>(currentTheme);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
+
+  const [cacheStats, setCacheStats] = useState<{ movies: number; series: number; live: number; lastUpdated: number | null }>({
+    movies: 0,
+    series: 0,
+    live: 0,
+    lastUpdated: null,
+  });
+  const [isClearingCache, setIsClearingCache] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && activePlaylist?.id) {
+      CatalogCacheService.getStats(activePlaylist.id).then((st) => setCacheStats(st));
+    }
+  }, [isOpen, activePlaylist?.id]);
+
+  const handleClearCache = async () => {
+    if (!activePlaylist?.id) return;
+    setIsClearingCache(true);
+    await CatalogCacheService.clear(activePlaylist.id);
+    setCacheStats({ movies: 0, series: 0, live: 0, lastUpdated: null });
+    setIsClearingCache(false);
+  };
 
   useEffect(() => {
     StorageService.getShowSplashAnimation().then((val) => setShowSplash(val));
@@ -658,6 +682,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         showSplash ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
+                  </button>
+                </div>
+              </div>
+
+              {/* Sección de Rendimiento y Caché Ultra-Rápida */}
+              <div className="pt-6 border-t border-zinc-800/80">
+                <div className="p-5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <Database className="w-4 h-4 text-cyan-400" />
+                      <h4 className="text-sm font-bold text-white">Caché Ultra-Rápida de Búsqueda</h4>
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      Retiene películas, series y canales de forma compacta (menos de 2 MB) para búsquedas instantáneas (0-10ms) en la TV.
+                    </p>
+                    <div className="flex items-center space-x-3 pt-1 text-[11px] font-mono text-zinc-400">
+                      <span className="text-cyan-400">{cacheStats.movies.toLocaleString()} películas</span>
+                      <span>•</span>
+                      <span className="text-blue-400">{cacheStats.series.toLocaleString()} series</span>
+                      <span>•</span>
+                      <span className="text-emerald-400">{cacheStats.live.toLocaleString()} canales</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleClearCache}
+                    disabled={isClearingCache || (cacheStats.movies === 0 && cacheStats.series === 0 && cacheStats.live === 0)}
+                    className="px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-xs font-bold text-zinc-300 hover:text-white border border-zinc-700 transition flex items-center space-x-2 shrink-0 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    <span>{isClearingCache ? 'Limpiando...' : 'Vaciar Caché'}</span>
                   </button>
                 </div>
               </div>

@@ -10,12 +10,15 @@ import {
   X, 
   Radio,
   Film,
-  Search
+  Search,
+  RotateCw
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
 import { TmdbService } from '../../services/tmdb';
 import { openExternalPlayer } from '../../utils/externalPlayer';
+import { BRANDING } from '../../config/branding';
+import { CatalogCacheService, type CompactCatalogItem } from '../../services/catalogCacheService';
 
 /**
  * Normaliza URLs de imágenes de servidores IPTV / Xtream Codes y TMDb
@@ -61,8 +64,8 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
 }) => {
   const isSeries = contentType === 'series';
   const rawCover = isSeries
-    ? ((item as any).cover || (item as any).stream_icon || (item as any).poster)
-    : ((item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
+    ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
+    : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
   const initialCover = normalizeMediaUrl(rawCover, server);
 
   const [imgSrc, setImgSrc] = useState<string>(initialCover);
@@ -338,43 +341,71 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     return () => { isMounted = false; };
   }, [selectedCategoryId, contentType, server, user, pass]);
 
-  // 🔍 Cargar catálogo completo de la sección (Películas, Series o Canales) en segundo plano al buscar
+  // ⚡ Pre-cargar catálogo desde la caché ultra-compacta de IndexedDB al entrar a la sección (0ms)
   useEffect(() => {
-    if (!searchQuery.trim() || allSectionStreams !== null || loadingSearchAll) return;
-
     let isMounted = true;
-    const fetchAllSectionStreams = async () => {
-      setLoadingSearchAll(true);
-      try {
-        let all: (XtreamStream | XtreamSeries)[] = [];
-        if (contentType === 'movies') {
-          all = await XtreamService.getVodStreams(server, user, pass);
-        } else if (contentType === 'series') {
-          all = await XtreamService.getSeries(server, user, pass);
-        } else {
-          all = await XtreamService.getLiveStreams(server, user, pass);
-        }
-        if (isMounted) {
-          setAllSectionStreams(all || []);
-        }
-      } catch (err) {
-        console.error('Error al cargar catálogo completo para búsqueda:', err);
-      } finally {
-        if (isMounted) setLoadingSearchAll(false);
+    CatalogCacheService.get(playlist.id, contentType).then((cached) => {
+      if (isMounted && cached && cached.length > 0) {
+        setAllSectionStreams(cached as any);
       }
-    };
-
-    fetchAllSectionStreams();
+    });
     return () => { isMounted = false; };
-  }, [searchQuery, allSectionStreams, loadingSearchAll, contentType, server, user, pass]);
+  }, [contentType, playlist.id]);
 
-  // Contenidos mostrados: si hay búsqueda filtra sobre TODO el catálogo de la sección; si no, la categoría activa
+  // 🔍 Cargar/Refrescar catálogo completo de la sección en segundo plano para búsqueda
+  const loadOrRefreshSectionCache = useCallback(async (force = false) => {
+    if (!force) {
+      // 1. Intentar leer de IndexedDB primero
+      const cached = await CatalogCacheService.get(playlist.id, contentType);
+      if (cached && cached.length > 0) {
+        setAllSectionStreams(cached as any);
+        return;
+      }
+    }
+
+    // 2. Si no hay caché o se forzó, descargar del servidor Xtream
+    setLoadingSearchAll(true);
+    try {
+      let all: (XtreamStream | XtreamSeries)[] = [];
+      if (contentType === 'movies') {
+        all = await XtreamService.getVodStreams(server, user, pass);
+      } else if (contentType === 'series') {
+        all = await XtreamService.getSeries(server, user, pass);
+      } else {
+        all = await XtreamService.getLiveStreams(server, user, pass);
+      }
+
+      // 3. Comprimir y almacenar en IndexedDB
+      if (all && all.length > 0) {
+        const compact = await CatalogCacheService.set(playlist.id, contentType, all);
+        setAllSectionStreams(compact as any);
+      } else {
+        setAllSectionStreams([]);
+      }
+    } catch (err) {
+      console.error('[FullCatalog] Error al cargar/refrescar catálogo de sección:', err);
+    } finally {
+      setLoadingSearchAll(false);
+    }
+  }, [contentType, playlist.id, server, user, pass]);
+
+  // Si el usuario empieza a escribir y no está cargado el catálogo, disparar carga en segundo plano
+  useEffect(() => {
+    if (searchQuery.trim() && allSectionStreams === null && !loadingSearchAll) {
+      loadOrRefreshSectionCache(false);
+    }
+  }, [searchQuery, allSectionStreams, loadingSearchAll, loadOrRefreshSectionCache]);
+
+  // Contenidos mostrados: si hay búsqueda filtra en memoria a ultra-alta velocidad (0-10ms)
   const displayedStreams = useMemo(() => {
     if (!searchQuery.trim()) return streams;
+    const pool = (allSectionStreams || streams) as any[];
+    if (pool.length > 0 && pool[0].norm) {
+      return CatalogCacheService.search(pool as CompactCatalogItem[], searchQuery);
+    }
     const q = searchQuery.toLowerCase().trim();
-    const pool = allSectionStreams || streams;
     return pool.filter((item) => {
-      const name = item.name || (item as any).title || '';
+      const name = item.name || item.title || '';
       return name.toLowerCase().includes(q);
     });
   }, [searchQuery, allSectionStreams, streams]);
@@ -1010,8 +1041,19 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               }
               className="bg-transparent text-xs text-white placeholder-zinc-500 focus:outline-none w-full"
             />
-            {loadingSearchAll && (
+            {loadingSearchAll ? (
               <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin mr-1 shrink-0" />
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  loadOrRefreshSectionCache(true);
+                }}
+                className="p-1 rounded-full hover:bg-white/10 text-zinc-400 hover:text-cyan-400 transition mr-0.5"
+                title="Actualizar catálogo desde el servidor"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+              </button>
             )}
             {searchQuery && (
               <button
@@ -1062,6 +1104,14 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               </button>
             );
           })}
+        </div>
+
+        {/* Pie de la barra lateral con versión oficial de la aplicación */}
+        <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-zinc-400 bg-black/20 shrink-0 select-none">
+          <span className="font-semibold text-zinc-300">XNova Player</span>
+          <span className="text-cyan-400 font-bold bg-cyan-950/50 border border-cyan-500/25 px-2 py-0.5 rounded-full shadow-sm">
+            v{BRANDING.version}
+          </span>
         </div>
       </aside>
 

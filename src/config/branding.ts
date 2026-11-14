@@ -3,7 +3,7 @@
  */
 export const BRANDING = {
   name: 'XNova Player',
-  version: '1.0.0',
+  version: '2.0.0',
   tagline: 'Tu centro de streaming premium para Android TV y Fire TV',
   
   // Rutas a recursos multimedia en /public/branding/
