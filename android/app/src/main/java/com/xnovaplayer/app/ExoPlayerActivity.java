@@ -105,12 +105,6 @@ public class ExoPlayerActivity extends AppCompatActivity {
             tvTitle.setText(title);
         }
 
-        TextView tvSubtitle = playerView.findViewById(R.id.tv_subtitle);
-        if (tvSubtitle != null) {
-            tvSubtitle.setVisibility(View.GONE);
-            tvSubtitle.setText("");
-        }
-
         // Ocultar barra de tiempo si es emisión en directo
         View bottomBar = playerView.findViewById(R.id.bottom_bar);
         if (bottomBar != null && isLive) {

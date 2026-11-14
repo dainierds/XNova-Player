@@ -70,25 +70,34 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
     ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
     : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
   const initialCover = normalizeMediaUrl(rawCover, server);
-
-  const [imgSrc, setImgSrc] = useState<string>(initialCover);
-  const [imageLoaded, setImageLoaded] = useState<boolean>(false);
-  const [hasFailed, setHasFailed] = useState<boolean>(false);
   const title = item.name || (item as any).title || 'Sin Título';
   const rating = item.rating || '7.0';
+
+  // Si no hay portada en el proveedor, buscar inmediatamente si ya está resuelta en RAM (0ms)
+  const cachedPoster = !initialCover ? PosterResolutionService.getCachedPoster(title) : null;
+  const initialSrc = initialCover || cachedPoster || '';
+
+  const [imgSrc, setImgSrc] = useState<string>(initialSrc);
+  const [imageLoaded, setImageLoaded] = useState<boolean>(() => {
+    return initialSrc ? ImagePreloadService.isCached(initialSrc) : false;
+  });
+  const [hasFailed, setHasFailed] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
     const coverUrl = normalizeMediaUrl(rawCover, server);
 
-    setImageLoaded(false);
-
     if (coverUrl) {
       setImgSrc(coverUrl);
       setHasFailed(false);
-      // La carátula del proveedor existe: no saturamos TMDb ni IndexedDB
+      if (ImagePreloadService.isCached(coverUrl)) {
+        setImageLoaded(true);
+      }
+    } else if (cachedPoster) {
+      setImgSrc(cachedPoster);
+      setHasFailed(false);
+      setImageLoaded(true);
     } else if (contentType === 'movies' || contentType === 'series') {
-      // 🚀 Si no hay carátula (ej. carpeta Plex 2026), resolver mediante TMDb de forma ordenada
       PosterResolutionService.resolvePoster(title).then((resolvedPoster) => {
         if (isMounted) {
           if (resolvedPoster && resolvedPoster.startsWith('http')) {
@@ -106,10 +115,9 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
     }
 
     return () => { isMounted = false; };
-  }, [rawCover, server, title, contentType]);
+  }, [rawCover, server, title, contentType, cachedPoster]);
 
   const handleImageError = () => {
-    // Si la imagen del proveedor falla (404 o enlace caído), resolver con TMDb como respaldo
     if (contentType === 'movies' || contentType === 'series') {
       PosterResolutionService.resolvePoster(title).then((resolved) => {
         if (resolved && resolved !== imgSrc && resolved.startsWith('http')) {
@@ -137,18 +145,23 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
       }`}
     >
       <div className={`aspect-[2/3] w-full rounded-2xl overflow-hidden bg-gradient-to-b from-zinc-800 to-zinc-950 border border-white/10 group-hover:border-cyan-400 relative shadow-lg flex items-center justify-center ${
-        !imageLoaded && !hasFailed ? 'shimmer-effect' : ''
+        !imageLoaded && !hasFailed && !imgSrc ? 'shimmer-effect' : ''
       }`}>
         {!hasFailed && imgSrc ? (
           <img
+            ref={(el) => {
+              if (el && (el.complete || el.naturalWidth > 0) && !imageLoaded) {
+                setImageLoaded(true);
+              }
+            }}
             src={imgSrc}
             alt={title}
             referrerPolicy="no-referrer"
-            loading="lazy"
+            decoding="async"
             onLoad={() => setImageLoaded(true)}
             onError={handleImageError}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${
-              imageLoaded ? 'opacity-100' : 'opacity-0'
+            className={`w-full h-full object-cover transition-opacity duration-200 ${
+              imageLoaded ? 'opacity-100' : 'opacity-90'
             }`}
           />
         ) : (
@@ -225,6 +238,10 @@ interface SeriesDetails {
   episodes: Record<string, EpisodeItem[]>;
 }
 
+// 🚀 Caché global en memoria RAM para 0ms de respuesta al reingresar a carpetas (Bíblicas, Acción, etc.)
+const globalCategoriesCache = new Map<string, XtreamCategory[]>();
+const globalCategoryStreamsCache = new Map<string, (XtreamStream | XtreamSeries)[]>();
+
 export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   playlist,
   initialType = 'movies',
@@ -233,11 +250,25 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   onPlayStream,
 }) => {
   const [contentType] = useState<'movies' | 'series' | 'live'>(initialType);
-  const [categories, setCategories] = useState<XtreamCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [streams, setStreams] = useState<(XtreamStream | XtreamSeries)[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingStreams, setLoadingStreams] = useState(false);
+
+  const server = playlist.serverUrl || '';
+  const user = playlist.username || '';
+  const pass = playlist.password || '';
+
+  // Clave de caché para categorías
+  const catCacheKey = `${server}_${user}_${contentType}`;
+  const initialCachedCats = globalCategoriesCache.get(catCacheKey) || [];
+  const initialSelectedCatId = initialCachedCats.length > 0 ? String(initialCachedCats[0].category_id) : '';
+
+  // Clave de caché para streams de la categoría inicial
+  const streamsCacheKey = initialSelectedCatId ? `${server}_${user}_${contentType}_${initialSelectedCatId}` : '';
+  const initialCachedStreams = streamsCacheKey ? (globalCategoryStreamsCache.get(streamsCacheKey) || []) : [];
+
+  const [categories, setCategories] = useState<XtreamCategory[]>(initialCachedCats);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(initialSelectedCatId);
+  const [streams, setStreams] = useState<(XtreamStream | XtreamSeries)[]>(initialCachedStreams);
+  const [loading, setLoading] = useState(initialCachedCats.length === 0);
+  const [loadingStreams, setLoadingStreams] = useState(initialCachedStreams.length === 0);
 
   // 🔍 Búsqueda general dentro de la sección activa (Películas, Series o Canales)
   const [searchQuery, setSearchQuery] = useState('');
@@ -284,18 +315,25 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   const gridItemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const episodeItemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const server = playlist.serverUrl || '';
-  const user = playlist.username || '';
-  const pass = playlist.password || '';
-
   // Número fijo de columnas para cálculo matemático 1:1 en control remoto
   const numCols = contentType === 'live' ? 4 : 5;
 
-  // 1. Cargar las categorías correspondientes
+  // 1. Cargar las categorías correspondientes (con caché en memoria 0ms)
   useEffect(() => {
     let isMounted = true;
     const loadCategories = async () => {
-      setLoading(true);
+      const cacheKey = `${server}_${user}_${contentType}`;
+      if (globalCategoriesCache.has(cacheKey)) {
+        const cached = globalCategoriesCache.get(cacheKey)!;
+        setCategories(cached);
+        if (!selectedCategoryId && cached.length > 0) {
+          setSelectedCategoryId(String(cached[0].category_id));
+        }
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+
       try {
         let validCats: XtreamCategory[] = [];
         if (contentType === 'movies') {
@@ -318,12 +356,15 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           }
         }
 
+        if (validCats.length > 0) {
+          globalCategoriesCache.set(cacheKey, validCats);
+        }
+
         if (isMounted) {
           setCategories(validCats);
-          if (validCats.length > 0) {
+          if (validCats.length > 0 && !selectedCategoryId) {
             setSelectedCategoryId(String(validCats[0].category_id));
-          } else {
-            // Si el servidor no tiene carpetas, cargar contenidos generales
+          } else if (validCats.length === 0 && !selectedCategoryId) {
             setSelectedCategoryId('all');
           }
           setFocusedCatIndex(0);
@@ -331,7 +372,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         }
       } catch (err) {
         console.error('Error al cargar categorías Xtream:', err);
-        if (isMounted) {
+        if (isMounted && categories.length === 0) {
           const store = usePlaylistStore.getState();
           const fallbackCats = contentType === 'live' ? store.liveCategories : store.vodCategories;
           if (Array.isArray(fallbackCats) && fallbackCats.length > 0) {
@@ -350,11 +391,30 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     return () => { isMounted = false; };
   }, [contentType, server, user, pass]);
 
-  // 2. Cargar los contenidos de la categoría seleccionada
+  // 2. Cargar los contenidos de la categoría seleccionada (con caché en memoria 0ms)
   useEffect(() => {
     let isMounted = true;
+    if (!selectedCategoryId || selectedCategoryId.trim() === '') return;
+
+    const streamsKey = `${server}_${user}_${contentType}_${selectedCategoryId}`;
+
+    // 🚀 Si ya tenemos los streams de esta carpeta en RAM, mostrarlos inmediatamente en 0ms
+    if (globalCategoryStreamsCache.has(streamsKey)) {
+      const cached = globalCategoryStreamsCache.get(streamsKey)!;
+      setStreams(cached);
+      setLoadingStreams(false);
+      // Precarga suave en segundo plano de las primeras 60 carátulas
+      const urls = cached.slice(0, 60).map((item) => {
+        const rawCover = contentType === 'series'
+          ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
+          : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
+        return normalizeMediaUrl(rawCover, server);
+      });
+      ImagePreloadService.preloadBatch(urls);
+      return;
+    }
+
     const loadStreams = async () => {
-      if (!selectedCategoryId || selectedCategoryId.trim() === '') return;
       setLoadingStreams(true);
       try {
         let validItems: (XtreamStream | XtreamSeries)[] = [];
@@ -369,9 +429,19 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           if (Array.isArray(res)) validItems = res;
         }
 
+        // Almacenar en caché de memoria RAM
+        globalCategoryStreamsCache.set(streamsKey, validItems);
+
         if (isMounted) {
           setStreams(validItems);
           setFocusedGridIndex(0);
+          const urls = validItems.slice(0, 60).map((item) => {
+            const rawCover = contentType === 'series'
+              ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
+              : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
+            return normalizeMediaUrl(rawCover, server);
+          });
+          ImagePreloadService.preloadBatch(urls);
         }
       } catch (err) {
         console.error('Error al cargar contenido de la categoría:', err);

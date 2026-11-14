@@ -37,6 +37,16 @@ class PosterResolutionEngine {
   }
 
   /**
+   * Obtiene el póster directamente de la memoria RAM si ya fue resuelto (0ms)
+   */
+  public getCachedPoster(rawTitle: string): string | null {
+    const clean = this.cleanTitle(rawTitle);
+    if (!clean) return null;
+    const cacheKey = `poster_tmdb_${clean.toLowerCase()}`;
+    return this.memoryCache.get(cacheKey) || null;
+  }
+
+  /**
    * Resuelve el póster real en alta definición
    */
   public async resolvePoster(rawTitle: string, fallbackUrl?: string): Promise<string> {
