@@ -15,7 +15,6 @@ import {
   LogOut,
   Layers
 } from 'lucide-react';
-import { BRANDING } from '../../config/branding';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useFavoritesStore } from '../../store/useFavoritesStore';
 import { useAdminFeaturedStore } from '../../store/useAdminFeaturedStore';
@@ -113,14 +112,17 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   const genreRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const catalogRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // 🌟 Fuente de datos real con fallback (priorizando los seleccionados por el Administrador hasta 5)
+  // 🌟 Fuente de datos garantizando exactamente 5 elementos en el carrusel superior
   const heroList = useMemo(() => {
     const adminMovies = adminFeaturedItems.filter((i) => i.type === 'movie');
     const adminSeries = adminFeaturedItems.filter((i) => i.type === 'series');
 
+    const pool: any[] = [];
+
     if (sectionType === 'movies') {
+      // 1. Añadir ítems configurados por el Administrador
       if (adminMovies.length > 0) {
-        return adminMovies.slice(0, 5).map((m) => ({
+        pool.push(...adminMovies.slice(0, 5).map((m) => ({
           id: m.id,
           title: m.title,
           streamUrl: m.streamUrl,
@@ -135,18 +137,41 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
           genre: m.genresText,
           duration: m.duration || 'Película',
           trailerYoutubeKey: m.trailerYoutubeKey,
-        }));
+        })));
       }
-      if (homeFeed?.featuredMovies && homeFeed.featuredMovies.length > 0) {
-        return homeFeed.featuredMovies.slice(0, 5);
+
+      // 2. Si faltan para llegar a 5, completar con la lista Xtream del usuario
+      if (pool.length < 5 && homeFeed?.featuredMovies && homeFeed.featuredMovies.length > 0) {
+        for (const item of homeFeed.featuredMovies) {
+          if (pool.length >= 5) break;
+          if (!pool.some((p) => String(p.id) === String(item.id) || p.title === item.title)) {
+            pool.push(item);
+          }
+        }
       }
-      if (homeFeed?.recientes && homeFeed.recientes.length > 0) {
-        return homeFeed.recientes.slice(0, 5);
+
+      if (pool.length < 5 && homeFeed?.recientes && homeFeed.recientes.length > 0) {
+        for (const item of homeFeed.recientes) {
+          if (pool.length >= 5) break;
+          if (!pool.some((p) => String(p.id) === String(item.id) || p.title === item.title)) {
+            pool.push(item);
+          }
+        }
       }
-      return SERIVIA_HERO_MOVIES.slice(0, 5);
+
+      // 3. Si aún faltan, completar con las películas destacadas predeterminadas
+      if (pool.length < 5) {
+        for (const item of SERIVIA_HERO_MOVIES) {
+          if (pool.length >= 5) break;
+          if (!pool.some((p) => String(p.id) === String(item.id) || p.title === item.title)) {
+            pool.push(item);
+          }
+        }
+      }
     } else {
+      // Series
       if (adminSeries.length > 0) {
-        return adminSeries.slice(0, 5).map((s) => ({
+        pool.push(...adminSeries.slice(0, 5).map((s) => ({
           id: s.id,
           title: s.title,
           streamUrl: s.streamUrl,
@@ -161,13 +186,29 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
           genre: s.genresText,
           duration: s.duration || 'Serie',
           trailerYoutubeKey: s.trailerYoutubeKey,
-        }));
+        })));
       }
-      if (homeFeed?.featuredSeries && homeFeed.featuredSeries.length > 0) {
-        return homeFeed.featuredSeries.slice(0, 5);
+
+      if (pool.length < 5 && homeFeed?.featuredSeries && homeFeed.featuredSeries.length > 0) {
+        for (const item of homeFeed.featuredSeries) {
+          if (pool.length >= 5) break;
+          if (!pool.some((p) => String(p.id) === String(item.id) || p.title === item.title)) {
+            pool.push(item);
+          }
+        }
       }
-      return SERIVIA_HERO_SERIES.slice(0, 5);
+
+      if (pool.length < 5) {
+        for (const item of SERIVIA_HERO_SERIES) {
+          if (pool.length >= 5) break;
+          if (!pool.some((p) => String(p.id) === String(item.id) || p.title === item.title)) {
+            pool.push(item);
+          }
+        }
+      }
     }
+
+    return pool.slice(0, 5);
   }, [sectionType, homeFeed, adminFeaturedItems]);
 
   const rawCatalogList = useMemo(() => {
@@ -553,17 +594,8 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
       {/* 1. BARRA LATERAL IZQUIERDA COMPLETA (Inicio, Buscar, TV en Vivo, Películas, Series, Favoritos, Ajustes, Cerrar Sesión) */}
       <aside className="w-56 h-full bg-[#0a0a0c] border-r border-white/10 flex flex-col justify-between py-6 px-4 z-20 shrink-0">
         <div>
-          {/* Logotipo Oficial XNova Player */}
-          <div className="flex items-center px-2 mb-6">
-            <img
-              src={BRANDING.assets.logo}
-              alt={BRANDING.name}
-              className="h-10 w-auto object-contain drop-shadow-[0_0_12px_rgba(34,211,238,0.3)]"
-            />
-          </div>
-
           {/* Menú Principal de Navegación */}
-          <nav className="space-y-1.5">
+          <nav className="space-y-1.5 pt-1">
             {SIDEBAR_ITEMS.slice(0, 6).map((item, idx) => {
               const Icon = item.icon;
               const isSelected = activeNav === item.id;
@@ -646,8 +678,8 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
 
       {/* 2. ÁREA DE CONTENIDO PRINCIPAL (LIMPIO Y ESPACIOSO) */}
       <main className="flex-1 h-full flex flex-col justify-start overflow-hidden px-8 pt-4 pb-4 space-y-4">
-        {/* 1. VISTA DE CARRUSEL SUPERIOR CINEMÁTICO (HASTA 5 TÍTULOS) */}
-        <div className="relative w-full h-48 md:h-52 lg:h-56 shrink-0 flex items-center space-x-4">
+        {/* 1. VISTA DE CARRUSEL SUPERIOR CINEMÁTICO COMPACTO (5 TÍTULOS) */}
+        <div className="relative w-full h-36 md:h-40 lg:h-44 shrink-0 flex items-center space-x-4">
           {/* Carta 1: Principal Activa (Panorámica con degradado suave) */}
           <div className="relative flex-1 h-full rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl bg-zinc-950 border border-white/15 flex flex-col justify-between p-4 md:p-5 z-10 transition-all duration-500">
             <img
@@ -846,7 +878,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         </div>
 
         {/* 5. FILA INFERIOR DE CARÁTULAS DE PELÍCULAS/SERIES CON PUNTUACIONES */}
-        <div className="flex-1 overflow-x-auto no-scrollbar flex items-start space-x-4 py-2 px-1">
+        <div className="flex-1 min-h-0 overflow-x-auto no-scrollbar flex items-start space-x-3.5 py-4 px-2">
           {catalogList.map((card: any, idx: number) => {
             const isFocused = focusZone === 'catalog' && focusedCatalogIdx === idx;
             const poster = card.posterUrl || card.thumbnailUrl || card.backdropUrl;
@@ -862,7 +894,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
                   setFocusedCatalogIdx(idx);
                   handlePlayCard(card);
                 }}
-                className={`group flex-shrink-0 cursor-pointer transition-all duration-200 w-36 md:w-40 ${
+                className={`group flex-shrink-0 cursor-pointer transition-all duration-200 w-28 sm:w-30 md:w-32 ${
                   isFocused
                     ? 'scale-105 z-20'
                     : 'hover:scale-102'
