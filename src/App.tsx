@@ -293,7 +293,7 @@ export function App() {
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [explorerType, setExplorerType] = useState<'movies' | 'series' | 'live'>('movies');
   const [playingItem, setPlayingItem] = useState<ShowcaseItem | null>(null);
-  const [activeTheme, setActiveTheme] = useState<'cinematic' | 'serivia'>('cinematic');
+  const [activeTheme, setActiveTheme] = useState<'cinematic' | 'serivia'>('serivia');
   const [needsInitialSync, setNeedsInitialSync] = useState(false);
 
   // ⚡ Verificación inteligente de Caché Local en Disco (IndexedDB)
@@ -492,7 +492,7 @@ export function App() {
     initializeAuth();
     loadStoredPlaylists();
     StorageService.getActiveProfile().then((p) => setCurrentProfile(p));
-    StorageService.getActiveTheme().then((t) => setActiveTheme(t));
+    StorageService.getActiveTheme().then((t) => setActiveTheme(t || 'serivia'));
     StorageService.getShowSplashAnimation().then((shouldShow) => {
       if (!shouldShow) setIsSplashVisible(false);
     });

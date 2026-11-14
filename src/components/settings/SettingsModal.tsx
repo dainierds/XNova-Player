@@ -68,7 +68,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   });
 
   const [showSplash, setShowSplash] = useState(true);
-  const [selectedTheme, setSelectedTheme] = useState<'cinematic' | 'serivia'>(currentTheme);
+  const [selectedTheme, setSelectedTheme] = useState<'cinematic' | 'serivia'>(currentTheme === 'cinematic' ? 'serivia' : currentTheme);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
 
@@ -96,14 +96,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     StorageService.getShowSplashAnimation().then((val) => setShowSplash(val));
-    StorageService.getActiveTheme().then((t) => setSelectedTheme(t));
+    StorageService.getActiveTheme().then(() => setSelectedTheme('serivia'));
   }, []);
 
-  const handleSelectTheme = useCallback(async (theme: 'cinematic' | 'serivia') => {
-    setSelectedTheme(theme);
-    await StorageService.setActiveTheme(theme);
+  const handleSelectTheme = useCallback(async (_theme?: 'cinematic' | 'serivia') => {
+    // Tema 2 desactivado por ahora
+    const targetTheme = 'serivia';
+    setSelectedTheme(targetTheme);
+    await StorageService.setActiveTheme(targetTheme);
     if (onThemeChange) {
-      onThemeChange(theme);
+      onThemeChange(targetTheme);
     }
   }, [onThemeChange]);
 
@@ -191,9 +193,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       items.push({ id: 'sync', onSelect: () => syncCurrentPlaylist() });
     }
 
-    // 7. Temas
+    // 7. Temas (Tema 2 desactivado por ahora)
     items.push({ id: 'theme_serivia', onSelect: () => handleSelectTheme('serivia') });
-    items.push({ id: 'theme_cinematic', onSelect: () => handleSelectTheme('cinematic') });
 
     // 8. Switch Splash
     items.push({ id: 'toggle_splash', onSelect: handleToggleSplash });
@@ -263,21 +264,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           break;
 
         case 'ArrowLeft':
-          if (focusItems[focusedIndex]?.id === 'theme_cinematic') {
-            const seriviaIdx = focusItems.findIndex((it) => it.id === 'theme_serivia');
-            if (seriviaIdx !== -1) setFocusedIndex(seriviaIdx);
-          } else {
-            setFocusedIndex((prev) => Math.max(0, prev - 1));
-          }
+          setFocusedIndex((prev) => Math.max(0, prev - 1));
           break;
 
         case 'ArrowRight':
-          if (focusItems[focusedIndex]?.id === 'theme_serivia') {
-            const cinematicIdx = focusItems.findIndex((it) => it.id === 'theme_cinematic');
-            if (cinematicIdx !== -1) setFocusedIndex(cinematicIdx);
-          } else {
-            setFocusedIndex((prev) => Math.min(focusItems.length - 1, prev + 1));
-          }
+          setFocusedIndex((prev) => Math.min(focusItems.length - 1, prev + 1));
           break;
 
         case 'Enter':
@@ -655,26 +646,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </p>
                   </div>
 
-                  {/* Tema 2: Cinematic Showcase (John Wick) */}
+                  {/* Tema 2: Cinematic Showcase (Desactivado por ahora) */}
                   <div
-                    ref={(el) => { itemRefs.current['theme_cinematic'] = el; }}
-                    onClick={() => handleSelectTheme('cinematic')}
-                    className={`p-4 rounded-xl border cursor-pointer transition ${
-                      selectedTheme === 'cinematic'
-                        ? 'bg-cyan-950/40 border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-950/40'
-                        : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-600'
-                    } ${getFocusClass('theme_cinematic')}`}
+                    className="p-4 rounded-xl border border-zinc-800/60 bg-zinc-900/30 opacity-40 cursor-not-allowed select-none"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-white">Cinematic Showcase</span>
-                      {selectedTheme === 'cinematic' && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500 text-white">
-                          Activo
-                        </span>
-                      )}
+                      <span className="text-sm font-bold text-zinc-400">Cinematic Showcase</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-white/10">
+                        Desactivado por ahora
+                      </span>
                     </div>
-                    <p className="text-xs text-zinc-400">
-                      Diseño con hero de pantalla completa, miniaturas ampliadas y carrusel continuo (Estilo John Wick).
+                    <p className="text-xs text-zinc-500">
+                      Diseño con hero de pantalla completa y carrusel continuo. (Temporalmente en mantenimiento).
                     </p>
                   </div>
                 </div>

@@ -158,11 +158,17 @@ export const StorageService = {
   // --- Estilo / Tema de la Interfaz ---
   async getActiveTheme(): Promise<'cinematic' | 'serivia'> {
     const theme = await get<'cinematic' | 'serivia'>(KEYS.ACTIVE_THEME);
-    return theme || 'cinematic'; // Por defecto: 'cinematic' (John Wick)
+    if (theme === 'cinematic') {
+      await set(KEYS.ACTIVE_THEME, 'serivia');
+      return 'serivia';
+    }
+    return 'serivia'; // Tema 1 (Serivia) por defecto; Tema 2 desactivado por ahora
   },
 
   async setActiveTheme(theme: 'cinematic' | 'serivia'): Promise<void> {
-    await set(KEYS.ACTIVE_THEME, theme);
+    // Tema 2 desactivado por ahora, siempre forzar 'serivia'
+    const finalTheme = theme === 'cinematic' ? 'serivia' : theme;
+    await set(KEYS.ACTIVE_THEME, finalTheme);
   },
 
   // --- Gestión de Usuarios y Sesiones Persistentes (Almacenamiento permanente en Disco / IndexedDB) ---
