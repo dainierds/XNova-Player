@@ -145,4 +145,51 @@ export const CloudService = {
       };
     }
   },
+
+  /**
+   * 🌟 Obtener títulos destacados de portada desde la Nube (Sincronización PC <-> TV)
+   */
+  async getFeaturedItems(): Promise<{ success: boolean; items?: any[]; error?: string }> {
+    try {
+      const response = await fetch(`${CLOUD_CONFIG.apiUrl}/featured`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const resData = await response.json();
+      return resData;
+    } catch (err: any) {
+      console.warn('Error al obtener featured items de la nube:', err);
+      return {
+        success: false,
+        error: 'Error de conexión con la nube de Vercel.',
+      };
+    }
+  },
+
+  /**
+   * 🌟 Guardar títulos destacados de portada en la Nube
+   */
+  async saveFeaturedItems(items: any[]): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${CLOUD_CONFIG.apiUrl}/featured`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items }),
+      });
+
+      const resData = await response.json();
+      return resData;
+    } catch (err: any) {
+      console.warn('Error al guardar featured items en la nube:', err);
+      return {
+        success: false,
+        error: 'Error de conexión con la nube de Vercel.',
+      };
+    }
+  },
 };

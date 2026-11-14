@@ -216,21 +216,54 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
       }
       return SERIVIA_MOVIES_CATALOG;
     }
+
+    // 🌟 1. Priorizar títulos seleccionados por el Administrador en la portada
+    const adminMatches = adminFeaturedItems
+      .filter((i) => (sectionType === 'movies' ? i.type === 'movie' : i.type === 'series'))
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        posterUrl: item.posterUrl || item.backdropUrl,
+        thumbnailUrl: item.posterUrl || item.backdropUrl,
+        backdropUrl: item.backdropUrl || item.posterUrl,
+        score: item.rating ? item.rating.replace(/[^0-9.]/g, '') || '8.5' : '8.5',
+        rating: item.rating || '8.5',
+        year: item.year || '2026',
+        genre: item.genresText || (sectionType === 'movies' ? 'Película' : 'Serie TV'),
+        streamUrl: item.streamUrl,
+        type: item.type,
+      }));
+
     if (sectionType === 'movies') {
-      if (homeFeed?.recientes && homeFeed.recientes.length > 0) {
-        return homeFeed.recientes;
+      const baseMovies =
+        homeFeed?.recientes && homeFeed.recientes.length > 0
+          ? homeFeed.recientes
+          : homeFeed?.featuredMovies && homeFeed.featuredMovies.length > 0
+          ? homeFeed.featuredMovies
+          : SERIVIA_MOVIES_CATALOG;
+
+      if (adminMatches.length > 0) {
+        const remaining = baseMovies.filter(
+          (m: any) => !adminMatches.some((a) => a.title.toLowerCase() === (m.title || '').toLowerCase())
+        );
+        return [...adminMatches, ...remaining];
       }
-      if (homeFeed?.featuredMovies && homeFeed.featuredMovies.length > 0) {
-        return homeFeed.featuredMovies;
-      }
-      return SERIVIA_MOVIES_CATALOG;
+      return baseMovies;
     } else {
-      if (homeFeed?.featuredSeries && homeFeed.featuredSeries.length > 0) {
-        return homeFeed.featuredSeries;
+      const baseSeries =
+        homeFeed?.featuredSeries && homeFeed.featuredSeries.length > 0
+          ? homeFeed.featuredSeries
+          : SERIVIA_HERO_SERIES;
+
+      if (adminMatches.length > 0) {
+        const remaining = baseSeries.filter(
+          (s: any) => !adminMatches.some((a) => a.title.toLowerCase() === (s.title || '').toLowerCase())
+        );
+        return [...adminMatches, ...remaining];
       }
-      return SERIVIA_HERO_SERIES;
+      return baseSeries;
     }
-  }, [sectionType, homeFeed, activeNav, favorites]);
+  }, [sectionType, homeFeed, activeNav, favorites, adminFeaturedItems]);
 
   // Lista de géneros disponibles incluyendo botón de acceso al catálogo secundario completo
   const genresList = useMemo(() => {

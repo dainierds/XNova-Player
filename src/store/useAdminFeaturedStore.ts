@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { StorageService } from '../services/storage';
+import { CloudService } from '../services/cloudService';
 
 export type FeaturedBadge = 'ESTRENO' | 'RECIÉN AÑADIDA' | 'PRÓXIMAMENTE';
 
@@ -38,8 +39,29 @@ export const useAdminFeaturedStore = create<AdminFeaturedState>((set, get) => ({
 
   loadFeaturedItems: async () => {
     try {
-      const items = await StorageService.getAdminFeaturedItems();
-      set({ featuredItems: items || [], isLoaded: true });
+      // 1. Cargar instantáneamente de almacenamiento local (0ms)
+      const localItems = await StorageService.getAdminFeaturedItems();
+      if (localItems && localItems.length > 0) {
+        set({ featuredItems: localItems, isLoaded: true });
+      }
+
+      // 2. Sincronizar en tiempo real con la nube (Vercel Serverless / Redis)
+      // Permite que lo configurado en la PC aparezca de inmediato en cualquier TV
+      try {
+        const cloudRes = await CloudService.getFeaturedItems();
+        if (cloudRes.success && Array.isArray(cloudRes.items) && cloudRes.items.length > 0) {
+          set({ featuredItems: cloudRes.items, isLoaded: true });
+          await StorageService.saveAdminFeaturedItems(cloudRes.items);
+        } else if (localItems && localItems.length > 0) {
+          // Si la nube estaba vacía pero la PC tenía ítems guardados, subirlos a la nube
+          CloudService.saveFeaturedItems(localItems).catch(() => {});
+        } else {
+          set({ isLoaded: true });
+        }
+      } catch (cloudErr) {
+        console.warn('Error sincronizando portada con la nube:', cloudErr);
+        set({ isLoaded: true });
+      }
     } catch (e) {
       console.error('Error al cargar contenido destacado de admin:', e);
       set({ isLoaded: true });
@@ -70,6 +92,7 @@ export const useAdminFeaturedStore = create<AdminFeaturedState>((set, get) => ({
 
     set({ featuredItems: updated });
     await StorageService.saveAdminFeaturedItems(updated);
+    CloudService.saveFeaturedItems(updated).catch(() => {});
     return true;
   },
 
@@ -78,6 +101,7 @@ export const useAdminFeaturedStore = create<AdminFeaturedState>((set, get) => ({
     const updated = featuredItems.filter((f) => f.id !== id);
     set({ featuredItems: updated });
     await StorageService.saveAdminFeaturedItems(updated);
+    CloudService.saveFeaturedItems(updated).catch(() => {});
   },
 
   updateBadge: async (id, badge) => {
@@ -85,15 +109,18 @@ export const useAdminFeaturedStore = create<AdminFeaturedState>((set, get) => ({
     const updated = featuredItems.map((f) => (f.id === id ? { ...f, badge } : f));
     set({ featuredItems: updated });
     await StorageService.saveAdminFeaturedItems(updated);
+    CloudService.saveFeaturedItems(updated).catch(() => {});
   },
 
   reorderItems: async (items) => {
     set({ featuredItems: items });
     await StorageService.saveAdminFeaturedItems(items);
+    CloudService.saveFeaturedItems(items).catch(() => {});
   },
 
   clearAll: async () => {
     set({ featuredItems: [] });
     await StorageService.saveAdminFeaturedItems([]);
+    CloudService.saveFeaturedItems([]).catch(() => {});
   },
 }));
