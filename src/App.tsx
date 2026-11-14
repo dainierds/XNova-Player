@@ -280,6 +280,53 @@ export function App() {
         e.preventDefault();
       }
 
+      const isOk =
+        e.key === 'Enter' ||
+        e.key === ' ' ||
+        e.key === 'Select' ||
+        e.key === 'Ok' ||
+        e.keyCode === 13 ||
+        e.keyCode === 23 ||
+        e.keyCode === 66;
+
+      const isBack =
+        e.key === 'Escape' ||
+        e.key === 'Backspace' ||
+        e.key === 'GoBack' ||
+        e.key === 'Back' ||
+        e.keyCode === 27 ||
+        e.keyCode === 4;
+
+      if (isOk) {
+        e.preventDefault();
+        if (focusedZone === 'hero_buttons') {
+          if (heroBtnIndex === 0) {
+            handlePlayShowcaseItem(activeItem);
+          } else {
+            handleOpenTrailer(activeItem);
+          }
+        } else if (focusedZone === 'thumbnails') {
+          handlePlayShowcaseItem(activeItem);
+        } else if (focusedZone === 'sidebar') {
+          if (focusedTab === 'settings') {
+            setIsSettingsOpen(true);
+          } else {
+            handleSelectTab(focusedTab);
+          }
+        }
+        return;
+      }
+
+      if (isBack) {
+        e.preventDefault();
+        if (focusedZone !== 'sidebar') {
+          setFocusedZone('sidebar');
+        } else {
+          setIsExitModalOpen(true);
+        }
+        return;
+      }
+
       switch (e.key) {
         // --- FLECHA IZQUIERDA ---
         case 'ArrowLeft':
@@ -638,10 +685,24 @@ export function App() {
       />
 
       {/* Explorador de Todo el Catálogo Xtream (Categorías y Carpetas Reales) */}
-      {isExplorerOpen && activePlaylist && (
+      {isExplorerOpen && (
         <div className={playingItem ? 'hidden' : 'block'}>
           <FullCatalogExplorer
-            playlist={activePlaylist}
+            key={`${explorerType}_${activePlaylist?.id || 'active'}`}
+            playlist={
+              activePlaylist ||
+              (currentUser?.playlists && currentUser.playlists.length > 0
+                ? currentUser.playlists[0]
+                : {
+                    id: 'default_pl',
+                    name: 'Catálogo Principal',
+                    type: 'xtream',
+                    serverUrl: 'http://line.xnovatv.com:8080',
+                    username: 'user1',
+                    password: 'user1',
+                    isActive: true,
+                  })
+            }
             initialType={explorerType}
             isActive={!playingItem}
             onClose={() => {

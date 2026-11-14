@@ -21,6 +21,7 @@ import { BRANDING } from '../../config/branding';
 import { CatalogCacheService, type CompactCatalogItem } from '../../services/catalogCacheService';
 import { ImagePreloadService } from '../../services/imagePreloadService';
 import { PosterResolutionService } from '../../services/posterResolutionService';
+import { usePlaylistStore } from '../../store/usePlaylistStore';
 
 /**
  * Normaliza URLs de imágenes de servidores IPTV / Xtream Codes y TMDb
@@ -287,25 +288,50 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     const loadCategories = async () => {
       setLoading(true);
       try {
-        let cats: XtreamCategory[] = [];
+        let validCats: XtreamCategory[] = [];
         if (contentType === 'movies') {
-          cats = await XtreamService.getVodCategories(server, user, pass);
+          const res = await XtreamService.getVodCategories(server, user, pass);
+          if (Array.isArray(res)) validCats = res;
         } else if (contentType === 'series') {
-          cats = await XtreamService.getSeriesCategories(server, user, pass);
+          const res = await XtreamService.getSeriesCategories(server, user, pass);
+          if (Array.isArray(res)) validCats = res;
         } else {
-          cats = await XtreamService.getLiveCategories(server, user, pass);
+          const res = await XtreamService.getLiveCategories(server, user, pass);
+          if (Array.isArray(res)) validCats = res;
+        }
+
+        // Si el servidor no devolvió categorías, recurrir a las cacheadas en el store
+        if (validCats.length === 0) {
+          const store = usePlaylistStore.getState();
+          const fallbackCats = contentType === 'live' ? store.liveCategories : store.vodCategories;
+          if (Array.isArray(fallbackCats) && fallbackCats.length > 0) {
+            validCats = fallbackCats;
+          }
         }
 
         if (isMounted) {
-          setCategories(cats || []);
-          if (cats && cats.length > 0) {
-            setSelectedCategoryId(cats[0].category_id);
+          setCategories(validCats);
+          if (validCats.length > 0) {
+            setSelectedCategoryId(String(validCats[0].category_id));
+          } else {
+            // Si el servidor no tiene carpetas, cargar contenidos generales
+            setSelectedCategoryId('all');
           }
           setFocusedCatIndex(0);
           setFocusedGridIndex(0);
         }
       } catch (err) {
         console.error('Error al cargar categorías Xtream:', err);
+        if (isMounted) {
+          const store = usePlaylistStore.getState();
+          const fallbackCats = contentType === 'live' ? store.liveCategories : store.vodCategories;
+          if (Array.isArray(fallbackCats) && fallbackCats.length > 0) {
+            setCategories(fallbackCats);
+            setSelectedCategoryId(String(fallbackCats[0].category_id));
+          } else {
+            setSelectedCategoryId('all');
+          }
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -322,21 +348,25 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       if (!selectedCategoryId || selectedCategoryId.trim() === '') return;
       setLoadingStreams(true);
       try {
-        let items: (XtreamStream | XtreamSeries)[] = [];
+        let validItems: (XtreamStream | XtreamSeries)[] = [];
         if (contentType === 'movies') {
-          items = await XtreamService.getVodStreams(server, user, pass, selectedCategoryId);
+          const res = await XtreamService.getVodStreams(server, user, pass, selectedCategoryId === 'all' ? undefined : selectedCategoryId);
+          if (Array.isArray(res)) validItems = res;
         } else if (contentType === 'series') {
-          items = await XtreamService.getSeries(server, user, pass, selectedCategoryId);
+          const res = await XtreamService.getSeries(server, user, pass, selectedCategoryId === 'all' ? undefined : selectedCategoryId);
+          if (Array.isArray(res)) validItems = res;
         } else {
-          items = await XtreamService.getLiveStreams(server, user, pass, selectedCategoryId);
+          const res = await XtreamService.getLiveStreams(server, user, pass, selectedCategoryId === 'all' ? undefined : selectedCategoryId);
+          if (Array.isArray(res)) validItems = res;
         }
 
         if (isMounted) {
-          setStreams(items || []);
+          setStreams(validItems);
           setFocusedGridIndex(0);
         }
       } catch (err) {
         console.error('Error al cargar contenido de la categoría:', err);
+        if (isMounted) setStreams([]);
       } finally {
         if (isMounted) setLoadingStreams(false);
       }
@@ -693,8 +723,61 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         e.stopPropagation();
       }
 
+      const isOk =
+        e.key === 'Enter' ||
+        e.key === ' ' ||
+        e.key === 'Select' ||
+        e.key === 'Ok' ||
+        e.keyCode === 13 ||
+        e.keyCode === 23 ||
+        e.keyCode === 66;
+
+      const isBack =
+        e.key === 'Escape' ||
+        e.key === 'Backspace' ||
+        e.key === 'GoBack' ||
+        e.key === 'Back' ||
+        e.keyCode === 27 ||
+        e.keyCode === 4;
+
       // ── CASO 1: PANTALLA COMPLETA DE DETALLES DE PELÍCULA (IMAGEN 2) ──
       if (focusZone === 'movie_detail' && selectedMovieDetail) {
+        if (isOk) {
+          e.preventDefault();
+          if (detailBtnIndex === 0) {
+            // Botón 0: Reproducir en el reproductor interno
+            onPlayStream({
+              id: `vod_${selectedMovieDetail.item.stream_id}`,
+              title: selectedMovieDetail.meta.title,
+              streamUrl: selectedMovieDetail.streamUrl,
+              posterUrl: selectedMovieDetail.meta.posterUrl,
+              isLive: false,
+            });
+          } else if (detailBtnIndex === 1) {
+            // Botón 1: Abrir en Reproductor Externo (VLC / MX Player)
+            openExternalPlayer(selectedMovieDetail.streamUrl, selectedMovieDetail.meta.title);
+          } else if (detailBtnIndex === 2) {
+            // Botón 2: Tráiler
+            if (selectedMovieDetail.meta.youtubeTrailer) {
+              window.open(`https://www.youtube.com/watch?v=${selectedMovieDetail.meta.youtubeTrailer}`, '_blank');
+            } else {
+              window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedMovieDetail.meta.title + ' trailer')}`, '_blank');
+            }
+          } else if (detailBtnIndex === 3) {
+            // Botón 3: Añadir a Mi Lista
+            setIsSavedInList((prev) => !prev);
+          }
+          return;
+        }
+
+        if (isBack) {
+          e.preventDefault();
+          e.stopPropagation();
+          setSelectedMovieDetail(null);
+          setFocusZone('grid');
+          return;
+        }
+
         switch (e.key) {
           case 'ArrowLeft':
             setDetailBtnIndex((prev) => Math.max(0, prev - 1));
@@ -702,43 +785,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
           case 'ArrowRight':
             setDetailBtnIndex((prev) => Math.min(3, prev + 1));
-            break;
-
-          case 'Enter':
-          case ' ':
-            e.preventDefault();
-            if (detailBtnIndex === 0) {
-              // Botón 0: Reproducir en el reproductor interno
-              onPlayStream({
-                id: `vod_${selectedMovieDetail.item.stream_id}`,
-                title: selectedMovieDetail.meta.title,
-                streamUrl: selectedMovieDetail.streamUrl,
-                posterUrl: selectedMovieDetail.meta.posterUrl,
-                isLive: false,
-              });
-            } else if (detailBtnIndex === 1) {
-              // Botón 1: Abrir en Reproductor Externo (VLC / MX Player)
-              openExternalPlayer(selectedMovieDetail.streamUrl, selectedMovieDetail.meta.title);
-            } else if (detailBtnIndex === 2) {
-              // Botón 2: Tráiler
-              if (selectedMovieDetail.meta.youtubeTrailer) {
-                window.open(`https://www.youtube.com/watch?v=${selectedMovieDetail.meta.youtubeTrailer}`, '_blank');
-              } else {
-                window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedMovieDetail.meta.title + ' trailer')}`, '_blank');
-              }
-            } else if (detailBtnIndex === 3) {
-              // Botón 3: Añadir a Mi Lista
-              setIsSavedInList((prev) => !prev);
-            }
-            break;
-
-          case 'Escape':
-          case 'Backspace':
-          case 'GoBack':
-            e.preventDefault();
-            e.stopPropagation();
-            setSelectedMovieDetail(null);
-            setFocusZone('grid');
             break;
         }
         return;
@@ -750,6 +796,25 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         e.stopPropagation();
         const seasonsList = selectedSeriesDetails.seasons || [];
         const numEpisodeCols = 2;
+
+        if (isOk) {
+          if (seriesFocusZone === 'episodes' && currentSeasonEpisodes[focusedEpisodeIndex]) {
+            playEpisode(currentSeasonEpisodes[focusedEpisodeIndex]);
+          } else if (seriesFocusZone === 'seasons') {
+            setSeriesFocusZone('episodes');
+            setFocusedEpisodeIndex(0);
+          } else if (seriesFocusZone === 'close') {
+            setSelectedSeriesDetails(null);
+            setFocusZone('grid');
+          }
+          return;
+        }
+
+        if (isBack) {
+          setSelectedSeriesDetails(null);
+          setFocusZone('grid');
+          return;
+        }
 
         switch (e.key) {
           case 'ArrowLeft':
@@ -823,32 +888,58 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               });
             }
             break;
-
-          case 'Enter':
-          case ' ':
-          case 'Select':
-            if (seriesFocusZone === 'episodes' && currentSeasonEpisodes[focusedEpisodeIndex]) {
-              playEpisode(currentSeasonEpisodes[focusedEpisodeIndex]);
-            } else if (seriesFocusZone === 'seasons') {
-              setSeriesFocusZone('episodes');
-              setFocusedEpisodeIndex(0);
-            } else if (seriesFocusZone === 'close') {
-              setSelectedSeriesDetails(null);
-              setFocusZone('grid');
-            }
-            break;
-
-          case 'Escape':
-          case 'Backspace':
-          case 'GoBack':
-            setSelectedSeriesDetails(null);
-            setFocusZone('grid');
-            break;
         }
         return;
       }
 
       // ── CASO 3: CATÁLOGO PRINCIPAL (TIVIMATE STYLE - IMAGEN 1) ──
+      if (isOk) {
+        e.preventDefault();
+        if (focusZone === 'sidebar_back') {
+          onClose();
+        } else if (focusZone === 'sidebar_search') {
+          searchInputRef.current?.focus();
+        } else if (focusZone === 'categories') {
+          if (categories[focusedCatIndex]) {
+            setSelectedCategoryId(categories[focusedCatIndex].category_id);
+            if (displayedStreams.length > 0) {
+              setFocusZone('grid');
+              setFocusedGridIndex(0);
+            }
+          }
+        } else if (focusZone === 'grid') {
+          if (displayedStreams[focusedGridIndex]) {
+            handleItemSelect(displayedStreams[focusedGridIndex]);
+          }
+        }
+        return;
+      }
+
+      if (isBack) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (focusZone === 'grid') {
+          if (searchQuery.trim().length > 0) {
+            setFocusZone('sidebar_search');
+            searchInputRef.current?.focus();
+          } else {
+            setFocusZone('categories');
+          }
+        } else if (focusZone === 'sidebar_search') {
+          setFocusZone('categories');
+          searchInputRef.current?.blur();
+        } else if (focusZone === 'categories' || focusZone === 'sidebar_back') {
+          if (searchQuery.trim().length > 0) {
+            setSearchQuery('');
+          } else {
+            onClose();
+          }
+        } else {
+          onClose();
+        }
+        return;
+      }
+
       switch (e.key) {
         case 'ArrowLeft':
           if (focusZone === 'grid') {
@@ -927,51 +1018,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             } else if (focusedGridIndex < displayedStreams.length - 1) {
               setFocusedGridIndex(displayedStreams.length - 1);
             }
-          }
-          break;
-
-        case 'Enter':
-        case ' ':
-          e.preventDefault();
-          if (focusZone === 'sidebar_back') {
-            onClose();
-          } else if (focusZone === 'sidebar_search') {
-            searchInputRef.current?.focus();
-          } else if (focusZone === 'categories') {
-            if (categories[focusedCatIndex]) {
-              setSelectedCategoryId(categories[focusedCatIndex].category_id);
-              if (displayedStreams.length > 0) {
-                setFocusZone('grid');
-                setFocusedGridIndex(0);
-              }
-            }
-          } else if (focusZone === 'grid') {
-            if (displayedStreams[focusedGridIndex]) {
-              handleItemSelect(displayedStreams[focusedGridIndex]);
-            }
-          }
-          break;
-
-        case 'Escape':
-        case 'Backspace':
-        case 'GoBack':
-          e.preventDefault();
-          e.stopPropagation();
-          if (focusZone === 'grid') {
-            if (searchQuery.trim().length > 0) {
-              setFocusZone('sidebar_search');
-              searchInputRef.current?.focus();
-            } else {
-              setFocusZone('categories');
-            }
-          } else if (focusZone === 'sidebar_search') {
-            if (searchQuery.trim().length > 0) {
-              setSearchQuery('');
-            } else {
-              onClose();
-            }
-          } else {
-            onClose();
           }
           break;
       }

@@ -31,7 +31,7 @@ public class MainActivity extends BridgeActivity {
                 settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
                 // Permitir cargar imágenes de servidores IPTV aunque tengan certificados SSL autofirmados o expirados (igual que OkHttp en TiviMate y Kai TV)
-                webView.setWebViewClient(new BridgeWebViewClient(getBridge()) {
+                getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
                     @Override
                     public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
                         if (handler != null) {
