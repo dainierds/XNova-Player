@@ -386,7 +386,20 @@ export function App() {
 
   // Motor de navegación D-pad para este concepto de interfaz
   useEffect(() => {
-    if (isSplashVisible || !isAuthenticated || isSettingsOpen || isSearchOpen || isProfileOpen || isExitModalOpen || isExplorerOpen || isUpdateOpen || playingItem || isTrailerOpen) {
+    // Si el tema activo es Serivia, SeriviaLayout se encarga de su propio motor D-pad
+    if (
+      activeTheme === 'serivia' ||
+      isSplashVisible ||
+      !isAuthenticated ||
+      isSettingsOpen ||
+      isSearchOpen ||
+      isProfileOpen ||
+      isExitModalOpen ||
+      isExplorerOpen ||
+      isUpdateOpen ||
+      playingItem ||
+      isTrailerOpen
+    ) {
       return;
     }
 
@@ -547,6 +560,7 @@ export function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
+    activeTheme,
     focusedZone,
     carouselIndex,
     heroBtnIndex,
@@ -586,7 +600,48 @@ export function App() {
           <SeriviaLayout
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenSearch={() => setIsSearchOpen(true)}
+            onOpenExplorer={(type) => {
+              setExplorerType(type);
+              setIsExplorerOpen(true);
+            }}
+            onOpenTrailer={(movie) => {
+              setTrailerMovie({
+                title: movie.title,
+                youtubeKey: movie.trailerYoutubeKey || movie.youtubeKey || null,
+                releaseDateText: movie.releaseDateText || 'Estreno',
+                synopsis: movie.synopsis || '',
+                backdropUrl: movie.backdropUrl || '',
+                posterUrl: movie.posterUrl || movie.thumbnailUrl || '',
+              });
+              setIsTrailerOpen(true);
+            }}
+            onOpenExitModal={() => setIsExitModalOpen(true)}
+            activePlaylist={activePlaylist}
+            homeFeed={homeFeed}
+            isActive={
+              !isSplashVisible &&
+              isAuthenticated &&
+              !isSettingsOpen &&
+              !isAdminPanelOpen &&
+              !isSearchOpen &&
+              !isProfileOpen &&
+              !isExitModalOpen &&
+              !isExplorerOpen &&
+              !isUpdateOpen &&
+              !playingItem &&
+              !isTrailerOpen
+            }
             onPlayMedia={async (media) => {
+              // 🚀 1. Si ya tiene streamUrl directo Xtream, reproducir de inmediato con ExoPlayer nativo
+              if (media.streamUrl && playWithNativePlayer({
+                streamUrl: media.streamUrl,
+                title: media.title,
+                posterUrl: media.posterUrl,
+                isLive: media.isLive,
+              })) {
+                return;
+              }
+
               if (activePlaylist) {
                 const match = await CatalogMatcherService.resolveMovieStream(activePlaylist, {
                   title: media.title,
@@ -597,30 +652,26 @@ export function App() {
                   streamUrl: urlToPlay,
                   title: match.matchedItem?.name || media.title,
                   posterUrl: match.matchedItem?.icon || media.posterUrl,
+                  isLive: media.isLive,
                 })) {
                   return;
                 }
-              } else if (media.streamUrl && playWithNativePlayer({
-                streamUrl: media.streamUrl,
-                title: media.title,
-                posterUrl: media.posterUrl,
-              })) {
-                return;
               }
+
               setPlayingItem({
                 id: media.id,
                 title: media.title,
                 subtitle: media.title,
                 backdropUrl: media.posterUrl || '',
                 thumbnailUrl: media.posterUrl || '',
-                releaseDateText: 'En reproducción',
+                releaseDateText: media.isLive ? 'En Directo' : 'En reproducción',
                 statusBadge: 'ESTRENO',
                 genresText: 'Streaming',
                 year: '2026',
                 rating: '13+',
                 duration: 'HD',
                 synopsis: 'Disfruta de tu contenido.',
-                type: 'movie',
+                type: media.isLive ? 'movie' : 'movie',
                 streamUrl: media.streamUrl,
               });
             }}
