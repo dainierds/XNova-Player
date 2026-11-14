@@ -6,7 +6,7 @@ interface ContinueWatchingStoreState {
   isLoading: boolean;
   loadItems: () => Promise<void>;
   addItem: (item: WatchProgressItem) => Promise<void>;
-  removeItem: (id: string) => Promise<void>;
+  removeItem: (id: string, streamUrl?: string, title?: string) => Promise<void>;
   clearAll: () => Promise<void>;
 }
 
@@ -36,11 +36,23 @@ export const useContinueWatchingStore = create<ContinueWatchingStoreState>((set,
     }
   },
 
-  removeItem: async (id: string) => {
+  removeItem: async (id: string, streamUrl?: string, title?: string) => {
     try {
-      await StorageService.removeWatchProgress(id);
+      await StorageService.removeWatchProgress(id, streamUrl, title);
+      const cleanId = String(id).replace(/^(vod_|series_|live_)/, '');
+      const cleanTitle = title ? title.toLowerCase().trim() : '';
+
       const current = get().items;
-      const filtered = current.filter((p) => String(p.id) !== String(id) && p.streamUrl !== id);
+      const filtered = current.filter((p) => {
+        const pId = String(p.id);
+        const pCleanId = pId.replace(/^(vod_|series_|live_)/, '');
+
+        const matchId = (pId === id || pCleanId === cleanId || pId === cleanId || pCleanId === id);
+        const matchUrl = streamUrl ? (p.streamUrl === streamUrl || p.streamUrl === id) : (p.streamUrl === id);
+        const matchTitle = cleanTitle ? (Boolean(p.title) && p.title.toLowerCase().trim() === cleanTitle) : false;
+
+        return !(matchId || matchUrl || matchTitle);
+      });
       set({ items: filtered });
     } catch (err) {
       console.error('[ContinueWatchingStore] Error removing item:', err);

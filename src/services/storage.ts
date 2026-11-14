@@ -98,9 +98,21 @@ export const StorageService = {
     await set(KEYS.WATCH_PROGRESS, filtered.slice(0, 50)); // Guardar hasta 50
   },
 
-  async removeWatchProgress(id: string): Promise<void> {
+  async removeWatchProgress(id: string, streamUrl?: string, title?: string): Promise<void> {
     const list = await this.getWatchProgress();
-    const filtered = list.filter((p) => String(p.id) !== String(id) && p.streamUrl !== id);
+    const cleanId = String(id).replace(/^(vod_|series_|live_)/, '');
+    const cleanTitle = title ? title.toLowerCase().trim() : '';
+
+    const filtered = list.filter((p) => {
+      const pId = String(p.id);
+      const pCleanId = pId.replace(/^(vod_|series_|live_)/, '');
+
+      const matchId = (pId === id || pCleanId === cleanId || pId === cleanId || pCleanId === id);
+      const matchUrl = streamUrl ? (p.streamUrl === streamUrl || p.streamUrl === id) : (p.streamUrl === id);
+      const matchTitle = cleanTitle ? (Boolean(p.title) && p.title.toLowerCase().trim() === cleanTitle) : false;
+
+      return !(matchId || matchUrl || matchTitle);
+    });
     await set(KEYS.WATCH_PROGRESS, filtered);
   },
 

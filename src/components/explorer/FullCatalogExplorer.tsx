@@ -1132,6 +1132,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     if (!isActive || isAdmin) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 🛑 Si el modal de favoritos / continuar viendo está abierto, ceder el control total al modal
+      if (isQuickFavOpen) return;
+
       // Bloquear scroll nativo
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
@@ -1494,6 +1497,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      // 🛑 Si el modal de favoritos / continuar viendo está abierto, ceder el control total al modal
+      if (isQuickFavOpen) return;
+
       const isOk =
         e.key === 'Enter' ||
         e.key === ' ' ||
@@ -1557,6 +1563,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     focusedSeasonIndex,
     focusedEpisodeIndex,
     currentSeasonEpisodes,
+    isQuickFavOpen,
   ]);
 
   const activeCategory = allCategories.find((c) => c.category_id === selectedCategoryId);
@@ -2252,12 +2259,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         isContinueWatching={selectedCategoryId === 'continue_watching'}
         onRemoveFromContinueWatching={() => {
           if (quickFavItem) {
-            const rawId = quickFavItem.id.replace(/^(vod_|series_|live_)/, '');
-            removeFromContinueWatching(quickFavItem.id);
-            removeFromContinueWatching(rawId);
-            if (quickFavItem.streamUrl) {
-              removeFromContinueWatching(quickFavItem.streamUrl);
-            }
+            removeFromContinueWatching(quickFavItem.id, quickFavItem.streamUrl, quickFavItem.title);
           }
         }}
         onToggleFavorite={() => {
