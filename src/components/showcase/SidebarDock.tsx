@@ -4,6 +4,7 @@ import {
   Tv, 
   Film, 
   Video, 
+  Heart,
   Settings 
 } from 'lucide-react';
 import { BRANDING } from '../../config/branding';
@@ -15,11 +16,12 @@ interface SidebarDockProps {
   onSelectTab: (tab: SidebarTabId) => void;
 }
 
-// Exactamente las secciones pedidas: TV, Películas, Series, Configuración
+// Secciones del Dock: TV, Películas, Series, Favoritos y Configuración
 export const SIDEBAR_ITEMS: { id: SidebarTabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'live', label: 'TV en Vivo', icon: Tv },
   { id: 'movies', label: 'Películas', icon: Film },
   { id: 'series', label: 'Series', icon: Video },
+  { id: 'favorites', label: 'Favoritos', icon: Heart },
   { id: 'settings', label: 'Configuración', icon: Settings },
 ];
 

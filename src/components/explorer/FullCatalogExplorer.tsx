@@ -4,23 +4,24 @@ import {
   Folder, 
   Play, 
   RefreshCw, 
-  ExternalLink, 
-  Bookmark, 
   Video, 
   X, 
   Radio,
   Film,
   Search,
-  RotateCw
+  RotateCw,
+  Heart
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
 import { TmdbService } from '../../services/tmdb';
-import { openExternalPlayer } from '../../utils/externalPlayer';
 import { CatalogCacheService, type CompactCatalogItem } from '../../services/catalogCacheService';
 import { ImagePreloadService } from '../../services/imagePreloadService';
 import { PosterResolutionService } from '../../services/posterResolutionService';
 import { usePlaylistStore } from '../../store/usePlaylistStore';
+import { useFavoritesStore } from '../../store/useFavoritesStore';
+import { QuickFavoriteModal, type QuickFavoriteItem } from '../common/QuickFavoriteModal';
+import { HoldProgressIndicator } from '../common/HoldProgressIndicator';
 
 /**
  * Normaliza URLs de imágenes de servidores IPTV / Xtream Codes y TMDb
@@ -259,8 +260,17 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     meta: MediaMetadata;
     streamUrl: string;
   } | null>(null);
-  const [detailBtnIndex, setDetailBtnIndex] = useState<number>(0); // 0: Play, 1: External, 2: Trailer, 3: My List
-  const [isSavedInList, setIsSavedInList] = useState(false);
+  const [detailBtnIndex, setDetailBtnIndex] = useState<number>(0); // 0: Play, 1: Favorite, 2: Trailer
+
+  // ⭐ Favoritos y pulsación de 3 segundos
+  const { isFavorite, toggleFavorite } = useFavoritesStore();
+  const [quickFavItem, setQuickFavItem] = useState<QuickFavoriteItem | null>(null);
+  const [isQuickFavOpen, setIsQuickFavOpen] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const holdTimerRef = useRef<number | null>(null);
+  const holdIntervalRef = useRef<number | null>(null);
+  const isHoldingOkRef = useRef(false);
+  const hasTriggeredLongPressRef = useRef(false);
 
   // 🎬 Modal de Episodios para Series
   const [selectedSeriesDetails, setSelectedSeriesDetails] = useState<SeriesDetails | null>(null);
@@ -739,7 +749,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         e.keyCode === 27 ||
         e.keyCode === 4;
 
-      // ── CASO 1: PANTALLA COMPLETA DE DETALLES DE PELÍCULA (IMAGEN 2) ──
+      // ── CASO 1: PANTALLA COMPLETA DE DETALLES DE PELÍCULA ──
       if (focusZone === 'movie_detail' && selectedMovieDetail) {
         if (isOk) {
           e.preventDefault();
@@ -753,18 +763,26 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               isLive: false,
             });
           } else if (detailBtnIndex === 1) {
-            // Botón 1: Abrir en Reproductor Externo (VLC / MX Player)
-            openExternalPlayer(selectedMovieDetail.streamUrl, selectedMovieDetail.meta.title);
+            // Botón 1: Añadir / Quitar de Favoritos
+            const { toggleFavorite } = useFavoritesStore.getState();
+            toggleFavorite({
+              id: `vod_${selectedMovieDetail.item.stream_id}`,
+              title: selectedMovieDetail.meta.title,
+              type: 'movie',
+              posterUrl: selectedMovieDetail.meta.posterUrl,
+              backdropUrl: selectedMovieDetail.meta.backdropUrl,
+              streamUrl: selectedMovieDetail.streamUrl,
+              year: selectedMovieDetail.meta.year,
+              rating: selectedMovieDetail.meta.rating,
+              genresText: selectedMovieDetail.meta.genres,
+            });
           } else if (detailBtnIndex === 2) {
-            // Botón 2: Tráiler
+            // Botón 2: Ver Tráiler
             if (selectedMovieDetail.meta.youtubeTrailer) {
               window.open(`https://www.youtube.com/watch?v=${selectedMovieDetail.meta.youtubeTrailer}`, '_blank');
             } else {
               window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedMovieDetail.meta.title + ' trailer')}`, '_blank');
             }
-          } else if (detailBtnIndex === 3) {
-            // Botón 3: Añadir a Mi Lista
-            setIsSavedInList((prev) => !prev);
           }
           return;
         }
@@ -783,7 +801,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             break;
 
           case 'ArrowRight':
-            setDetailBtnIndex((prev) => Math.min(3, prev + 1));
+            setDetailBtnIndex((prev) => Math.min(2, prev + 1));
             break;
         }
         return;
@@ -907,9 +925,44 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             }
           }
         } else if (focusZone === 'grid') {
-          if (displayedStreams[focusedGridIndex]) {
-            handleItemSelect(displayedStreams[focusedGridIndex]);
+          // Iniciar temporizador de 2.5s para Favoritos en el catálogo
+          if (!isHoldingOkRef.current) {
+            isHoldingOkRef.current = true;
+            hasTriggeredLongPressRef.current = false;
+            const currentItem = displayedStreams[focusedGridIndex];
+
+            const startTime = Date.now();
+            holdIntervalRef.current = window.setInterval(() => {
+              const elapsed = Date.now() - startTime;
+              setHoldProgress(Math.min(100, Math.round((elapsed / 2500) * 100)));
+            }, 50);
+
+            holdTimerRef.current = window.setTimeout(() => {
+              hasTriggeredLongPressRef.current = true;
+              if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+              setHoldProgress(0);
+
+              if (currentItem) {
+                const isLive = contentType === 'live';
+                const isSeries = contentType === 'series';
+                const id = isLive
+                  ? `live_${(currentItem as any).stream_id ?? (currentItem as any).id}`
+                  : isSeries
+                  ? `series_${(currentItem as any).series_id ?? (currentItem as any).id}`
+                  : `vod_${(currentItem as any).stream_id ?? (currentItem as any).id}`;
+
+                setQuickFavItem({
+                  id,
+                  title: currentItem.name || (currentItem as any).title || 'Sin Título',
+                  posterUrl: (currentItem as any).stream_icon || (currentItem as any).cover,
+                  backdropUrl: (currentItem as any).cover || (currentItem as any).stream_icon,
+                  type: isLive ? 'live' : isSeries ? 'series' : 'movie',
+                });
+                setIsQuickFavOpen(true);
+              }
+            }, 2500);
           }
+          return;
         }
         return;
       }
@@ -1022,8 +1075,51 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const isOk =
+        e.key === 'Enter' ||
+        e.key === ' ' ||
+        e.key === 'Select' ||
+        e.key === 'Ok' ||
+        e.keyCode === 13 ||
+        e.keyCode === 23 ||
+        e.keyCode === 66;
+
+      if (isOk) {
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        if (holdIntervalRef.current) {
+          clearInterval(holdIntervalRef.current);
+          holdIntervalRef.current = null;
+        }
+        setHoldProgress(0);
+
+        const wasLongPress = hasTriggeredLongPressRef.current;
+        isHoldingOkRef.current = false;
+        hasTriggeredLongPressRef.current = false;
+
+        if (wasLongPress) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+
+        if (focusZone === 'grid' && displayedStreams[focusedGridIndex]) {
+          handleItemSelect(displayedStreams[focusedGridIndex]);
+        }
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+    };
   }, [
     isActive,
     focusZone,
@@ -1444,23 +1540,36 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               }`}
             >
               <Play className="w-4 h-4 fill-current ml-0.5" />
-              <span>Play</span>
+              <span>Reproducir</span>
             </button>
 
-            {/* 2. Botón Reproductor Externo (VLC / MX Player) */}
+            {/* 2. Botón Añadir a Favoritos */}
             <button
-              onClick={() => openExternalPlayer(selectedMovieDetail.streamUrl, selectedMovieDetail.meta.title)}
+              onClick={() => {
+                const { toggleFavorite } = useFavoritesStore.getState();
+                toggleFavorite({
+                  id: `vod_${selectedMovieDetail.item.stream_id}`,
+                  title: selectedMovieDetail.meta.title,
+                  type: 'movie',
+                  posterUrl: selectedMovieDetail.meta.posterUrl,
+                  backdropUrl: selectedMovieDetail.meta.backdropUrl,
+                  streamUrl: selectedMovieDetail.streamUrl,
+                  year: selectedMovieDetail.meta.year,
+                  rating: selectedMovieDetail.meta.rating,
+                  genresText: selectedMovieDetail.meta.genres,
+                });
+              }}
               className={`px-6 py-3.5 rounded-xl font-bold text-sm transition-all duration-200 flex items-center space-x-2 ${
                 detailBtnIndex === 1
                   ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-105 shadow-2xl shadow-cyan-400/50'
                   : 'bg-white/10 hover:bg-white/20 text-white'
               }`}
             >
-              <ExternalLink className="w-4 h-4" />
-              <span>Open in external player</span>
+              <Heart className={`w-4 h-4 ${useFavoritesStore.getState().isFavorite(`vod_${selectedMovieDetail.item.stream_id}`) ? 'fill-rose-500 text-rose-500' : ''}`} />
+              <span>{useFavoritesStore.getState().isFavorite(`vod_${selectedMovieDetail.item.stream_id}`) ? 'En Favoritos' : 'Añadir a Favoritos'}</span>
             </button>
 
-            {/* 3. Botón Tráiler */}
+            {/* 3. Botón Ver Tráiler */}
             <button
               onClick={() => {
                 if (selectedMovieDetail.meta.youtubeTrailer) {
@@ -1476,20 +1585,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               }`}
             >
               <Video className="w-4 h-4" />
-              <span>Trailer</span>
-            </button>
-
-            {/* 4. Botón Añadir a Mi Lista */}
-            <button
-              onClick={() => setIsSavedInList((prev) => !prev)}
-              className={`px-6 py-3.5 rounded-xl font-bold text-sm transition-all duration-200 flex items-center space-x-2 ${
-                detailBtnIndex === 3
-                  ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-105 shadow-2xl shadow-cyan-400/50'
-                  : 'bg-white/10 hover:bg-white/20 text-white'
-              }`}
-            >
-              <Bookmark className={`w-4 h-4 ${isSavedInList ? 'fill-cyan-400 text-cyan-400' : ''}`} />
-              <span>{isSavedInList ? 'In My list' : 'Add to My list'}</span>
+              <span>Ver Tráiler</span>
             </button>
           </div>
         </div>
@@ -1602,6 +1698,36 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           </div>
         </div>
       )}
+
+      {/* ⭐ Menú Rápido de Favoritos por pulsación de 3 segundos en Catálogo */}
+      <QuickFavoriteModal
+        isOpen={isQuickFavOpen}
+        item={quickFavItem}
+        isFavorite={quickFavItem ? isFavorite(quickFavItem.id) : false}
+        onToggleFavorite={() => {
+          if (quickFavItem) {
+            toggleFavorite(quickFavItem);
+          }
+        }}
+        onPlay={() => {
+          if (quickFavItem) {
+            const currentItem = displayedStreams[focusedGridIndex];
+            if (currentItem) {
+              handleItemSelect(currentItem);
+            }
+          }
+        }}
+        onClose={() => {
+          setIsQuickFavOpen(false);
+          setQuickFavItem(null);
+        }}
+      />
+
+      {/* ⏱️ Indicador visual de progreso de 3 segundos al presionar Enter */}
+      <HoldProgressIndicator
+        progress={holdProgress}
+        title={displayedStreams[focusedGridIndex]?.name || (displayedStreams[focusedGridIndex] as any)?.title}
+      />
     </div>
   );
 };

@@ -21,4 +21,5 @@ export type SidebarTabId =
   | 'live'
   | 'movies'
   | 'series'
+  | 'favorites'
   | 'settings';

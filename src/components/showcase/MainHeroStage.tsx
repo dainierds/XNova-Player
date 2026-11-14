@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ShowcaseItem } from '../../types/showcase';
-import { Play } from 'lucide-react';
+import { Play, Heart } from 'lucide-react';
 
 const FALLBACK_POSTER = 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400';
 const FALLBACK_BACKDROP = 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=1920';
@@ -10,9 +10,11 @@ interface MainHeroStageProps {
   items: ShowcaseItem[];
   selectedIndex: number;
   focusedZone: 'hero_buttons' | 'thumbnails';
-  heroButtonIndex: number; // 0: Watch now, 1: Trailer
+  heroButtonIndex: number; // 0: Watch now, 1: Favorite, 2: Trailer
+  isFavorite?: boolean;
   onSelectThumbnail: (index: number) => void;
   onPlay: () => void;
+  onToggleFavorite?: () => void;
   onOpenTrailer: () => void;
 }
 
@@ -22,8 +24,10 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
   selectedIndex,
   focusedZone,
   heroButtonIndex,
+  isFavorite = false,
   onSelectThumbnail,
   onPlay,
+  onToggleFavorite,
   onOpenTrailer,
 }) => {
   const [backdropSrc, setBackdropSrc] = useState(item.backdropUrl || FALLBACK_BACKDROP);
@@ -89,9 +93,9 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
           {item.subtitle}
         </p>
 
-        {/* Fila de Botones: Ver ahora + Trailer */}
+        {/* Fila de Botones: Ver ahora + Favorito + Trailer */}
         <div className="flex items-center space-x-3 pt-1">
-          {/* Botón: Ver ahora */}
+          {/* Botón 0: Ver ahora */}
           <button
             onClick={onPlay}
             className={`
@@ -105,12 +109,30 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
             <span>Ver ahora</span>
           </button>
 
-          {/* Botón: Trailer */}
+          {/* Botón 1: Añadir a Favoritos / En Favoritos */}
+          <button
+            onClick={onToggleFavorite}
+            className={`
+              px-5 py-2.5 rounded-full font-bold text-xs md:text-sm flex items-center space-x-2 transition-all duration-200
+              ${focusedZone === 'hero_buttons' && heroButtonIndex === 1
+                ? isFavorite
+                  ? 'bg-rose-500 text-white scale-105 ring-4 ring-rose-400 shadow-xl shadow-rose-500/40'
+                  : 'bg-cyan-400 text-black scale-105 ring-4 ring-cyan-300 shadow-xl shadow-cyan-400/50'
+                : isFavorite
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                : 'glass-panel text-white border border-white/20 hover:bg-white/10'}
+            `}
+          >
+            <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
+            <span>{isFavorite ? 'En Favoritos' : 'Añadir a Favoritos'}</span>
+          </button>
+
+          {/* Botón 2: Trailer */}
           <button
             onClick={onOpenTrailer}
             className={`
               px-6 py-2.5 rounded-full font-semibold text-xs md:text-sm text-white glass-panel border border-white/20 transition-all duration-200
-              ${focusedZone === 'hero_buttons' && heroButtonIndex === 1
+              ${focusedZone === 'hero_buttons' && heroButtonIndex === 2
                 ? 'bg-white/25 border-cyan-400 scale-105 ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/30'
                 : 'hover:bg-white/10'}
             `}

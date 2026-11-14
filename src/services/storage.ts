@@ -7,6 +7,7 @@ const KEYS = {
   ACTIVE_PLAYLIST_ID: 'xnova_active_playlist_id',
   CACHE_PREFIX: 'xnova_cache_',
   FAVORITES: 'xnova_favorites',
+  FAVORITE_ITEMS: 'xnova_favorite_items',
   WATCH_PROGRESS: 'xnova_watch_progress',
   PARENTAL_PIN: 'xnova_parental_pin',
   ACTIVE_PROFILE: 'xnova_active_profile',
@@ -26,6 +27,19 @@ export interface WatchProgressItem {
   streamUrl: string;
   type: 'movie' | 'series';
   updatedAt: number;
+}
+
+export interface SavedFavoriteItem {
+  id: string;
+  title: string;
+  type: 'movie' | 'series' | 'live';
+  posterUrl?: string;
+  backdropUrl?: string;
+  streamUrl?: string;
+  year?: string;
+  rating?: string;
+  genresText?: string;
+  addedAt: number;
 }
 
 export const StorageService = {
@@ -90,6 +104,25 @@ export const StorageService = {
     const updated = exists ? favs.filter((f) => f !== id) : [...favs, id];
     await set(KEYS.FAVORITES, updated);
     return !exists;
+  },
+
+  async getFavoriteItems(): Promise<SavedFavoriteItem[]> {
+    const items = await get<SavedFavoriteItem[]>(KEYS.FAVORITE_ITEMS);
+    return items || [];
+  },
+
+  async toggleFavoriteItem(item: Omit<SavedFavoriteItem, 'addedAt'>): Promise<boolean> {
+    const items = await this.getFavoriteItems();
+    const exists = items.some((i) => i.id === item.id);
+    let updated: SavedFavoriteItem[];
+    if (exists) {
+      updated = items.filter((i) => i.id !== item.id);
+    } else {
+      updated = [{ ...item, addedAt: Date.now() }, ...items];
+    }
+    await set(KEYS.FAVORITE_ITEMS, updated);
+    await set(KEYS.FAVORITES, updated.map((i) => i.id));
+    return !exists; // true si se añadió, false si se quitó
   },
 
   // --- Perfil y Control Parental ---

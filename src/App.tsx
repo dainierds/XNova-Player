@@ -28,6 +28,9 @@ import { ImagePreloadService } from './services/imagePreloadService';
 import { TrailerModal } from './components/player/TrailerModal';
 import { TmdbService } from './services/tmdb';
 import { XtreamService } from './services/xtream';
+import { useFavoritesStore } from './store/useFavoritesStore';
+import { QuickFavoriteModal, type QuickFavoriteItem } from './components/common/QuickFavoriteModal';
+import { HoldProgressIndicator } from './components/common/HoldProgressIndicator';
 
 type FocusSection = 'sidebar' | 'hero_buttons' | 'thumbnails';
 
@@ -58,11 +61,60 @@ export function App() {
   const [activeTab, setActiveTab] = useState<SidebarTabId>('movies');
   const [focusedTab, setFocusedTab] = useState<SidebarTabId>('movies');
   const [focusedZone, setFocusedZone] = useState<FocusSection>('sidebar');
-  const [heroBtnIndex, setHeroBtnIndex] = useState(0); // 0: Watch now, 1: Trailer
+  const [heroBtnIndex, setHeroBtnIndex] = useState(0); // 0: Watch now, 1: Favorite, 2: Trailer
   
-  // Catálogo activo según pestaña (Películas o Series)
-  // Prioridad: 100% contenidos reales del servidor Xtream activo
-  const currentCatalog: ShowcaseItem[] = (activeTab === 'series') 
+  // Hook de favoritos persistidos en IndexedDB
+  const { favorites, isFavorite, toggleFavorite, loadFavorites } = useFavoritesStore();
+
+  useEffect(() => {
+    loadFavorites();
+  }, [loadFavorites]);
+
+  // Modal y feedback de pulsación larga (3 segundos) para Favoritos
+  const [quickFavItem, setQuickFavItem] = useState<QuickFavoriteItem | null>(null);
+  const [isQuickFavOpen, setIsQuickFavOpen] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const holdTimerRef = useRef<number | null>(null);
+  const holdIntervalRef = useRef<number | null>(null);
+  const isHoldingOkRef = useRef(false);
+  const hasTriggeredLongPressRef = useRef(false);
+
+  // Catálogo activo según pestaña (Favoritos, Películas o Series)
+  // Prioridad: 100% contenidos reales del servidor Xtream activo o favoritos guardados
+  const currentCatalog: ShowcaseItem[] = (activeTab === 'favorites')
+    ? (favorites && favorites.length > 0)
+      ? favorites.map((fav) => ({
+          id: fav.id,
+          title: fav.title.toUpperCase(),
+          subtitle: fav.title,
+          backdropUrl: fav.backdropUrl || fav.posterUrl || '',
+          thumbnailUrl: fav.posterUrl || fav.backdropUrl || '',
+          releaseDateText: '⭐ Favorito',
+          statusBadge: 'TENDENCIA' as const,
+          genresText: fav.genresText || 'Mis Favoritos',
+          year: fav.year || '2026',
+          rating: fav.rating || '★ 9.0',
+          duration: fav.type === 'live' ? 'DIRECTO' : 'HD',
+          synopsis: 'Título guardado en tus favoritos.',
+          type: fav.type === 'series' ? 'series' as const : 'movie' as const,
+          streamUrl: fav.streamUrl,
+        }))
+      : [{
+          id: 'empty_favorites',
+          title: 'AÚN NO TIENES FAVORITOS',
+          subtitle: 'Mantén presionado ENTER durante 3 segundos en cualquier película, serie o canal',
+          backdropUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920',
+          thumbnailUrl: 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400',
+          releaseDateText: 'Acceso Rápido',
+          statusBadge: 'NUEVO' as const,
+          genresText: 'Favoritos',
+          year: '2026',
+          rating: '★ VIP',
+          duration: '3 segundos',
+          synopsis: 'Para agregar cualquier película, serie o canal de TV a Favoritos, simplemente mantén presionado el botón ENTER / OK de tu control remoto durante 3 segundos sobre la carátula o canal.',
+          type: 'movie' as const,
+        }]
+    : (activeTab === 'series') 
     ? (homeFeed.featuredSeries && homeFeed.featuredSeries.length > 0)
       ? homeFeed.featuredSeries.map((s) => ({
           id: s.id,
@@ -381,6 +433,11 @@ export function App() {
     } else if (tab === 'live') {
       setExplorerType('live');
       setIsExplorerOpen(true);
+    } else if (tab === 'favorites') {
+      setActiveTab('favorites');
+      setFocusedTab('favorites');
+      setFocusedZone('thumbnails');
+      setCarouselIndex(0);
     }
   };
 
@@ -428,20 +485,45 @@ export function App() {
 
       if (isOk) {
         e.preventDefault();
-        if (focusedZone === 'hero_buttons') {
-          if (heroBtnIndex === 0) {
-            handlePlayShowcaseItem(activeItem);
-          } else {
-            handleOpenTrailer(activeItem);
-          }
-        } else if (focusedZone === 'thumbnails') {
-          handlePlayShowcaseItem(activeItem);
-        } else if (focusedZone === 'sidebar') {
+        if (focusedZone === 'sidebar') {
           if (focusedTab === 'settings') {
             setIsSettingsOpen(true);
           } else {
             handleSelectTab(focusedTab);
           }
+          return;
+        }
+
+        // Si está en thumbnails o hero_buttons, iniciar temporizador de 2.5s para Favoritos
+        if (!isHoldingOkRef.current) {
+          isHoldingOkRef.current = true;
+          hasTriggeredLongPressRef.current = false;
+          const currentTarget = activeItem;
+
+          const startTime = Date.now();
+          holdIntervalRef.current = window.setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            setHoldProgress(Math.min(100, Math.round((elapsed / 2500) * 100)));
+          }, 50);
+
+          holdTimerRef.current = window.setTimeout(() => {
+            hasTriggeredLongPressRef.current = true;
+            if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+            setHoldProgress(0);
+
+            if (currentTarget && currentTarget.id !== 'empty_favorites') {
+              setQuickFavItem({
+                id: currentTarget.id,
+                title: currentTarget.title,
+                posterUrl: currentTarget.thumbnailUrl,
+                backdropUrl: currentTarget.backdropUrl,
+                type: currentTarget.type || 'movie',
+                year: currentTarget.year,
+                streamUrl: currentTarget.streamUrl,
+              });
+              setIsQuickFavOpen(true);
+            }
+          }, 2500);
         }
         return;
       }
@@ -483,7 +565,7 @@ export function App() {
               setCarouselIndex(carouselIndex + 1);
             }
           } else if (focusedZone === 'hero_buttons') {
-            if (heroBtnIndex < 1) {
+            if (heroBtnIndex < 2) {
               setHeroBtnIndex(heroBtnIndex + 1);
             }
           }
@@ -557,8 +639,69 @@ export function App() {
       }, 5000);
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const isOk =
+        e.key === 'Enter' ||
+        e.key === ' ' ||
+        e.key === 'Select' ||
+        e.key === 'Ok' ||
+        e.keyCode === 13 ||
+        e.keyCode === 23 ||
+        e.keyCode === 66;
+
+      if (isOk) {
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        if (holdIntervalRef.current) {
+          clearInterval(holdIntervalRef.current);
+          holdIntervalRef.current = null;
+        }
+        setHoldProgress(0);
+
+        const wasLongPress = hasTriggeredLongPressRef.current;
+        isHoldingOkRef.current = false;
+        hasTriggeredLongPressRef.current = false;
+
+        if (wasLongPress) {
+          e.preventDefault();
+          return;
+        }
+
+        // Si fue pulsación corta:
+        if (focusedZone === 'hero_buttons') {
+          if (heroBtnIndex === 0) {
+            handlePlayShowcaseItem(activeItem);
+          } else if (heroBtnIndex === 1) {
+            toggleFavorite({
+              id: activeItem.id,
+              title: activeItem.title,
+              type: activeItem.type || 'movie',
+              posterUrl: activeItem.thumbnailUrl,
+              backdropUrl: activeItem.backdropUrl,
+              streamUrl: activeItem.streamUrl,
+              year: activeItem.year,
+              rating: activeItem.rating,
+              genresText: activeItem.genresText,
+            });
+          } else if (heroBtnIndex === 2) {
+            handleOpenTrailer(activeItem);
+          }
+        } else if (focusedZone === 'thumbnails') {
+          handlePlayShowcaseItem(activeItem);
+        }
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+    };
   }, [
     activeTheme,
     focusedZone,
@@ -705,6 +848,20 @@ export function App() {
                     : 'thumbnails'
                 }
                 heroButtonIndex={heroBtnIndex}
+                isFavorite={isFavorite(activeItem.id)}
+                onToggleFavorite={() => {
+                  toggleFavorite({
+                    id: activeItem.id,
+                    title: activeItem.title,
+                    type: activeItem.type || 'movie',
+                    posterUrl: activeItem.thumbnailUrl,
+                    backdropUrl: activeItem.backdropUrl,
+                    streamUrl: activeItem.streamUrl,
+                    year: activeItem.year,
+                    rating: activeItem.rating,
+                    genresText: activeItem.genresText,
+                  });
+                }}
                 onSelectThumbnail={(idx) => {
                   setCarouselIndex(idx);
                   setFocusedZone('thumbnails');
@@ -925,6 +1082,52 @@ export function App() {
           setIsTrailerOpen(false);
           setTrailerMovie(null);
         }}
+      />
+
+      {/* ⭐ Menú Rápido de Favoritos por pulsación de 3 segundos (Enter) */}
+      <QuickFavoriteModal
+        isOpen={isQuickFavOpen}
+        item={quickFavItem}
+        isFavorite={quickFavItem ? isFavorite(quickFavItem.id) : false}
+        onToggleFavorite={() => {
+          if (quickFavItem) {
+            toggleFavorite(quickFavItem);
+          }
+        }}
+        onPlay={() => {
+          if (quickFavItem) {
+            if (activeItem && activeItem.id === quickFavItem.id) {
+              handlePlayShowcaseItem(activeItem);
+            } else {
+              setPlayingItem({
+                id: quickFavItem.id,
+                title: quickFavItem.title,
+                subtitle: quickFavItem.title,
+                backdropUrl: quickFavItem.backdropUrl || '',
+                thumbnailUrl: quickFavItem.posterUrl || '',
+                releaseDateText: 'Favorito',
+                statusBadge: 'NUEVO',
+                genresText: 'Favoritos',
+                year: quickFavItem.year || '2026',
+                rating: 'TP',
+                duration: 'HD',
+                synopsis: 'Disfruta de tu contenido favorito.',
+                type: quickFavItem.type === 'series' ? 'series' : 'movie',
+                streamUrl: quickFavItem.streamUrl,
+              });
+            }
+          }
+        }}
+        onClose={() => {
+          setIsQuickFavOpen(false);
+          setQuickFavItem(null);
+        }}
+      />
+
+      {/* ⏱️ Indicador visual de progreso de 3 segundos al presionar Enter */}
+      <HoldProgressIndicator
+        progress={holdProgress}
+        title={activeItem?.title}
       />
     </main>
   );

@@ -18,6 +18,9 @@ import {
 } from 'lucide-react';
 import { BRANDING } from '../../config/branding';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useFavoritesStore } from '../../store/useFavoritesStore';
+import { QuickFavoriteModal, type QuickFavoriteItem } from '../common/QuickFavoriteModal';
+import { HoldProgressIndicator } from '../common/HoldProgressIndicator';
 import { PLAN_CONFIGS } from '../../types/auth';
 import type { PlaylistAccount } from '../../types';
 import { 
@@ -89,6 +92,16 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   const [selectedGenre, setSelectedGenre] = useState('Todos');
   const [isFavoriteHero, setIsFavoriteHero] = useState(false);
 
+  // ⭐ Favoritos sincronizados con IndexedDB
+  const { favorites, isFavorite, toggleFavorite } = useFavoritesStore();
+  const [quickFavItem, setQuickFavItem] = useState<QuickFavoriteItem | null>(null);
+  const [isQuickFavOpen, setIsQuickFavOpen] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const holdTimerRef = useRef<number | null>(null);
+  const holdIntervalRef = useRef<number | null>(null);
+  const isHoldingOkRef = useRef(false);
+  const hasTriggeredLongPressRef = useRef(false);
+
   // 🎮 Control Remoto D-Pad: Zonas de foco espacial
   const [focusZone, setFocusZone] = useState<SeriviaFocusZone>('sidebar');
   const [focusedSidebarIdx, setFocusedSidebarIdx] = useState(0);
@@ -120,6 +133,12 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   }, [sectionType, homeFeed]);
 
   const rawCatalogList = useMemo(() => {
+    if (activeNav === 'favorites') {
+      if (favorites && favorites.length > 0) {
+        return favorites;
+      }
+      return SERIVIA_MOVIES_CATALOG;
+    }
     if (sectionType === 'movies') {
       if (homeFeed?.recientes && homeFeed.recientes.length > 0) {
         return homeFeed.recientes;
@@ -134,7 +153,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
       }
       return SERIVIA_HERO_SERIES;
     }
-  }, [sectionType, homeFeed]);
+  }, [sectionType, homeFeed, activeNav, favorites]);
 
   // Lista de géneros disponibles incluyendo botón de acceso al catálogo secundario completo
   const genresList = useMemo(() => {
@@ -415,18 +434,90 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         } else if (e.key === 'ArrowUp') {
           setFocusZone('genres');
         } else if (isOk) {
-          const card = catalogList[focusedCatalogIdx];
-          if (card) {
-            handlePlayCard(card);
+          // Iniciar temporizador de 2.5s para Favoritos en el catálogo
+          if (!isHoldingOkRef.current) {
+            isHoldingOkRef.current = true;
+            hasTriggeredLongPressRef.current = false;
+            const card = catalogList[focusedCatalogIdx];
+
+            const startTime = Date.now();
+            holdIntervalRef.current = window.setInterval(() => {
+              const elapsed = Date.now() - startTime;
+              setHoldProgress(Math.min(100, Math.round((elapsed / 2500) * 100)));
+            }, 50);
+
+            holdTimerRef.current = window.setTimeout(() => {
+              hasTriggeredLongPressRef.current = true;
+              if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+              setHoldProgress(0);
+
+              if (card) {
+                setQuickFavItem({
+                  id: card.id,
+                  title: card.title,
+                  posterUrl: card.posterUrl || card.thumbnailUrl || card.backdropUrl,
+                  backdropUrl: card.backdropUrl || card.posterUrl,
+                  type: card.type || (sectionType === 'series' ? 'series' : 'movie'),
+                  year: card.year,
+                  streamUrl: card.streamUrl,
+                });
+                setIsQuickFavOpen(true);
+              }
+            }, 2500);
           }
+          return;
         }
         return;
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const isOk =
+        e.key === 'Enter' ||
+        e.key === ' ' ||
+        e.key === 'Select' ||
+        e.key === 'Ok' ||
+        e.keyCode === 13 ||
+        e.keyCode === 23 ||
+        e.keyCode === 66;
+
+      if (isOk) {
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        if (holdIntervalRef.current) {
+          clearInterval(holdIntervalRef.current);
+          holdIntervalRef.current = null;
+        }
+        setHoldProgress(0);
+
+        const wasLongPress = hasTriggeredLongPressRef.current;
+        isHoldingOkRef.current = false;
+        hasTriggeredLongPressRef.current = false;
+
+        if (wasLongPress) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+
+        if (focusZone === 'catalog') {
+          const card = catalogList[focusedCatalogIdx];
+          if (card) {
+            handlePlayCard(card);
+          }
+        }
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
     };
   }, [
     isActive,
@@ -852,6 +943,33 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
           })}
         </div>
       </main>
+
+      {/* ⭐ Menú Rápido de Favoritos por pulsación de 3 segundos */}
+      <QuickFavoriteModal
+        isOpen={isQuickFavOpen}
+        item={quickFavItem}
+        isFavorite={quickFavItem ? isFavorite(quickFavItem.id) : false}
+        onToggleFavorite={() => {
+          if (quickFavItem) {
+            toggleFavorite(quickFavItem);
+          }
+        }}
+        onPlay={() => {
+          if (quickFavItem) {
+            handlePlayCard(quickFavItem);
+          }
+        }}
+        onClose={() => {
+          setIsQuickFavOpen(false);
+          setQuickFavItem(null);
+        }}
+      />
+
+      {/* ⏱️ Indicador visual de progreso de 3 segundos al presionar Enter */}
+      <HoldProgressIndicator
+        progress={holdProgress}
+        title={catalogList[focusedCatalogIdx]?.title}
+      />
     </div>
   );
 };
