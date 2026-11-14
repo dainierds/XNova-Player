@@ -35,7 +35,8 @@ export function normalizeSearchString(text: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Elimina acentos/tildes
-    .replace(/[«»\[\]\(\)\{\}\-_\.\:]/g, ' ') // Elimina signos comunes de IPTV
+    .replace(/[«»\[\]\(\)\{\}\-_\.\:\/\\\|]/g, ' ') // Elimina signos comunes de IPTV
+    .replace(/\b(plex|p2p|4k|2160p|1080p|720p|480p|fhd|hd|latino|castellano|sub|esp|eng|dual)\b/gi, ' ') // Elimina tags técnicos y marcas de agua de proveedores IPTV
     .replace(/\s+/g, ' ')
     .trim();
 }
