@@ -16,7 +16,8 @@ import {
   AlertCircle,
   LogOut,
   ShieldCheck,
-  Database
+  Database,
+  AlertTriangle
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 
@@ -81,6 +82,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [isUpdatingCache, setIsUpdatingCache] = useState(false);
   const [cacheProgress, setCacheProgress] = useState<{ step: string; percent: number } | null>(null);
+  const [showClearCacheConfirm, setShowClearCacheConfirm] = useState(false);
+  const [clearCacheConfirmBtnIndex, setClearCacheConfirmBtnIndex] = useState<0 | 1>(0); // 0: Cancelar, 1: Confirmar
 
   useEffect(() => {
     const plId = activePlaylist?.id || playlists[0]?.id || currentUser?.playlists?.[0]?.id;
@@ -262,7 +265,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     // 9. Botones de Caché
     items.push({ id: 'update_cache', onSelect: handleUpdateCache });
-    items.push({ id: 'clear_cache', onSelect: handleClearCache });
+    items.push({ 
+      id: 'clear_cache', 
+      onSelect: () => {
+        setClearCacheConfirmBtnIndex(0);
+        setShowClearCacheConfirm(true);
+      } 
+    });
 
     return items;
   }, [
@@ -303,6 +312,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (!isOpen || isAdmin) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 🛑 Interceptar navegación D-pad si está abierto el modal de confirmación de vaciar caché
+      if (showClearCacheConfirm) {
+        if (['Escape', 'Backspace', 'GoBack'].includes(e.key) || e.keyCode === 27 || e.keyCode === 4) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowClearCacheConfirm(false);
+          return;
+        }
+
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          e.stopPropagation();
+          setClearCacheConfirmBtnIndex((prev) => (prev === 0 ? 1 : 0));
+          return;
+        }
+
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Select' || e.keyCode === 13 || e.keyCode === 23) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (clearCacheConfirmBtnIndex === 0) {
+            setShowClearCacheConfirm(false);
+          } else {
+            setShowClearCacheConfirm(false);
+            handleClearCache();
+          }
+          return;
+        }
+        return;
+      }
+
       if (isEditing) {
         if (['Escape', 'GoBack'].includes(e.key)) {
           e.preventDefault();
@@ -355,7 +394,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen, isEditing, focusItems, focusedIndex, onClose]);
+  }, [isOpen, isEditing, focusItems, focusedIndex, onClose, showClearCacheConfirm, clearCacheConfirmBtnIndex]);
 
   const isItemFocused = (id: string) => focusItems[focusedIndex]?.id === id;
   const getFocusClass = (id: string) =>
@@ -807,7 +846,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </button>
                       <button
                         ref={(el) => { itemRefs.current['clear_cache'] = el; }}
-                        onClick={handleClearCache}
+                        onClick={() => {
+                          setClearCacheConfirmBtnIndex(0);
+                          setShowClearCacheConfirm(true);
+                        }}
                         disabled={isClearingCache || isUpdatingCache || (cacheStats.movies === 0 && cacheStats.series === 0 && cacheStats.live === 0)}
                         className={`px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-zinc-300 hover:text-white border border-zinc-700 transition flex items-center space-x-2 cursor-pointer ${getFocusClass('clear_cache')}`}
                       >
@@ -989,6 +1031,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               </div>
             </form>
+          )}
+
+          {/* 🛑 Modal de Confirmación para Vaciar Caché */}
+          {showClearCacheConfirm && (
+            <div className="fixed inset-0 z-70 bg-black/85 backdrop-blur-md flex items-center justify-center p-6 animate-fadeIn">
+              <div className="bg-[#121826] border border-amber-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-left">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                    <AlertTriangle className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white">¿Vaciar la memoria caché?</h3>
+                    <p className="text-xs text-zinc-300 mt-2 leading-relaxed">
+                      Si borras la caché, las imágenes de <strong className="text-amber-300 font-bold">portadas, fondos, sinopsis y el catálogo local</strong> se eliminarán de este dispositivo.
+                    </p>
+                    <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+                      La próxima vez que entres a la aplicación o navegues por los canales y películas, <strong className="text-white font-bold">los contenidos e imágenes tardarán más tiempo en cargar</strong> mientras vuelven a descargarse de tu servidor IPTV.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 text-xs text-zinc-300 font-medium">
+                  ¿Confirmas que deseas vaciar la caché de esta lista ahora?
+                </div>
+
+                <div className="flex items-center justify-end space-x-3 pt-2">
+                  {/* Botón Cancelar (0) */}
+                  <button
+                    onClick={() => setShowClearCacheConfirm(false)}
+                    className={`px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-2 cursor-pointer ${
+                      clearCacheConfirmBtnIndex === 0
+                        ? 'bg-white text-black ring-4 ring-cyan-400 scale-105 shadow-xl font-black'
+                        : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Cancelar</span>
+                  </button>
+
+                  {/* Botón Confirmar Borrado (1) */}
+                  <button
+                    onClick={() => {
+                      setShowClearCacheConfirm(false);
+                      handleClearCache();
+                    }}
+                    className={`px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-2 cursor-pointer ${
+                      clearCacheConfirmBtnIndex === 1
+                        ? 'bg-rose-600 text-white ring-4 ring-rose-400 scale-105 shadow-xl shadow-rose-600/40 font-black'
+                        : 'bg-rose-600/30 text-rose-300 hover:bg-rose-600/50 border border-rose-500/40'
+                    }`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Sí, Vaciar Caché</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
