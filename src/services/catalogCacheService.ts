@@ -173,10 +173,11 @@ export const CatalogCacheService = {
   async findBestMatch(
     playlistId: string,
     searchTitle: string,
-    tmdbId?: number | string
+    tmdbId?: number | string,
+    type: 'movies' | 'series' = 'movies'
   ): Promise<CompactCatalogItem | null> {
     try {
-      const items = await this.get(playlistId, 'movies', true);
+      const items = await this.get(playlistId, type, true);
       if (!items || items.length === 0) return null;
 
       // 1. Coincidencia directa por tmdbId (100% de precisión)

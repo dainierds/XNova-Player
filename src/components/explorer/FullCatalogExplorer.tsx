@@ -216,6 +216,7 @@ interface FullCatalogExplorerProps {
     posterUrl?: string;
     isLive?: boolean;
   }) => void;
+  initialSelectedItem?: any | null;
 }
 
 type FocusZone = 'sidebar_back' | 'sidebar_search' | 'categories' | 'grid' | 'movie_detail' | 'series_modal';
@@ -264,6 +265,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   isActive = true,
   onClose,
   onPlayStream,
+  initialSelectedItem = null,
 }) => {
   const [contentType] = useState<'movies' | 'series' | 'live'>(initialType);
 
@@ -375,6 +377,196 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
   // Número fijo de columnas para cálculo matemático 1:1 en control remoto
   const numCols = contentType === 'live' ? 4 : 5;
+
+  // 🎬 Abrir directamente la pantalla de información de película o selección de capítulos si viene de la pantalla principal
+  useEffect(() => {
+    if (!initialSelectedItem) return;
+
+    let isMounted = true;
+    const item = initialSelectedItem;
+    const isSeries = item.type === 'series' || initialType === 'series' || String(item.id).startsWith('series_');
+
+    if (isSeries) {
+      const rawId = String(item.id).replace('series_', '');
+      const loadInitialSeries = async () => {
+        setLoadingSeriesModal(true);
+        try {
+          let seriesId: string | number = rawId;
+          // Si el ID no es numérico (ej: viene de TMDb o datos mock), buscar el ID real en Xtream
+          if (!/^\d+$/.test(String(rawId))) {
+            const match = await CatalogCacheService.findBestMatch(playlist.id, item.title, item.tmdbId, 'series');
+            if (match && match.id) {
+              seriesId = match.id;
+            }
+          }
+
+          const details = await XtreamService.getSeriesInfo(server, user, pass, seriesId);
+          if (!isMounted) return;
+
+          const seasons = details.seasons || [];
+          const episodes = details.episodes || {};
+          const seasonKeys = Object.keys(episodes);
+
+          if (seasonKeys.length > 0) {
+            const firstSeasonNum = Number(seasonKeys[0]) || 1;
+            const seriesObj: XtreamSeries = {
+              num: 1,
+              name: details.info?.name || item.title || 'Serie',
+              series_id: Number(seriesId) || 0,
+              cover: details.info?.cover || item.thumbnailUrl || item.posterUrl || '',
+              plot: details.info?.plot || item.synopsis || '',
+              cast: (details.info as any)?.cast || item.actors || '',
+              director: (details.info as any)?.director || item.director || '',
+              genre: details.info?.genre || item.genresText || '',
+              releaseDate: details.info?.releaseDate || item.year || '',
+              rating: details.info?.rating || item.rating || '8.8',
+              category_id: (details.info as any)?.category_id || '0',
+            };
+
+            setSelectedSeriesDetails({
+              series: seriesObj,
+              seasons: seasons.length > 0 ? seasons : seasonKeys.map((k) => ({
+                season_number: Number(k),
+                name: `Temporada ${k}`,
+              })),
+              episodes,
+            });
+            setSelectedSeasonNumber(firstSeasonNum);
+            setFocusedEpisodeIndex(0);
+            setFocusedSeasonIndex(0);
+            setSeriesFocusZone('episodes');
+            setFocusZone('series_modal');
+          } else {
+            // Si la serie no devolvió episodios con ese ID, intentar resolver por nombre en catálogo
+            const match = await CatalogCacheService.findBestMatch(playlist.id, item.title, item.tmdbId, 'series');
+            if (match && match.id && String(match.id) !== String(seriesId)) {
+              const retryDetails = await XtreamService.getSeriesInfo(server, user, pass, match.id);
+              if (retryDetails.episodes && Object.keys(retryDetails.episodes).length > 0 && isMounted) {
+                const sKeys = Object.keys(retryDetails.episodes);
+                setSelectedSeriesDetails({
+                  series: {
+                    num: 1,
+                    name: retryDetails.info?.name || item.title || 'Serie',
+                    series_id: match.id,
+                    cover: retryDetails.info?.cover || item.thumbnailUrl || item.posterUrl || '',
+                    plot: retryDetails.info?.plot || item.synopsis,
+                    rating: retryDetails.info?.rating || '8.8',
+                  } as any,
+                  seasons: retryDetails.seasons || sKeys.map((k) => ({ season_number: Number(k), name: `Temporada ${k}` })),
+                  episodes: retryDetails.episodes,
+                });
+                setSelectedSeasonNumber(Number(sKeys[0]) || 1);
+                setFocusedEpisodeIndex(0);
+                setFocusedSeasonIndex(0);
+                setSeriesFocusZone('episodes');
+                setFocusZone('series_modal');
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[Series Modal] Error al cargar info de serie:', err);
+        } finally {
+          if (isMounted) setLoadingSeriesModal(false);
+        }
+      };
+
+      loadInitialSeries();
+    } else {
+      // Es una película: Abrir la pantalla completa de información de película (con botón Reproducir)
+      const rawId = String(item.id).replace('vod_', '').replace('movie_', '');
+      const loadInitialMovie = async () => {
+        try {
+          let streamId: string | number = rawId;
+          let matchedItem: any = null;
+
+          if (!/^\d+$/.test(String(rawId))) {
+            const match = await CatalogCacheService.findBestMatch(playlist.id, item.title, item.tmdbId, 'movies');
+            if (match && match.id) {
+              streamId = match.id;
+              matchedItem = match;
+            }
+          }
+
+          const rawExt = item.container_extension || matchedItem?.ext || 'mp4';
+          const streamUrl = (item.streamUrl && !item.streamUrl.includes('test-streams.mux.dev'))
+            ? item.streamUrl
+            : XtreamService.buildVodStreamUrl(server, user, pass, streamId, rawExt);
+
+          let meta: MediaMetadata = {
+            title: item.title || 'Película',
+            posterUrl: item.posterUrl || item.thumbnailUrl || (matchedItem ? normalizeMediaUrl(matchedItem.icon, server) : ''),
+            backdropUrl: item.backdropUrl || item.posterUrl || item.thumbnailUrl || '',
+            rating: item.rating || '8.0',
+            year: item.year || '2026',
+            duration: item.duration || 'Película',
+            genres: item.genresText || (item.genres ? item.genres.join(', ') : 'Película'),
+            cast: item.actors || item.cast || 'Reparto cargando...',
+            director: item.director || 'Director cargando...',
+            plot: item.synopsis || 'Presiona reproducir para iniciar la película.',
+            containerExtension: rawExt,
+            youtubeTrailer: item.trailerYoutubeKey,
+          };
+
+          if (/^\d+$/.test(String(streamId))) {
+            try {
+              const vodDetails = await XtreamService.getVodInfo(server, user, pass, streamId);
+              const info = vodDetails?.info || {};
+              const movieData = vodDetails?.movie_data || {};
+
+              let rawBackdrop = (info.backdrop_path && info.backdrop_path.length > 0)
+                ? info.backdrop_path[0]
+                : (info.movie_image || info.cover_big || meta.backdropUrl);
+              let backdrop = normalizeMediaUrl(rawBackdrop, server) || meta.backdropUrl;
+
+              meta = {
+                title: info.name || meta.title,
+                rating: info.rating || meta.rating,
+                year: info.releasedate ? info.releasedate.substring(0, 4) : meta.year,
+                duration: info.duration || (info.episode_run_time ? `${info.episode_run_time} min` : meta.duration),
+                genres: info.genre || meta.genres,
+                cast: info.actors || info.cast || meta.cast,
+                director: info.director || meta.director,
+                plot: info.plot || info.description || meta.plot,
+                backdropUrl: backdrop,
+                posterUrl: normalizeMediaUrl(info.cover_big || info.movie_image, server) || meta.posterUrl,
+                containerExtension: info.container_extension || movieData.container_extension || rawExt,
+                youtubeTrailer: info.youtube_trailer || meta.youtubeTrailer,
+              };
+            } catch {
+              // Mantener metadatos base
+            }
+          }
+
+          if (!isMounted) return;
+
+          const vodObj: XtreamStream = {
+            num: 1,
+            name: meta.title,
+            stream_type: 'movie',
+            stream_id: Number(streamId) || 0,
+            stream_icon: meta.posterUrl || '',
+            rating: meta.rating,
+            container_extension: meta.containerExtension,
+            category_id: '0',
+          };
+
+          setSelectedMovieDetail({
+            item: vodObj,
+            meta,
+            streamUrl,
+          });
+          setDetailBtnIndex(0);
+          setFocusZone('movie_detail');
+        } catch (err) {
+          console.error('[Movie Detail] Error al cargar detalle de película:', err);
+        }
+      };
+
+      loadInitialMovie();
+    }
+
+    return () => { isMounted = false; };
+  }, [initialSelectedItem, server, user, pass, playlist.id, initialType]);
 
   // 1. Cargar las categorías correspondientes (con caché en memoria 0ms)
   useEffect(() => {
@@ -1004,8 +1196,12 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         if (isBack) {
           e.preventDefault();
           e.stopPropagation();
-          setSelectedMovieDetail(null);
-          setFocusZone('grid');
+          if (initialSelectedItem) {
+            onClose();
+          } else {
+            setSelectedMovieDetail(null);
+            setFocusZone('grid');
+          }
           return;
         }
 
@@ -1035,15 +1231,23 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             setSeriesFocusZone('episodes');
             setFocusedEpisodeIndex(0);
           } else if (seriesFocusZone === 'close') {
-            setSelectedSeriesDetails(null);
-            setFocusZone('grid');
+            if (initialSelectedItem) {
+              onClose();
+            } else {
+              setSelectedSeriesDetails(null);
+              setFocusZone('grid');
+            }
           }
           return;
         }
 
         if (isBack) {
-          setSelectedSeriesDetails(null);
-          setFocusZone('grid');
+          if (initialSelectedItem) {
+            onClose();
+          } else {
+            setSelectedSeriesDetails(null);
+            setFocusZone('grid');
+          }
           return;
         }
 
@@ -1726,6 +1930,22 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       {/* ── 3. PANTALLA COMPLETA DE DETALLES DE PELÍCULA (IMAGEN 2) ── */}
       {selectedMovieDetail && (
         <div className="fixed inset-0 z-60 bg-[#070A12] flex flex-col justify-between p-12 overflow-hidden animate-fadeIn">
+          {/* Botón Cerrar / Volver en esquina superior derecha */}
+          <button
+            onClick={() => {
+              if (initialSelectedItem) {
+                onClose();
+              } else {
+                setSelectedMovieDetail(null);
+                setFocusZone('grid');
+              }
+            }}
+            className="absolute top-8 right-8 z-30 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer border border-white/10 shadow-lg"
+            title="Volver"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
           {/* Gran Imagen de Fondo Cinemática */}
           {selectedMovieDetail.meta.backdropUrl && (
             <div className="absolute inset-0 pointer-events-none">
@@ -1875,6 +2095,19 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         </div>
       )}
 
+      {/* ── SPINNER DE CARGA AL ABRIR SERIE DIRECTAMENTE ── */}
+      {loadingSeriesModal && !selectedSeriesDetails && (
+        <div className="fixed inset-0 z-60 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center space-y-4 animate-fadeIn">
+          <RefreshCw className="w-12 h-12 text-cyan-400 animate-spin" />
+          <p className="text-base font-black text-white tracking-wide">
+            Cargando capítulos y temporadas...
+          </p>
+          <p className="text-xs text-zinc-400">
+            Consultando episodios disponibles en tu lista IPTV
+          </p>
+        </div>
+      )}
+
       {/* ── 4. MODAL DE EPISODIOS DE SERIES ── */}
       {selectedSeriesDetails && (
         <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-xl flex flex-col p-10 animate-fadeIn">
@@ -1922,8 +2155,12 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
               <button
                 onClick={() => {
-                  setSelectedSeriesDetails(null);
-                  setFocusZone('grid');
+                  if (initialSelectedItem) {
+                    onClose();
+                  } else {
+                    setSelectedSeriesDetails(null);
+                    setFocusZone('grid');
+                  }
                 }}
                 className={`p-3 rounded-full transition ${
                   focusZone === 'series_modal' && seriesFocusZone === 'close'

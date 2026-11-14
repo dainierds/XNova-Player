@@ -27,7 +27,6 @@ import { CatalogMatcherService } from './services/catalogMatcherService';
 import { ImagePreloadService } from './services/imagePreloadService';
 import { TrailerModal } from './components/player/TrailerModal';
 import { TmdbService } from './services/tmdb';
-import { XtreamService } from './services/xtream';
 import { recordWatchItem } from './store/useContinueWatchingStore';
 import { useFavoritesStore } from './store/useFavoritesStore';
 import { useAdminFeaturedStore } from './store/useAdminFeaturedStore';
@@ -69,6 +68,7 @@ export function App() {
   const [focusedTab, setFocusedTab] = useState<SidebarTabId>('movies');
   const [focusedZone, setFocusedZone] = useState<FocusSection>('sidebar');
   const [heroBtnIndex, setHeroBtnIndex] = useState(0); // 0: Watch now, 1: Favorite, 2: Trailer
+  const [explorerSelectedItem, setExplorerSelectedItem] = useState<any | null>(null);
   
   // Hook de favoritos persistidos en IndexedDB
   const { favorites, isFavorite, toggleFavorite, loadFavorites } = useFavoritesStore();
@@ -354,152 +354,58 @@ export function App() {
     ImagePreloadService.preloadBatch(urls);
   }, [carouselIndex, currentCatalog]);
 
-  // 🎯 Reproducción inteligente con Deep Link / Smart Matching y Fallback a Trailer
+  // 🎯 Navegación inteligente desde la pantalla principal a Detalles de Película o Capítulos de Serie
   const handlePlayShowcaseItem = async (item: ShowcaseItem) => {
-    // 0. Si es una serie de la lista Xtream, resolver el episodio 1 y reproducirlo de inmediato
-    if (item.type === 'series' || item.id.startsWith('series_')) {
-      const seriesId = item.id.replace('series_', '');
-      const server = activePlaylist?.serverUrl || '';
-      const user = activePlaylist?.username || '';
-      const pass = activePlaylist?.password || '';
-
-      if (server && user && pass) {
-        try {
-          const details = await XtreamService.getSeriesInfo(server, user, pass, seriesId);
-          const episodesMap = details?.episodes || {};
-          const seasons = Object.keys(episodesMap).sort((a, b) => Number(a) - Number(b));
-          const firstSeason = seasons[0];
-          const firstEp = firstSeason && episodesMap[firstSeason] ? episodesMap[firstSeason][0] : null;
-
-          if (firstEp) {
-            const epUrl = XtreamService.buildSeriesStreamUrl(
-              server,
-              user,
-              pass,
-              firstEp.id,
-              firstEp.container_extension || 'mp4'
-            );
-            const epTitle = `${item.title} - T${firstSeason}:E${firstEp.episode_num || 1} ${firstEp.title || ''}`;
-
-            recordWatchItem({
-              id: item.id || epTitle,
-              title: epTitle,
-              posterUrl: item.thumbnailUrl || item.backdropUrl,
-              streamUrl: epUrl,
-              type: 'series',
-            });
-
-            if (
-              playWithNativePlayer({
-                streamUrl: epUrl,
-                title: epTitle,
-                posterUrl: item.thumbnailUrl || item.backdropUrl,
-                isLive: false,
-              })
-            ) {
-              return;
-            }
-
-            setPlayingItem({
-              ...item,
-              title: epTitle,
-              streamUrl: epUrl,
-            });
-            return;
-          }
-        } catch (err) {
-          console.warn('Error al obtener info de serie para reproducir:', err);
-        }
-      }
-
-      // Si no pudo resolver el episodio, abrir el catálogo de series directamente
+    // 0. Si es una serie: abrir DIRECTAMENTE la pantalla de selección de capítulos de esa serie
+    if (item.type === 'series' || item.id.startsWith('series_') || activeTab === 'series') {
       setExplorerType('series');
+      setExplorerSelectedItem(item);
       setIsExplorerOpen(true);
       return;
     }
 
-    // 1. Si ya tiene URL de Xtream con usuario activo, reproducir de inmediato con Google Media3 ExoPlayer
-    if (
-      item.streamUrl &&
-      !item.streamUrl.includes('test-streams.mux.dev')
-    ) {
-      recordWatchItem({
-        id: item.id || item.title,
-        title: item.title,
-        posterUrl: item.backdropUrl || item.thumbnailUrl,
-        streamUrl: item.streamUrl,
-        type: 'movie',
-      });
-
-      if (
-        playWithNativePlayer({
-          streamUrl: item.streamUrl,
-          title: item.title,
-          posterUrl: item.backdropUrl,
-          isLive: false,
-        })
-      ) {
-        return;
-      }
-      setPlayingItem(item);
-      return;
-    }
-
-    // 2. Si no tiene URL directa o viene de TMDb, intentar resolverla en la lista Xtream local en 0-5ms
-    if (activePlaylist) {
-      const match = await CatalogMatcherService.resolveMovieStream(activePlaylist, {
-        title: item.title,
-        tmdbId: item.tmdbId,
-        streamUrl: item.streamUrl,
-      });
-
-      if (match.isMatch && match.resolvedUrl) {
+    // 1. Si es TV en Vivo: reproducir canal directamente
+    if (item.type === 'live' || item.id.startsWith('live_') || activeTab === 'live') {
+      const streamUrl = item.streamUrl;
+      if (streamUrl) {
         recordWatchItem({
-          id: item.id || item.title,
-          title: match.matchedItem?.name || item.title,
-          posterUrl: match.matchedItem?.icon || item.backdropUrl,
-          streamUrl: match.resolvedUrl,
-          type: 'movie',
+          id: item.id,
+          title: item.title,
+          posterUrl: item.thumbnailUrl || item.backdropUrl,
+          streamUrl,
+          type: 'live',
         });
-
-        if (
-          playWithNativePlayer({
-            streamUrl: match.resolvedUrl,
-            title: match.matchedItem?.name || item.title,
-            posterUrl: match.matchedItem?.icon || item.backdropUrl,
-            isLive: false,
-          })
-        ) {
+        if (playWithNativePlayer({
+          streamUrl,
+          title: item.title,
+          posterUrl: item.thumbnailUrl || item.backdropUrl,
+          isLive: true,
+        })) {
           return;
         }
         setPlayingItem({
-          ...item,
-          streamUrl: match.resolvedUrl,
+          id: item.id,
+          title: item.title,
+          subtitle: item.subtitle,
+          backdropUrl: item.backdropUrl,
+          thumbnailUrl: item.thumbnailUrl,
+          releaseDateText: 'En Directo',
+          statusBadge: 'ESTRENO',
+          genresText: item.genresText,
+          year: item.year || '2026',
+          rating: item.rating || 'TP',
+          duration: 'DIRECTO',
+          synopsis: item.synopsis || 'Canal de TV en vivo',
+          type: 'movie',
+          streamUrl,
         });
-        return;
       }
-    }
-
-    // 3. Si no existe en la lista del usuario (ej: es un PRÓXIMAMENTE o un estreno no subido aún)
-    if (item.statusBadge === 'PRÓXIMAMENTE' || item.trailerYoutubeKey || !item.streamUrl) {
-      let ytKey = item.trailerYoutubeKey;
-      if (!ytKey && item.tmdbId) {
-        ytKey = (await TmdbService.getMovieTrailer(Number(item.tmdbId))) || undefined;
-      }
-      setTrailerMovie({
-        title: item.title,
-        youtubeKey: ytKey || null,
-        releaseDateText: item.releaseDateText,
-        synopsis: item.synopsis,
-        backdropUrl: item.backdropUrl,
-        posterUrl: item.thumbnailUrl,
-      });
-      setIsTrailerOpen(true);
       return;
     }
 
-    // 4. Fallback al explorador de catálogo
+    // 2. Si es una película: abrir DIRECTAMENTE la pantalla donde está la información de esa película (con botón Reproducir)
     setExplorerType('movies');
+    setExplorerSelectedItem(item);
     setIsExplorerOpen(true);
   };
 
@@ -572,12 +478,15 @@ export function App() {
     if (tab === 'settings') {
       setIsSettingsOpen(true);
     } else if (tab === 'movies') {
+      setExplorerSelectedItem(null);
       setExplorerType('movies');
       setIsExplorerOpen(true);
     } else if (tab === 'series') {
+      setExplorerSelectedItem(null);
       setExplorerType('series');
       setIsExplorerOpen(true);
     } else if (tab === 'live') {
+      setExplorerSelectedItem(null);
       setExplorerType('live');
       setIsExplorerOpen(true);
     } else if (tab === 'favorites') {
@@ -1203,7 +1112,7 @@ export function App() {
       {isExplorerOpen && (
         <div className={playingItem ? 'hidden' : 'block'}>
           <FullCatalogExplorer
-            key={`${explorerType}_${activePlaylist?.id || 'active'}`}
+            key={`${explorerType}_${explorerSelectedItem ? explorerSelectedItem.id : 'all'}_${activePlaylist?.id || 'active'}`}
             playlist={
               activePlaylist ||
               (currentUser?.playlists && currentUser.playlists.length > 0
@@ -1219,10 +1128,12 @@ export function App() {
                   })
             }
             initialType={explorerType}
+            initialSelectedItem={explorerSelectedItem}
             isActive={!playingItem}
             onClose={() => {
               setIsExplorerOpen(false);
-              setFocusedZone('sidebar');
+              setExplorerSelectedItem(null);
+              setFocusedZone('thumbnails');
             }}
             onPlayStream={(stream) => {
               const watchType = stream.isLive ? 'live' : stream.id.startsWith('series_') ? 'series' : 'movie';

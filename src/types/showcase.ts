@@ -12,7 +12,7 @@ export interface ShowcaseItem {
   synopsis: string;
   duration: string;
   streamUrl?: string;
-  type: 'movie' | 'series';
+  type: 'movie' | 'series' | 'live';
   trailerYoutubeKey?: string;
   tmdbId?: number | string;
 }
