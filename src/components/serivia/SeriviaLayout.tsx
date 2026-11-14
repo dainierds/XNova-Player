@@ -549,9 +549,9 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   ]);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#0A0E1A] text-white flex select-none font-sans">
-      {/* 1. BARRA LATERAL IZQUIERDA COMPLETA (Inicio, TV en Vivo, Películas, Series, Favoritos, Ajustes, Cerrar Sesión) */}
-      <aside className="w-56 h-full bg-[#0A0E1A] border-r border-white/5 flex flex-col justify-between py-6 px-4 z-20 shrink-0">
+    <div className="relative w-screen h-screen overflow-hidden bg-black text-white flex select-none font-sans">
+      {/* 1. BARRA LATERAL IZQUIERDA COMPLETA (Inicio, Buscar, TV en Vivo, Películas, Series, Favoritos, Ajustes, Cerrar Sesión) */}
+      <aside className="w-56 h-full bg-[#0a0a0c] border-r border-white/10 flex flex-col justify-between py-6 px-4 z-20 shrink-0">
         <div>
           {/* Logotipo Oficial XNova Player */}
           <div className="flex items-center px-2 mb-6">
@@ -591,9 +591,9 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
                   }}
                   className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                     isFocused
-                      ? 'bg-gradient-to-r from-cyan-500/35 to-blue-600/25 text-white ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/25 scale-[1.04]'
+                      ? 'bg-gradient-to-r from-cyan-500/30 to-zinc-800 text-white ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/20 scale-[1.04]'
                       : isSelected
-                      ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10'
+                      ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/15'
                       : 'text-zinc-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
@@ -606,7 +606,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         </div>
 
         {/* Menú Secundario Inferior: Ajustes y Cerrar Sesión */}
-        <div className="pt-4 border-t border-white/5 space-y-1.5">
+        <div className="pt-4 border-t border-white/10 space-y-1.5">
           {SIDEBAR_ITEMS.slice(6).map((item, relIdx) => {
             const idx = relIdx + 6;
             const Icon = item.icon;
@@ -630,7 +630,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
                   isFocused
                     ? isLogout
                       ? 'bg-rose-500/30 text-rose-200 ring-2 ring-rose-400 shadow-lg shadow-rose-500/30 scale-[1.04]'
-                      : 'bg-gradient-to-r from-cyan-500/35 to-blue-600/25 text-white ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/25 scale-[1.04]'
+                      : 'bg-gradient-to-r from-cyan-500/30 to-zinc-800 text-white ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/20 scale-[1.04]'
                     : isLogout
                     ? 'text-rose-400 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20'
                     : 'text-zinc-400 hover:text-white hover:bg-white/5'
@@ -816,8 +816,8 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
                         : isSelected
                         ? 'bg-white text-black shadow-md scale-105'
                         : isAllCat
-                        ? 'bg-cyan-950/60 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-900/60'
-                        : 'bg-[#131824] text-zinc-400 hover:text-white border border-white/5'
+                        ? 'bg-zinc-900 text-cyan-300 border border-cyan-500/40 hover:bg-zinc-800'
+                        : 'bg-zinc-900 text-zinc-300 hover:text-white hover:bg-zinc-800 border border-white/10'
                     }
                   `}
                 >
@@ -832,13 +832,13 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
           <div className="flex items-center space-x-1 shrink-0">
             <button
               onClick={handlePrevHero}
-              className="w-7 h-7 rounded-lg bg-[#131824] border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition"
+              className="w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={handleNextHero}
-              className="w-7 h-7 rounded-lg bg-[#131824] border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition"
+              className="w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition cursor-pointer"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
