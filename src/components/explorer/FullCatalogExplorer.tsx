@@ -1495,7 +1495,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               )}
               {selectedMovieDetail.meta.year && <span>{selectedMovieDetail.meta.year}</span>}
               {selectedMovieDetail.meta.duration && <span>• {selectedMovieDetail.meta.duration}</span>}
-              {selectedMovieDetail.meta.genres && <span className="text-cyan-400">• {selectedMovieDetail.meta.genres}</span>}
+              {selectedMovieDetail.meta.genres && <span className="text-zinc-300">• {selectedMovieDetail.meta.genres}</span>}
             </div>
 
             {/* Cast */}
@@ -1607,7 +1607,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               <div>
                 <h2 className="text-2xl font-black text-white">{selectedSeriesDetails.series.name}</h2>
                 <div className="flex items-center space-x-4 mt-1.5 text-xs text-zinc-300">
-                  <span className="text-cyan-400">{selectedSeriesDetails.series.genre || 'Serie'}</span>
+                  <span className="text-zinc-300 font-semibold">{selectedSeriesDetails.series.genre || 'Serie'}</span>
                   <span>{selectedSeriesDetails.seasons.length} Temporadas</span>
                 </div>
               </div>

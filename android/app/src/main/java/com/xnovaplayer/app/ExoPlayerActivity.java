@@ -107,7 +107,8 @@ public class ExoPlayerActivity extends AppCompatActivity {
 
         TextView tvSubtitle = playerView.findViewById(R.id.tv_subtitle);
         if (tvSubtitle != null) {
-            tvSubtitle.setText(isLive ? "Transmisión en Vivo • Motor Nativo" : "Película / Serie VOD • Motor Nativo");
+            tvSubtitle.setVisibility(View.GONE);
+            tvSubtitle.setText("");
         }
 
         // Ocultar barra de tiempo si es emisión en directo
