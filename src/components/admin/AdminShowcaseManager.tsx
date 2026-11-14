@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Film, 
   Plus, 
@@ -8,7 +8,8 @@ import {
   Search, 
   Play, 
   X, 
-  Check
+  Check,
+  Server
 } from 'lucide-react';
 import { 
   useAdminFeaturedStore, 
@@ -18,6 +19,9 @@ import { usePlaylistStore } from '../../store/usePlaylistStore';
 import { CatalogCacheService } from '../../services/catalogCacheService';
 import { XtreamService } from '../../services/xtream';
 import { TmdbService } from '../../services/tmdb';
+import { AuthService } from '../../services/authService';
+import { StorageService } from '../../services/storage';
+import type { PlaylistAccount } from '../../types';
 
 interface AdminShowcaseManagerProps {
   onPlayStream?: (stream: {
@@ -41,7 +45,10 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
   } = useAdminFeaturedStore();
 
   const { activePlaylist, playlists } = usePlaylistStore();
-  const effectivePlaylist = activePlaylist || playlists[0] || null;
+
+  // 📡 Listas recopiladas de todo el sistema (clientes y almacenamiento)
+  const [availablePlaylists, setAvailablePlaylists] = useState<PlaylistAccount[]>([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>('');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,7 +63,64 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
 
   useEffect(() => {
     loadFeaturedItems();
-  }, [loadFeaturedItems]);
+
+    const loadAllSystemPlaylists = async () => {
+      const listMap = new Map<string, PlaylistAccount>();
+
+      // 1. Del store activo
+      if (activePlaylist && activePlaylist.serverUrl) {
+        listMap.set(activePlaylist.id, activePlaylist);
+      }
+      playlists.forEach((p) => {
+        if (p.serverUrl) listMap.set(p.id, p);
+      });
+
+      // 2. De los usuarios administrados (Dainier, etc.)
+      try {
+        const allUsers = AuthService.getAllUsers();
+        allUsers.forEach((u) => {
+          (u.playlists || []).forEach((p) => {
+            if (p.serverUrl && p.username) {
+              const displayName = `${p.name} (${u.displayName})`;
+              listMap.set(p.id, { ...p, name: displayName });
+            }
+          });
+        });
+      } catch (e) {
+        console.error('Error cargando listas de usuarios:', e);
+      }
+
+      // 3. De almacenamiento local persistente
+      try {
+        const stored = await StorageService.getPlaylists();
+        stored.forEach((p) => {
+          if (p.serverUrl && !listMap.has(p.id)) {
+            listMap.set(p.id, p);
+          }
+        });
+      } catch (e) {
+        console.error('Error cargando storage playlists:', e);
+      }
+
+      const combined = Array.from(listMap.values());
+      setAvailablePlaylists(combined);
+      if (combined.length > 0) {
+        setSelectedPlaylistId(combined[0].id);
+      }
+    };
+
+    loadAllSystemPlaylists();
+  }, [loadFeaturedItems, activePlaylist, playlists]);
+
+  const effectivePlaylist = useMemo(() => {
+    return (
+      availablePlaylists.find((p) => p.id === selectedPlaylistId) ||
+      activePlaylist ||
+      availablePlaylists[0] ||
+      playlists[0] ||
+      null
+    );
+  }, [availablePlaylists, selectedPlaylistId, activePlaylist, playlists]);
 
   // Mostrar mensaje de éxito temporal
   const showToast = (msg: string) => {
@@ -64,7 +128,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
     setTimeout(() => setSuccessToast(null), 3500);
   };
 
-  // Búsqueda en catálogo de la lista o TMDb
+  // Búsqueda profunda en catálogo IPTV (con fallback en vivo a API) y TMDb
   const handleSearch = async () => {
     const q = searchQuery.trim();
     if (!q) return;
@@ -73,83 +137,165 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
 
     try {
       const results: any[] = [];
+      const lowerQ = q.toLowerCase();
 
+      // 1. Buscar en la lista IPTV seleccionada
       if (effectivePlaylist) {
         const pId = effectivePlaylist.id;
         const server = effectivePlaylist.serverUrl || '';
         const user = effectivePlaylist.username || '';
         const pass = effectivePlaylist.password || '';
 
-        // 1. Buscar en películas cacheadas o servidor
+        // Buscar Películas IPTV
         if (searchFilter === 'all' || searchFilter === 'movies') {
+          let moviesFound: any[] = [];
           const cachedMovies = await CatalogCacheService.get(pId, 'movies', true);
           if (cachedMovies && cachedMovies.length > 0) {
-            const matched = CatalogCacheService.search(cachedMovies, q).slice(0, 15);
-            matched.forEach((m) => {
-              const streamUrl = XtreamService.buildVodStreamUrl(server, user, pass, m.id, m.ext || 'mp4');
-              results.push({
-                id: `movie_${m.id}`,
-                streamId: m.id,
-                title: m.name,
-                type: 'movie' as const,
-                posterUrl: m.icon || '',
-                backdropUrl: m.icon || '',
-                streamUrl,
-                year: m.year || '2026',
-                rating: m.rating || '8.0',
-                genresText: m.cat || 'Película',
-                source: 'IPTV',
-              });
-            });
+            moviesFound = CatalogCacheService.search(cachedMovies, q).slice(0, 20);
+          } else if (server && user && pass) {
+            try {
+              const remoteVod = await XtreamService.getVodStreams(server, user, pass);
+              if (remoteVod && remoteVod.length > 0) {
+                const matched = remoteVod.filter((m: any) =>
+                  m.name && m.name.toLowerCase().includes(lowerQ)
+                ).slice(0, 20);
+                moviesFound = matched.map((m: any) => ({
+                  id: m.stream_id,
+                  name: m.name,
+                  icon: m.stream_icon,
+                  year: m.year,
+                  rating: m.rating,
+                  cat: 'Película',
+                  ext: m.container_extension || 'mp4',
+                }));
+              }
+            } catch (err) {
+              console.warn('Error consultando VOD Xtream directamente:', err);
+            }
           }
+
+          moviesFound.forEach((m) => {
+            const streamUrl = XtreamService.buildVodStreamUrl(server, user, pass, m.id, m.ext || 'mp4');
+            results.push({
+              id: `movie_${m.id}`,
+              streamId: m.id,
+              title: m.name,
+              type: 'movie' as const,
+              posterUrl: m.icon || '',
+              backdropUrl: m.icon || '',
+              streamUrl,
+              year: m.year || '2026',
+              rating: m.rating || '8.0',
+              genresText: m.cat || 'Película',
+              source: `IPTV (${effectivePlaylist.name.split(' (')[0]})`,
+            });
+          });
         }
 
-        // 2. Buscar en series cacheadas o servidor
+        // Buscar Series IPTV
         if (searchFilter === 'all' || searchFilter === 'series') {
+          let seriesFound: any[] = [];
           const cachedSeries = await CatalogCacheService.get(pId, 'series', true);
           if (cachedSeries && cachedSeries.length > 0) {
-            const matched = CatalogCacheService.search(cachedSeries, q).slice(0, 15);
-            matched.forEach((s) => {
-              results.push({
-                id: `series_${s.id}`,
-                streamId: s.id,
-                title: s.name,
-                type: 'series' as const,
-                posterUrl: s.icon || '',
-                backdropUrl: s.icon || '',
-                year: s.year || '2026',
-                rating: s.rating || '8.5',
-                genresText: s.cat || 'Serie TV',
-                source: 'IPTV',
-              });
-            });
+            seriesFound = CatalogCacheService.search(cachedSeries, q).slice(0, 20);
+          } else if (server && user && pass) {
+            try {
+              const remoteSeries = await XtreamService.getSeries(server, user, pass);
+              if (remoteSeries && remoteSeries.length > 0) {
+                const matched = remoteSeries.filter((s: any) =>
+                  s.name && s.name.toLowerCase().includes(lowerQ)
+                ).slice(0, 20);
+                seriesFound = matched.map((s: any) => ({
+                  id: s.series_id,
+                  name: s.name,
+                  icon: s.cover,
+                  year: s.year,
+                  rating: s.rating,
+                  cat: 'Serie',
+                }));
+              }
+            } catch (err) {
+              console.warn('Error consultando Series Xtream directamente:', err);
+            }
           }
+
+          seriesFound.forEach((s) => {
+            results.push({
+              id: `series_${s.id}`,
+              streamId: s.id,
+              title: s.name,
+              type: 'series' as const,
+              posterUrl: s.icon || '',
+              backdropUrl: s.icon || '',
+              year: s.year || '2026',
+              rating: s.rating || '8.5',
+              genresText: s.cat || 'Serie TV',
+              source: `IPTV (${effectivePlaylist.name.split(' (')[0]})`,
+            });
+          });
         }
       }
 
-      // 3. Si se encontraron pocos resultados o se busca estrenos mundiales, complementar con TMDb
-      if (results.length < 5) {
-        try {
-          const enriched = await TmdbService.enrichMovie(q);
-          if (enriched && enriched.title) {
-            if (!results.some((r) => r.title.toLowerCase() === enriched.title.toLowerCase())) {
-              results.push({
-                id: `tmdb_${enriched.id || Date.now()}`,
-                streamId: enriched.id,
-                title: enriched.title,
-                type: 'movie' as const,
-                posterUrl: enriched.posterUrl || '',
-                backdropUrl: enriched.backdropUrl || '',
-                year: enriched.year || '2026',
-                rating: enriched.rating || '8.0 ★',
-                synopsis: enriched.synopsis || '',
-                source: 'TMDb Oficial',
-              });
-            }
+      // 2. Búsqueda en Cartelera Mundial / TMDb (Para títulos cinematográficos, próximos estrenos y tráilers)
+      try {
+        const tmdbApiKey = '844dba0bfd8f3a4f3799f6130ef9e335';
+        if (searchFilter === 'all' || searchFilter === 'movies') {
+          const tmdbUrl = `https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(q)}&language=es-ES&page=1&include_adult=false`;
+          const tmdbRes = await fetch(tmdbUrl);
+          if (tmdbRes.ok) {
+            const tmdbData = await tmdbRes.json();
+            const tmdbList = (tmdbData.results || []).slice(0, 10);
+            tmdbList.forEach((t: any) => {
+              if (!results.some((r) => r.title.toLowerCase() === (t.title || '').toLowerCase())) {
+                const year = t.release_date ? t.release_date.split('-')[0] : '2026';
+                const poster = t.poster_path ? `https://image.tmdb.org/t/p/w500${t.poster_path}` : '';
+                const backdrop = t.backdrop_path ? `https://image.tmdb.org/t/p/original${t.backdrop_path}` : poster;
+                results.push({
+                  id: `tmdb_m_${t.id}`,
+                  streamId: t.id,
+                  title: t.title,
+                  type: 'movie' as const,
+                  posterUrl: poster,
+                  backdropUrl: backdrop,
+                  year,
+                  rating: t.vote_average ? `${t.vote_average.toFixed(1)} ★` : '8.0 ★',
+                  synopsis: t.overview || '',
+                  source: 'Cartelera / TMDb',
+                });
+              }
+            });
           }
-        } catch {
-          // Fallback silencioso si no hay red a TMDb
         }
+
+        if (searchFilter === 'all' || searchFilter === 'series') {
+          const tmdbTvUrl = `https://api.themoviedb.org/3/search/tv?api_key=${tmdbApiKey}&query=${encodeURIComponent(q)}&language=es-ES&page=1&include_adult=false`;
+          const tmdbTvRes = await fetch(tmdbTvUrl);
+          if (tmdbTvRes.ok) {
+            const tmdbTvData = await tmdbTvRes.json();
+            const tmdbTvList = (tmdbTvData.results || []).slice(0, 10);
+            tmdbTvList.forEach((t: any) => {
+              if (!results.some((r) => r.title.toLowerCase() === (t.name || '').toLowerCase())) {
+                const year = t.first_air_date ? t.first_air_date.split('-')[0] : '2026';
+                const poster = t.poster_path ? `https://image.tmdb.org/t/p/w500${t.poster_path}` : '';
+                const backdrop = t.backdrop_path ? `https://image.tmdb.org/t/p/original${t.backdrop_path}` : poster;
+                results.push({
+                  id: `tmdb_s_${t.id}`,
+                  streamId: t.id,
+                  title: t.name,
+                  type: 'series' as const,
+                  posterUrl: poster,
+                  backdropUrl: backdrop,
+                  year,
+                  rating: t.vote_average ? `${t.vote_average.toFixed(1)} ★` : '8.0 ★',
+                  synopsis: t.overview || '',
+                  source: 'Cartelera / TMDb',
+                });
+              }
+            });
+          }
+        }
+      } catch (tmdbErr) {
+        console.warn('Error buscando en TMDb:', tmdbErr);
       }
 
       setSearchResults(results);
@@ -447,8 +593,30 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
               </button>
             </div>
 
+            {/* Selector de Lista IPTV y Fuente */}
+            <div className="mt-4 flex items-center space-x-2.5 bg-white/5 border border-white/10 px-3.5 py-2.5 rounded-2xl text-xs shrink-0">
+              <Server className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span className="text-zinc-400 font-semibold shrink-0">Lista IPTV de búsqueda:</span>
+              <select
+                value={effectivePlaylist?.id || ''}
+                onChange={(e) => setSelectedPlaylistId(e.target.value)}
+                className="bg-transparent text-cyan-300 font-bold focus:outline-none cursor-pointer flex-1 text-xs truncate"
+              >
+                {availablePlaylists.map((pl) => (
+                  <option key={pl.id} value={pl.id} className="bg-[#0E1526] text-white">
+                    📡 {pl.name} {pl.serverUrl ? `• ${pl.serverUrl}` : ''}
+                  </option>
+                ))}
+                {availablePlaylists.length === 0 && (
+                  <option value="" className="bg-[#0E1526] text-zinc-400">
+                    Búsqueda Global en Cartelera / TMDb (Sin listas IPTV registradas)
+                  </option>
+                )}
+              </select>
+            </div>
+
             {/* Buscador */}
-            <div className="my-4 space-y-3 shrink-0">
+            <div className="my-3 space-y-3 shrink-0">
               <div className="flex items-center space-x-2">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
