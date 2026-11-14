@@ -50,14 +50,14 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
   const [availablePlaylists, setAvailablePlaylists] = useState<PlaylistAccount[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>('');
 
-  // 🎬 / 📺 Pestaña activa: Películas de Portada (hasta 5) o Series de Portada (hasta 5)
+  // 🎬 / 📺 Pestaña activa: Películas de Portada (hasta 6) o Series de Portada (hasta 6)
   const [activeSectionTab, setActiveSectionTab] = useState<'movies' | 'series'>('movies');
 
   const movieItems = useMemo(() => featuredItems.filter((i) => i.type === 'movie'), [featuredItems]);
   const seriesItems = useMemo(() => featuredItems.filter((i) => i.type === 'series'), [featuredItems]);
   const currentItems = activeSectionTab === 'movies' ? movieItems : seriesItems;
   const currentCount = currentItems.length;
-  const isLimitReached = currentCount >= 5;
+  const isLimitReached = currentCount >= 6;
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -323,8 +323,8 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
     const existingTargetCount = targetType === 'series' ? seriesItems.length : movieItems.length;
 
     const isAlreadyAdded = featuredItems.some((f) => f.id === selectedItem.id);
-    if (!isAlreadyAdded && existingTargetCount >= 5) {
-      showToast(`Ya tienes 5 ${targetType === 'series' ? 'series' : 'películas'} fijadas. Elimina una antes de añadir otra.`);
+    if (!isAlreadyAdded && existingTargetCount >= 6) {
+      showToast(`Ya tienes 6 ${targetType === 'series' ? 'series' : 'películas'} fijadas. Elimina una antes de añadir otra.`);
       return;
     }
 
@@ -398,7 +398,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
 
   const handleOpenAddModal = () => {
     if (isLimitReached) {
-      showToast(`Ya has alcanzado el límite de 5 ${activeSectionTab === 'movies' ? 'películas' : 'series'} de portada.`);
+      showToast(`Ya has alcanzado el límite de 6 ${activeSectionTab === 'movies' ? 'películas' : 'series'} de portada.`);
       return;
     }
     setSearchFilter(activeSectionTab === 'movies' ? 'movies' : 'series');
@@ -416,7 +416,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
         </div>
       )}
 
-      {/* Pestañas de Navegación: Películas vs Series (Hasta 5 cada una) */}
+      {/* Pestañas de Navegación: Películas vs Series (Hasta 6 cada una) */}
       <div className="flex items-center space-x-3 mb-4 shrink-0 bg-[#0A0E1A]/80 p-1.5 rounded-2xl border border-white/10 w-fit">
         <button
           onClick={() => setActiveSectionTab('movies')}
@@ -431,7 +431,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
             activeSectionTab === 'movies' ? 'bg-black/25 text-black' : 'bg-cyan-500/20 text-cyan-300'
           }`}>
-            {movieItems.length} / 5
+            {movieItems.length} / 6
           </span>
         </button>
 
@@ -448,7 +448,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
             activeSectionTab === 'series' ? 'bg-black/30 text-white' : 'bg-purple-500/20 text-purple-300'
           }`}>
-            {seriesItems.length} / 5
+            {seriesItems.length} / 6
           </span>
         </button>
       </div>
@@ -458,7 +458,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
         <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs px-4 py-2.5 rounded-xl flex items-center space-x-2 shrink-0">
           <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>
-            ✓ Has completado el cupo de 5 {activeSectionTab === 'movies' ? 'películas' : 'series'} de portada. Se mostrarán en primer lugar en la pantalla principal.
+            ✓ Has completado el cupo de 6 {activeSectionTab === 'movies' ? 'películas' : 'series'} de portada. Se mostrarán en primer lugar en la pantalla principal.
           </span>
         </div>
       ) : (
@@ -466,10 +466,10 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           <div className="flex items-center space-x-2">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
             <span>
-              Tienes <strong className="text-white">{currentCount} de 5</strong> {activeSectionTab === 'movies' ? 'películas' : 'series'} fijadas. Puedes añadir {5 - currentCount} más.
+              Tienes <strong className="text-white">{currentCount} de 6</strong> {activeSectionTab === 'movies' ? 'películas' : 'series'} fijadas. Puedes añadir {6 - currentCount} más.
             </span>
           </div>
-          <span className="text-[11px] text-zinc-400">Total global fijado: {featuredItems.length}/10</span>
+          <span className="text-[11px] text-zinc-400">Total global fijado: {featuredItems.length}/12</span>
         </div>
       )}
 
@@ -485,7 +485,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
                 ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
                 : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
             }`}>
-              {currentCount} / 5 títulos
+              {currentCount} / 6 títulos
             </span>
           </h2>
           <p className="text-xs text-zinc-400 mt-0.5">
@@ -526,7 +526,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           >
             <Plus className="w-4 h-4" />
             <span>
-              AÑADIR {activeSectionTab === 'movies' ? 'PELÍCULA' : 'SERIE'} ({currentCount}/5)
+              AÑADIR {activeSectionTab === 'movies' ? 'PELÍCULA' : 'SERIE'} ({currentCount}/6)
             </span>
           </button>
         </div>

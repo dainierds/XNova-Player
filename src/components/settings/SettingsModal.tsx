@@ -198,6 +198,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     // 8. Switch Splash
     items.push({ id: 'toggle_splash', onSelect: handleToggleSplash });
 
+    // 9. Botón Vaciar Caché
+    items.push({ id: 'clear_cache', onSelect: handleClearCache });
+
     return items;
   }, [
     isEditing,
@@ -215,6 +218,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     syncCurrentPlaylist,
     handleSelectTheme,
     handleToggleSplash,
+    handleClearCache,
   ]);
 
   // Auto-scroll del elemento enfocado
@@ -223,7 +227,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const cur = focusItems[focusedIndex];
     if (cur && itemRefs.current[cur.id]) {
       itemRefs.current[cur.id]?.scrollIntoView({
-        block: 'nearest',
+        block: 'center',
         behavior: 'smooth',
       });
     }
@@ -321,14 +325,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-8 animate-fadeIn">
-      <div className="bg-[#0f1319] border border-zinc-700/80 rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 md:p-6 animate-fadeIn">
+      <div className="bg-[#0f1319] border border-zinc-700/80 rounded-2xl w-full max-w-4xl h-[92vh] max-h-[94vh] flex flex-col overflow-hidden shadow-2xl">
         {/* Cabecera de Ajustes */}
-        <div className="px-8 py-5 border-b border-zinc-800 flex items-center justify-between">
+        <div className="px-6 md:px-8 py-3.5 md:py-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-3">
-            <Server className="w-7 h-7 text-cyan-400" />
+            <Server className="w-6 h-6 md:w-7 md:h-7 text-cyan-400 shrink-0" />
             <div>
-              <h2 className="text-xl font-bold text-white tracking-wide">
+              <h2 className="text-lg md:text-xl font-bold text-white tracking-wide">
                 Ajustes & Gestión de Listas IPTV
               </h2>
               <p className="text-xs text-zinc-400">
@@ -349,7 +353,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Mensaje de error si ocurre */}
         {errorMessage && (
-          <div className="mx-8 mt-4 p-3 bg-red-950/60 border border-red-500/50 rounded-lg flex items-center space-x-3 text-red-200 text-xs">
+          <div className="mx-6 md:mx-8 mt-3 p-3 bg-red-950/60 border border-red-500/50 rounded-lg flex items-center space-x-3 text-red-200 text-xs shrink-0">
             <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
             <span className="flex-1">{errorMessage}</span>
             <button onClick={clearError} className="underline text-zinc-400 hover:text-white">
@@ -359,7 +363,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         )}
 
         {/* Contenido principal: Lista de cuentas o Formulario de edición */}
-        <div className="flex-1 overflow-y-auto px-8 py-6">
+        <div className="flex-1 overflow-y-auto px-6 md:px-8 pt-4 pb-28">
           {/* 1. Acceso a Panel de Administración (ESTRICTAMENTE SOLO SI ES ADMINISTRADOR, NUNCA PARA CLIENTES) */}
           {isAdmin && onOpenAdminPanel && (
             <div className="p-4 rounded-xl bg-purple-950/40 border border-purple-500/40 mb-6 flex items-center justify-between">
@@ -685,7 +689,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <button
                     ref={(el) => { itemRefs.current['toggle_splash'] = el; }}
                     onClick={handleToggleSplash}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
                       showSplash ? 'bg-cyan-500' : 'bg-zinc-700'
                     } ${getFocusClass('toggle_splash')}`}
                   >
@@ -719,9 +723,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   <button
+                    ref={(el) => { itemRefs.current['clear_cache'] = el; }}
                     onClick={handleClearCache}
                     disabled={isClearingCache || (cacheStats.movies === 0 && cacheStats.series === 0 && cacheStats.live === 0)}
-                    className="px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-xs font-bold text-zinc-300 hover:text-white border border-zinc-700 transition flex items-center space-x-2 shrink-0 cursor-pointer"
+                    className={`px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-xs font-bold text-zinc-300 hover:text-white border border-zinc-700 transition flex items-center space-x-2 shrink-0 cursor-pointer ${getFocusClass('clear_cache')}`}
                   >
                     <Trash2 className="w-3.5 h-3.5 text-rose-400" />
                     <span>{isClearingCache ? 'Limpiando...' : 'Vaciar Caché'}</span>
@@ -730,7 +735,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Sección Acerca de XNova Player */}
-              <div className="pt-6 border-t border-zinc-800/80">
+              <div className="pt-6 border-t border-zinc-800/80 mb-6">
                 <div className="p-5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <img

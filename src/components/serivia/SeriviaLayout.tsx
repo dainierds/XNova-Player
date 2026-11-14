@@ -110,7 +110,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   const genreRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const catalogRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // 🌟 Fuente de datos garantizando exactamente 5 elementos en el carrusel superior
+  // 🌟 Fuente de datos garantizando exactamente 6 elementos en el carrusel superior
   const heroList = useMemo(() => {
     const adminMovies = adminFeaturedItems.filter((i) => i.type === 'movie');
     const adminSeries = adminFeaturedItems.filter((i) => i.type === 'series');
@@ -120,7 +120,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
     if (sectionType === 'movies') {
       // 1. Añadir ítems configurados por el Administrador
       if (adminMovies.length > 0) {
-        pool.push(...adminMovies.slice(0, 5).map((m) => ({
+        pool.push(...adminMovies.slice(0, 6).map((m) => ({
           id: m.id,
           title: m.title,
           streamUrl: m.streamUrl,
@@ -138,19 +138,19 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         })));
       }
 
-      // 2. Si faltan para llegar a 5, completar con la lista Xtream del usuario
-      if (pool.length < 5 && homeFeed?.featuredMovies && homeFeed.featuredMovies.length > 0) {
+      // 2. Si faltan para llegar a 6, completar con la lista Xtream del usuario
+      if (pool.length < 6 && homeFeed?.featuredMovies && homeFeed.featuredMovies.length > 0) {
         for (const item of homeFeed.featuredMovies) {
-          if (pool.length >= 5) break;
+          if (pool.length >= 6) break;
           if (!pool.some((p) => String(p.id) === String(item.id) || p.title === item.title)) {
             pool.push(item);
           }
         }
       }
 
-      if (pool.length < 5 && homeFeed?.recientes && homeFeed.recientes.length > 0) {
+      if (pool.length < 6 && homeFeed?.recientes && homeFeed.recientes.length > 0) {
         for (const item of homeFeed.recientes) {
-          if (pool.length >= 5) break;
+          if (pool.length >= 6) break;
           if (!pool.some((p) => String(p.id) === String(item.id) || p.title === item.title)) {
             pool.push(item);
           }
@@ -158,9 +158,9 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
       }
 
       // 3. Si aún faltan, completar con las películas destacadas predeterminadas
-      if (pool.length < 5) {
+      if (pool.length < 6) {
         for (const item of SERIVIA_HERO_MOVIES) {
-          if (pool.length >= 5) break;
+          if (pool.length >= 6) break;
           if (!pool.some((p) => String(p.id) === String(item.id) || p.title === item.title)) {
             pool.push(item);
           }
@@ -169,7 +169,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
     } else {
       // Series
       if (adminSeries.length > 0) {
-        pool.push(...adminSeries.slice(0, 5).map((s) => ({
+        pool.push(...adminSeries.slice(0, 6).map((s) => ({
           id: s.id,
           title: s.title,
           streamUrl: s.streamUrl,
@@ -187,18 +187,18 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         })));
       }
 
-      if (pool.length < 5 && homeFeed?.featuredSeries && homeFeed.featuredSeries.length > 0) {
+      if (pool.length < 6 && homeFeed?.featuredSeries && homeFeed.featuredSeries.length > 0) {
         for (const item of homeFeed.featuredSeries) {
-          if (pool.length >= 5) break;
+          if (pool.length >= 6) break;
           if (!pool.some((p) => String(p.id) === String(item.id) || p.title === item.title)) {
             pool.push(item);
           }
         }
       }
 
-      if (pool.length < 5) {
+      if (pool.length < 6) {
         for (const item of SERIVIA_HERO_SERIES) {
-          if (pool.length >= 5) break;
+          if (pool.length >= 6) break;
           if (!pool.some((p) => String(p.id) === String(item.id) || p.title === item.title)) {
             pool.push(item);
           }
@@ -206,7 +206,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
       }
     }
 
-    return pool.slice(0, 5);
+    return pool.slice(0, 6);
   }, [sectionType, homeFeed, adminFeaturedItems]);
 
   const rawCatalogList = useMemo(() => {
@@ -739,9 +739,9 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
                 </span>
               </div>
 
-              {/* Puntos Indicadores del Carrusel (hasta 5) */}
+              {/* Puntos Indicadores del Carrusel (hasta 6) */}
               <div className="flex items-center space-x-1.5 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
-                {heroList.slice(0, 5).map((_, idx) => (
+                {heroList.slice(0, 6).map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => setHeroIndex(idx)}
