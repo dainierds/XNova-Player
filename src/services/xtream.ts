@@ -281,9 +281,11 @@ export class XtreamService {
     serverUrl: string,
     username: string,
     password: string,
-    streamId: number | string
+    streamId: number | string,
+    containerExtension: string = 'ts'
   ): string {
     const base = this.normalizeUrl(serverUrl);
-    return `${base}/live/${username}/${password}/${streamId}.m3u8`;
+    const cleanExt = (containerExtension || 'ts').toString().replace(/^\.+/, '').trim() || 'ts';
+    return `${base}/live/${username}/${password}/${streamId}.${cleanExt}`;
   }
 }

@@ -21,6 +21,8 @@ import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
+import androidx.media3.extractor.DefaultExtractorsFactory;
+import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory;
 import androidx.media3.ui.PlayerView;
 
 @OptIn(markerClass = UnstableApi.class)
@@ -136,7 +138,15 @@ public class ExoPlayerActivity extends AppCompatActivity {
                     .setReadTimeoutMs(15000)
                     .setAllowCrossProtocolRedirects(true);
 
-            DefaultMediaSourceFactory mediaSourceFactory = new DefaultMediaSourceFactory(httpDataSourceFactory);
+            // Factoría de extractores con soporte robusto para flujos MPEG-TS de TV en Vivo (exactamente igual a TiviMate)
+            DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory()
+                    .setConstantBitrateSeekingEnabled(true)
+                    .setTsExtractorFlags(
+                            DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES |
+                            DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS
+                    );
+
+            DefaultMediaSourceFactory mediaSourceFactory = new DefaultMediaSourceFactory(httpDataSourceFactory, extractorsFactory);
 
             player = new ExoPlayer.Builder(this, renderersFactory)
                     .setMediaSourceFactory(mediaSourceFactory)
@@ -166,14 +176,23 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 public void onPlayerError(PlaybackException error) {
                     loadingSpinner.setVisibility(View.GONE);
 
-                    // 1. Fallback automático de extensión para Series y VOD (.mp4 <-> .mkv)
-                    // Si el servidor IPTV responde con 404/recurso no encontrado porque el archivo real es .mkv y no .mp4 (o viceversa),
+                    // 1. Fallback automático de extensión para Canales en Vivo (.ts <-> .m3u8) y Series/VOD (.mp4 <-> .mkv)
+                    // Si el servidor IPTV responde con 404/recurso no encontrado porque el canal requiere .ts y no .m3u8 (o viceversa),
                     // reintentar silenciosamente con la otra extensión exactamente como hace TiviMate
                     if ((error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
-                         error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND) &&
+                         error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
+                         error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) &&
                         !hasTriedExtensionFallback && streamUrl != null && !streamUrl.isEmpty()) {
                         hasTriedExtensionFallback = true;
-                        if (streamUrl.endsWith(".mp4")) {
+                        if (streamUrl.endsWith(".m3u8")) {
+                            streamUrl = streamUrl.substring(0, streamUrl.length() - 5) + ".ts";
+                            initPlayer();
+                            return;
+                        } else if (streamUrl.endsWith(".ts")) {
+                            streamUrl = streamUrl.substring(0, streamUrl.length() - 3) + ".m3u8";
+                            initPlayer();
+                            return;
+                        } else if (streamUrl.endsWith(".mp4")) {
                             streamUrl = streamUrl.substring(0, streamUrl.length() - 4) + ".mkv";
                             initPlayer();
                             return;

@@ -51,7 +51,7 @@ export function App() {
   // Estados de navegación y foco
   const [activeTab, setActiveTab] = useState<SidebarTabId>('movies');
   const [focusedTab, setFocusedTab] = useState<SidebarTabId>('movies');
-  const [focusedZone, setFocusedZone] = useState<FocusSection>('thumbnails');
+  const [focusedZone, setFocusedZone] = useState<FocusSection>('sidebar');
   const [heroBtnIndex, setHeroBtnIndex] = useState(0); // 0: Watch now, 1: Trailer
   
   // Catálogo activo según pestaña (Películas o Series)
@@ -119,9 +119,9 @@ export function App() {
     setCarouselIndex(0);
   }, [activeTab]);
 
-  // Rotación automática del carrusel cuando no hay interacción activa
+  // Rotación automática del carrusel cuando no hay interacción activa y el usuario está explorando los thumbnails
   useEffect(() => {
-    if (isSplashVisible || isSettingsOpen || isSearchOpen || playingItem) return;
+    if (isSplashVisible || isSettingsOpen || isSearchOpen || playingItem || focusedZone === 'sidebar') return;
 
     const startTimer = () => {
       autoPlayTimerRef.current = window.setTimeout(() => {
@@ -136,7 +136,7 @@ export function App() {
     return () => {
       if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
     };
-  }, [currentCatalog.length, isSplashVisible, isSettingsOpen, isSearchOpen, playingItem]);
+  }, [currentCatalog.length, isSplashVisible, isSettingsOpen, isSearchOpen, playingItem, focusedZone]);
 
   const activeItem = currentCatalog[carouselIndex] || currentCatalog[0];
 
@@ -395,8 +395,7 @@ export function App() {
         onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
         onClose={() => {
           setIsSettingsOpen(false);
-          setActiveTab('movies');
-          setFocusedZone('thumbnails');
+          setFocusedZone('sidebar');
         }}
       />
 
@@ -427,7 +426,7 @@ export function App() {
         channels={liveStreams}
         onClose={() => {
           setIsSearchOpen(false);
-          setFocusedZone('thumbnails');
+          setFocusedZone('sidebar');
         }}
         onSelectMovie={(m: MovieItem) => {
           setPlayingItem({
@@ -488,9 +487,9 @@ export function App() {
           contentId={playingItem.id}
           isLive={playingItem.duration === 'DIRECTO'}
           onClose={() => {
-            // Al salir del reproductor, cerrar video y regresar inmediatamente
-            // a la misma sección y carpeta donde estaba el usuario
+            // Al salir del reproductor, cerrar video y regresar con el foco seguro en la barra lateral
             setPlayingItem(null);
+            setFocusedZone('sidebar');
           }}
         />
       )}
@@ -531,8 +530,7 @@ export function App() {
             isActive={!playingItem}
             onClose={() => {
               setIsExplorerOpen(false);
-              setActiveTab('movies');
-              setFocusedZone('thumbnails');
+              setFocusedZone('sidebar');
             }}
             onPlayStream={(stream) => {
               // 🚀 1. Intentar reproducir con Google Media3 ExoPlayer nativo (el mismo motor de TiviMate)

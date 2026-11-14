@@ -536,10 +536,15 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       setDetailBtnIndex(0);
       setFocusZone('movie_detail');
     } else if (contentType === 'live') {
-      // Para canales de TV, reproducir directo
+      // Para canales de TV, reproducir directo con soporte de extensión (.ts nativo o .m3u8)
       const live = item as XtreamStream;
-      const streamId = live.stream_id || (live as any).id;
-      const streamUrl = XtreamService.buildLiveStreamUrl(server, user, pass, streamId);
+      const streamId = (live as any).stream_id ?? (live as any).id;
+      const rawExt = (live as any).container_extension || (live as any).extension || (live as any).ext || 'ts';
+      const cleanExt = String(rawExt).replace(/^\.+/, '').trim() || 'ts';
+      const streamUrl = (live as any).direct_source && String((live as any).direct_source).startsWith('http')
+        ? (live as any).direct_source
+        : XtreamService.buildLiveStreamUrl(server, user, pass, streamId, cleanExt);
+
       onPlayStream({
         id: `live_${streamId}`,
         title: live.name || 'Canal de TV',
