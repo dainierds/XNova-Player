@@ -325,6 +325,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   const catItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const gridItemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const episodeItemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const gridScrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Número fijo de columnas para cálculo matemático 1:1 en control remoto
   const numCols = contentType === 'live' ? 4 : 5;
@@ -540,10 +541,13 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     });
   }, [searchQuery, allSectionStreams, streams]);
 
-  // Al cambiar la búsqueda, restablecer el foco a la primera tarjeta
+  // Al cambiar la búsqueda o categoría, restablecer el foco y scroll al inicio
   useEffect(() => {
     setFocusedGridIndex(0);
-  }, [searchQuery]);
+    if (gridScrollContainerRef.current) {
+      gridScrollContainerRef.current.scrollTop = 0;
+    }
+  }, [searchQuery, selectedCategoryId]);
 
   // Auto-scroll del elemento enfocado en categorías
   useEffect(() => {
@@ -558,12 +562,21 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   // Auto-scroll del elemento enfocado en la cuadrícula
   useEffect(() => {
     if (focusZone === 'grid') {
-      gridItemRefs.current[focusedGridIndex]?.scrollIntoView({
-        block: 'nearest',
-        behavior: 'smooth',
-      });
+      const cols = contentType === 'live' ? 4 : 5;
+      if (focusedGridIndex < cols) {
+        // En la primera fila, garantizar que el contenedor esté en la cima absoluta (top: 0)
+        // para que las portadas se vean 100% completas con sus esquinas redondeadas y anillo de foco intactos
+        if (gridScrollContainerRef.current) {
+          gridScrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      } else {
+        gridItemRefs.current[focusedGridIndex]?.scrollIntoView({
+          block: 'nearest',
+          behavior: 'smooth',
+        });
+      }
     }
-  }, [focusedGridIndex, focusZone]);
+  }, [focusedGridIndex, focusZone, contentType]);
 
   // Auto-scroll del episodio enfocado en modal de series
   useEffect(() => {
@@ -1343,7 +1356,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       {/* ── PANEL PRINCIPAL DERECHO: HERO INFO (ARRIBA) + CARROUSEL DE PELÍCULAS (ABAJO) ── */}
       <main className="flex-1 flex flex-col overflow-hidden bg-[#070A12] relative">
         {/* 🎬 1. SECCIÓN SUPERIOR: HERO INFO CINEMÁTICO (IMAGEN 1) */}
-        <div className="relative h-72 w-full border-b border-white/10 shrink-0 overflow-hidden bg-gradient-to-r from-[#070A12] via-[#070A12]/90 to-transparent flex items-center">
+        <div className="relative h-64 md:h-70 w-full border-b border-white/10 shrink-0 overflow-hidden bg-gradient-to-r from-[#070A12] via-[#070A12]/90 to-transparent flex items-center">
           {/* Imagen de fondo desenfocada/fundida a la derecha */}
           {focusedMetadata?.backdropUrl && (
             <div className="absolute right-0 top-0 bottom-0 w-3/5 overflow-hidden pointer-events-none">
@@ -1362,8 +1375,8 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           )}
 
           {/* Información textual de la película enfocada */}
-          <div className="relative z-10 max-w-2xl px-10 py-6 flex flex-col justify-center">
-            <h1 className="text-3xl font-black text-white tracking-wide line-clamp-1 drop-shadow-md">
+          <div className="relative z-10 max-w-2xl px-10 py-5 flex flex-col justify-center">
+            <h1 className="text-2xl md:text-3xl font-black text-white tracking-wide line-clamp-1 drop-shadow-md">
               {focusedMetadata?.title || 'Selecciona un contenido'}
             </h1>
 
@@ -1383,7 +1396,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
             {/* Reparto (Cast) */}
             {focusedMetadata?.cast && (
-              <p className="text-xs text-zinc-300 mt-2.5 line-clamp-1">
+              <p className="text-xs text-zinc-300 mt-2 line-clamp-1">
                 <span className="text-zinc-500 font-bold mr-1.5">Cast:</span>
                 {focusedMetadata.cast}
               </p>
@@ -1398,48 +1411,52 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             )}
 
             {/* Sinopsis Oficial */}
-            <p className="text-xs text-zinc-400 mt-2.5 line-clamp-3 leading-relaxed max-w-xl">
+            <p className="text-xs text-zinc-400 mt-2 line-clamp-2 md:line-clamp-3 leading-relaxed max-w-xl">
               {focusedMetadata?.plot || 'Explora los títulos con las flechas del control remoto para ver su sinopsis completa.'}
             </p>
           </div>
         </div>
 
-        {/* 🎞️ 2. SECCIÓN INFERIOR: CARRUSEL DE TARJETAS (IMAGEN 1) */}
-        <div className="flex-1 overflow-y-auto px-10 py-4 flex flex-col scroll-smooth">
-          {/* Título de la Categoría Activa o Búsqueda */}
-          <div className="flex items-center justify-between mb-4">
+        {/* 🎞️ BARRA FIJA SUPERIOR DE CARPETA Y CONTADOR (NUNCA SE CORTA NI SE DESPLAZA) */}
+        <div className="px-10 py-2.5 shrink-0 flex items-center justify-between border-b border-white/5 bg-[#070A12]/95 backdrop-blur-md z-10">
+          <div className="flex items-center space-x-3">
             <h2 className="text-sm font-black uppercase text-white flex items-center space-x-2">
-              {searchQuery.trim() ? (
-                <>
-                  <span className="text-cyan-400">Resultados para &quot;{searchQuery}&quot;</span>
-                  <span className="text-xs text-zinc-500 font-normal">
-                    ({displayedStreams.length} {contentType === 'live' ? 'canales' : contentType === 'series' ? 'series' : 'películas'})
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-cyan-400">{activeCategory?.category_name || 'Contenido'}</span>
-                  <span className="text-xs text-zinc-500 font-normal">
-                    ({displayedStreams.length} {contentType === 'live' ? 'canales' : 'títulos'})
-                  </span>
-                </>
-              )}
+              <span className="text-cyan-400">
+                {searchQuery.trim() ? `Resultados: "${searchQuery}"` : (activeCategory?.category_name || 'Contenido')}
+              </span>
             </h2>
 
-            {(loadingStreams || loadingSeriesModal || loadingSearchAll) && (
-              <div className="flex items-center space-x-2 text-xs text-cyan-400">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>
-                  {loadingSeriesModal 
-                    ? 'Cargando episodios de la serie...' 
-                    : loadingSearchAll 
-                      ? 'Buscando en todo el catálogo...' 
-                      : 'Cargando lista...'}
+            {displayedStreams.length > 0 && (
+              <div className="flex items-center space-x-2.5">
+                <span className="px-2.5 py-0.5 rounded-lg bg-cyan-950/70 border border-cyan-400/40 text-xs font-mono font-bold text-cyan-300 shadow-sm">
+                  {focusZone === 'grid' ? focusedGridIndex + 1 : 1} / {displayedStreams.length}
+                </span>
+                <span className="text-xs text-zinc-500 font-medium">
+                  ({displayedStreams.length} {contentType === 'live' ? 'canales' : contentType === 'series' ? 'series' : 'películas'})
                 </span>
               </div>
             )}
           </div>
 
+          {(loadingStreams || loadingSeriesModal || loadingSearchAll) && (
+            <div className="flex items-center space-x-2 text-xs text-cyan-400">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              <span>
+                {loadingSeriesModal 
+                  ? 'Cargando episodios de la serie...' 
+                  : loadingSearchAll 
+                    ? 'Buscando en todo el catálogo...' 
+                    : 'Cargando lista...'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* 🎞️ 2. SECCIÓN INFERIOR: CARRUSEL DE TARJETAS (IMAGEN 1) */}
+        <div 
+          ref={gridScrollContainerRef}
+          className="flex-1 overflow-y-auto px-10 pt-4 pb-12 flex flex-col scroll-smooth"
+        >
           {/* Estado Vacío de Búsqueda */}
           {displayedStreams.length === 0 && !loadingStreams && !loadingSearchAll && (
             <div className="flex-1 flex flex-col items-center justify-center py-20 text-zinc-500">
@@ -1459,7 +1476,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
           {/* Skeleton Shimmer durante la carga inicial de la categoría */}
           {loadingStreams && displayedStreams.length === 0 && (
-            <div className={contentType !== 'live' ? "grid grid-cols-5 gap-5 pb-8" : "grid grid-cols-4 gap-3 pb-8"}>
+            <div className={contentType !== 'live' ? "grid grid-cols-5 gap-5 pt-2 pb-8" : "grid grid-cols-4 gap-3 pt-2 pb-8"}>
               {Array.from({ length: contentType !== 'live' ? 10 : 8 }).map((_, i) => (
                 contentType !== 'live' ? (
                   <div key={i} className="flex flex-col space-y-2">
@@ -1478,7 +1495,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
           {/* Cuadrícula / Fila de Posters (5 Columnas fijas para D-Pad 1:1) */}
           {contentType !== 'live' ? (
-            <div className="grid grid-cols-5 gap-5 pb-8">
+            <div className="grid grid-cols-5 gap-5 pt-2 pb-8">
               {displayedStreams.map((item, idx) => (
                 <CatalogPosterCard
                   key={(item as any).stream_id || (item as any).series_id || idx}
@@ -1496,7 +1513,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             </div>
           ) : (
             /* Lista de Canales de TV en Vivo */
-            <div className="grid grid-cols-4 gap-3 pb-8">
+            <div className="grid grid-cols-4 gap-3 pt-2 pb-8">
               {displayedStreams.map((live, idx) => {
                 const stream = live as XtreamStream;
                 const title = stream.name || `Canal #${stream.stream_id}`;
