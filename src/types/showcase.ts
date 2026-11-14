@@ -13,6 +13,8 @@ export interface ShowcaseItem {
   duration: string;
   streamUrl?: string;
   type: 'movie' | 'series';
+  trailerYoutubeKey?: string;
+  tmdbId?: number | string;
 }
 
 export type SidebarTabId = 

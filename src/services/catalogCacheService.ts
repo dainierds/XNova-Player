@@ -14,6 +14,9 @@ export interface CompactCatalogItem {
   ext?: string;
   rating?: string;
   type: 'movies' | 'series' | 'live';
+  tmdbId?: number | string;
+  added?: string | number;
+  year?: string;
 }
 
 interface CacheEnvelope {
@@ -63,6 +66,10 @@ export function compressXtreamItem(
     ? 'ts' 
     : ((raw as any).container_extension || (raw as any).ext || (isSeries ? 'mkv' : 'mp4'));
 
+  const rawTmdb = (raw as any).tmdb_id || (raw as any).tmdb;
+  const rawAdded = (raw as any).added;
+  const rawYear = (raw as any).year || (raw as any).releaseDate;
+
   return {
     id: rawId,
     name,
@@ -72,6 +79,9 @@ export function compressXtreamItem(
     ext: rawExt ? String(rawExt).replace(/^\.+/, '').trim() : undefined,
     rating: raw.rating,
     type,
+    tmdbId: rawTmdb ? String(rawTmdb) : undefined,
+    added: rawAdded,
+    year: rawYear ? String(rawYear) : undefined,
   };
 }
 
@@ -148,6 +158,62 @@ export const CatalogCacheService = {
     return items.filter((item) => {
       return tokens.every((token) => item.norm.includes(token));
     });
+  },
+
+  /**
+   * 🎯 Smart Matcher: Vinculación inteligente entre un título/TMDb y el catálogo local de Xtream.
+   * Resuelve la película exacta dentro de la lista del usuario en 0-5ms.
+   */
+  async findBestMatch(
+    playlistId: string,
+    searchTitle: string,
+    tmdbId?: number | string
+  ): Promise<CompactCatalogItem | null> {
+    try {
+      const items = await this.get(playlistId, 'movies', true);
+      if (!items || items.length === 0) return null;
+
+      // 1. Coincidencia directa por tmdbId (100% de precisión)
+      if (tmdbId) {
+        const strId = String(tmdbId);
+        const matchByTmdb = items.find((it) => it.tmdbId && String(it.tmdbId) === strId);
+        if (matchByTmdb) return matchByTmdb;
+      }
+
+      // 2. Coincidencia por título normalizado
+      const cleanNorm = normalizeSearchString(searchTitle);
+      if (!cleanNorm) return null;
+
+      // Intento A: Coincidencia exacta de norm
+      const exactMatch = items.find((it) => it.norm === cleanNorm);
+      if (exactMatch) return exactMatch;
+
+      // Intento B: Las palabras clave principales del título están contenidas en el norm del ítem
+      const tokens = cleanNorm.split(' ').filter((t) => t.length > 2);
+      if (tokens.length > 0) {
+        const tokenMatch = items.find((it) => tokens.every((tok) => it.norm.includes(tok)));
+        if (tokenMatch) return tokenMatch;
+      }
+
+      // Intento C: Mayor superposición de palabras
+      let bestItem: CompactCatalogItem | null = null;
+      let maxMatches = 0;
+      for (const it of items) {
+        let count = 0;
+        for (const tok of tokens) {
+          if (it.norm.includes(tok)) count++;
+        }
+        if (count > maxMatches && count >= Math.min(2, tokens.length)) {
+          maxMatches = count;
+          bestItem = it;
+        }
+      }
+
+      return bestItem;
+    } catch (err) {
+      console.warn('[CatalogCache] Error en findBestMatch:', err);
+      return null;
+    }
   },
 
   /**

@@ -23,6 +23,10 @@ import { PLAN_CONFIGS } from './types/auth';
 import { StorageService } from './services/storage';
 import { useXtreamHomeFeed } from './hooks/useXtreamHomeFeed';
 import type { ContentTag } from './hooks/useXtreamHomeFeed';
+import { CatalogMatcherService } from './services/catalogMatcherService';
+import { ImagePreloadService } from './services/imagePreloadService';
+import { TrailerModal } from './components/player/TrailerModal';
+import { TmdbService } from './services/tmdb';
 
 type FocusSection = 'sidebar' | 'hero_buttons' | 'thumbnails';
 
@@ -59,7 +63,7 @@ export function App() {
   const currentCatalog: ShowcaseItem[] = (activeTab === 'series') 
     ? SHOWCASE_SERIES 
     : homeFeed.featured.length > 0
-      // ✅ Películas REALES de la lista Xtream con tags automáticos
+      // ✅ Películas REALES combinadas (TMDb Estrenos/Próximamente + Xtream)
       ? homeFeed.featured.map((m) => ({
           id: m.id,
           title: m.title.toUpperCase(),
@@ -75,6 +79,8 @@ export function App() {
           synopsis: m.synopsis,
           type: 'movie' as const,
           streamUrl: m.streamUrl,
+          trailerYoutubeKey: m.trailerYoutubeKey,
+          tmdbId: m.tmdbId,
         }))
       : SHOWCASE_MOVIES; // Fallback con películas de demo si no hay lista
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -92,6 +98,111 @@ export function App() {
   const [explorerType, setExplorerType] = useState<'movies' | 'series' | 'live'>('movies');
   const [playingItem, setPlayingItem] = useState<ShowcaseItem | null>(null);
   const [activeTheme, setActiveTheme] = useState<'cinematic' | 'serivia'>('cinematic');
+
+  // 🎬 Modal de Tráiler Oficial de YouTube / Próximamente
+  const [isTrailerOpen, setIsTrailerOpen] = useState(false);
+  const [trailerMovie, setTrailerMovie] = useState<{
+    title: string;
+    youtubeKey?: string | null;
+    releaseDateText?: string;
+    synopsis?: string;
+    backdropUrl?: string;
+    posterUrl?: string;
+  } | null>(null);
+
+  // ⚡ Precarga agresiva de imágenes en memoria RAM para el carrusel (estilo Glide en Kai TV)
+  useEffect(() => {
+    if (!currentCatalog || currentCatalog.length === 0) return;
+    const nextIndices = [
+      (carouselIndex + 1) % currentCatalog.length,
+      (carouselIndex + 2) % currentCatalog.length,
+      (carouselIndex + 3) % currentCatalog.length,
+    ];
+    const urls = nextIndices.flatMap((idx) => [
+      currentCatalog[idx]?.backdropUrl,
+      currentCatalog[idx]?.thumbnailUrl,
+    ]);
+    ImagePreloadService.preloadBatch(urls);
+  }, [carouselIndex, currentCatalog]);
+
+  // 🎯 Reproducción inteligente con Deep Link / Smart Matching y Fallback a Trailer
+  const handlePlayShowcaseItem = async (item: ShowcaseItem) => {
+    // 1. Si ya tiene URL de Xtream con usuario activo, reproducir de inmediato con Google Media3 ExoPlayer
+    if (
+      item.streamUrl &&
+      activePlaylist?.username &&
+      item.streamUrl.includes(activePlaylist.username) &&
+      !item.streamUrl.includes('test-streams.mux.dev')
+    ) {
+      if (
+        playWithNativePlayer({
+          streamUrl: item.streamUrl,
+          title: item.title,
+          posterUrl: item.backdropUrl,
+        })
+      ) {
+        return;
+      }
+    }
+
+    // 2. Si no tiene URL directa o viene de TMDb, intentar resolverla en la lista Xtream local en 0-5ms
+    if (activePlaylist) {
+      const match = await CatalogMatcherService.resolveMovieStream(activePlaylist, {
+        title: item.title,
+        tmdbId: item.tmdbId,
+        streamUrl: item.streamUrl,
+      });
+
+      if (match.isMatch && match.resolvedUrl) {
+        if (
+          playWithNativePlayer({
+            streamUrl: match.resolvedUrl,
+            title: match.matchedItem?.name || item.title,
+            posterUrl: match.matchedItem?.icon || item.backdropUrl,
+          })
+        ) {
+          return;
+        }
+      }
+    }
+
+    // 3. Si no existe en la lista del usuario (ej: es un PRÓXIMAMENTE o un estreno no subido aún)
+    if (item.statusBadge === 'PRÓXIMAMENTE' || item.trailerYoutubeKey || !item.streamUrl) {
+      let ytKey = item.trailerYoutubeKey;
+      if (!ytKey && item.tmdbId) {
+        ytKey = (await TmdbService.getMovieTrailer(Number(item.tmdbId))) || undefined;
+      }
+      setTrailerMovie({
+        title: item.title,
+        youtubeKey: ytKey || null,
+        releaseDateText: item.releaseDateText,
+        synopsis: item.synopsis,
+        backdropUrl: item.backdropUrl,
+        posterUrl: item.thumbnailUrl,
+      });
+      setIsTrailerOpen(true);
+      return;
+    }
+
+    // 4. Fallback al reproductor web integrado si se corre en navegador
+    setPlayingItem(item);
+  };
+
+  const handleOpenTrailer = async (item: ShowcaseItem) => {
+    let ytKey = item.trailerYoutubeKey;
+    if (!ytKey && item.tmdbId) {
+      ytKey = (await TmdbService.getMovieTrailer(Number(item.tmdbId))) || undefined;
+    }
+    setTrailerMovie({
+      title: item.title,
+      youtubeKey: ytKey || null,
+      releaseDateText: item.releaseDateText,
+      synopsis: item.synopsis,
+      backdropUrl: item.backdropUrl,
+      posterUrl: item.thumbnailUrl,
+    });
+    setIsTrailerOpen(true);
+  };
 
   // Temporizador de rotación automática estilo carrusel (6 segundos)
   const autoPlayTimerRef = useRef<number | null>(null);
@@ -159,7 +270,7 @@ export function App() {
 
   // Motor de navegación D-pad para este concepto de interfaz
   useEffect(() => {
-    if (isSplashVisible || !isAuthenticated || isSettingsOpen || isSearchOpen || isProfileOpen || isExitModalOpen || isExplorerOpen || isUpdateOpen || playingItem) {
+    if (isSplashVisible || !isAuthenticated || isSettingsOpen || isSearchOpen || isProfileOpen || isExitModalOpen || isExplorerOpen || isUpdateOpen || playingItem || isTrailerOpen) {
       return;
     }
 
@@ -237,12 +348,12 @@ export function App() {
         case ' ':
           if (focusedZone === 'hero_buttons') {
             if (heroBtnIndex === 0) {
-              setPlayingItem(activeItem);
+              handlePlayShowcaseItem(activeItem);
             } else {
-              console.log('Ver trailer de:', activeItem.title);
+              handleOpenTrailer(activeItem);
             }
           } else if (focusedZone === 'thumbnails') {
-            setPlayingItem(activeItem);
+            handlePlayShowcaseItem(activeItem);
           } else if (focusedZone === 'sidebar') {
             if (focusedTab === 'settings') {
               setIsSettingsOpen(true);
@@ -288,6 +399,7 @@ export function App() {
     isExplorerOpen,
     isUpdateOpen,
     playingItem,
+    isTrailerOpen,
   ]);
 
   return (
@@ -311,8 +423,21 @@ export function App() {
           <SeriviaLayout
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenSearch={() => setIsSearchOpen(true)}
-            onPlayMedia={(media) => {
-              if (media.streamUrl && playWithNativePlayer({
+            onPlayMedia={async (media) => {
+              if (activePlaylist) {
+                const match = await CatalogMatcherService.resolveMovieStream(activePlaylist, {
+                  title: media.title,
+                  streamUrl: media.streamUrl,
+                });
+                const urlToPlay = (match.isMatch && match.resolvedUrl) ? match.resolvedUrl : media.streamUrl;
+                if (urlToPlay && playWithNativePlayer({
+                  streamUrl: urlToPlay,
+                  title: match.matchedItem?.name || media.title,
+                  posterUrl: match.matchedItem?.icon || media.posterUrl,
+                })) {
+                  return;
+                }
+              } else if (media.streamUrl && playWithNativePlayer({
                 streamUrl: media.streamUrl,
                 title: media.title,
                 posterUrl: media.posterUrl,
@@ -328,7 +453,7 @@ export function App() {
                 releaseDateText: 'En reproducción',
                 statusBadge: 'ESTRENO',
                 genresText: 'Streaming',
-                year: '2025',
+                year: '2026',
                 rating: '13+',
                 duration: 'HD',
                 synopsis: 'Disfruta de tu contenido.',
@@ -370,17 +495,8 @@ export function App() {
                   setCarouselIndex(idx);
                   setFocusedZone('thumbnails');
                 }}
-                onPlay={() => {
-                  if (activeItem.streamUrl && playWithNativePlayer({
-                    streamUrl: activeItem.streamUrl,
-                    title: activeItem.title,
-                    posterUrl: activeItem.backdropUrl,
-                  })) {
-                    return;
-                  }
-                  setPlayingItem(activeItem);
-                }}
-                onOpenTrailer={() => console.log('Abrir trailer de:', activeItem.title)}
+                onPlay={() => handlePlayShowcaseItem(activeItem)}
+                onOpenTrailer={() => handleOpenTrailer(activeItem)}
               />
             </div>
           </>
@@ -567,6 +683,21 @@ export function App() {
 
       {/* Verificador y Modal de Actualización Automática OTA */}
       <UpdateModal onOpenStateChange={(isOpen) => setIsUpdateOpen(isOpen)} />
+
+      {/* 🎬 Modal de Tráiler Oficial de YouTube / Próximamente (Estilo Kai TV) */}
+      <TrailerModal
+        isOpen={isTrailerOpen}
+        title={trailerMovie?.title || ''}
+        youtubeKey={trailerMovie?.youtubeKey}
+        releaseDateText={trailerMovie?.releaseDateText}
+        synopsis={trailerMovie?.synopsis}
+        backdropUrl={trailerMovie?.backdropUrl}
+        posterUrl={trailerMovie?.posterUrl}
+        onClose={() => {
+          setIsTrailerOpen(false);
+          setTrailerMovie(null);
+        }}
+      />
     </main>
   );
 }

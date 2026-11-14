@@ -19,6 +19,7 @@ import { TmdbService } from '../../services/tmdb';
 import { openExternalPlayer } from '../../utils/externalPlayer';
 import { BRANDING } from '../../config/branding';
 import { CatalogCacheService, type CompactCatalogItem } from '../../services/catalogCacheService';
+import { ImagePreloadService } from '../../services/imagePreloadService';
 
 /**
  * Normaliza URLs de imágenes de servidores IPTV / Xtream Codes y TMDb
@@ -340,6 +341,17 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     loadStreams();
     return () => { isMounted = false; };
   }, [selectedCategoryId, contentType, server, user, pass]);
+
+  // 🚀 Precarga ultra-rápida de pósters en memoria RAM (estilo Glide en Kai TV)
+  useEffect(() => {
+    if (streams && streams.length > 0) {
+      const urls = streams.slice(0, 30).map((item) => {
+        const rawCover = (item as any).icon || (item as any).stream_icon || (item as any).cover;
+        return normalizeMediaUrl(rawCover, server);
+      });
+      ImagePreloadService.preloadBatch(urls);
+    }
+  }, [streams, server]);
 
   // ⚡ Pre-cargar catálogo desde la caché ultra-compacta de IndexedDB al entrar a la sección (0ms)
   useEffect(() => {

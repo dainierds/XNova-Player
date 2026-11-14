@@ -178,4 +178,91 @@ export class TmdbService {
       return fallbackItem;
     }
   }
+
+  /**
+   * 📅 Obtiene los próximos estrenos mundiales (PRÓXIMAMENTE) desde TMDb
+   */
+  public static async getUpcomingMovies(page: number = 1): Promise<TmdbMovieResult[]> {
+    const apiKey = this.getApiKey();
+    if (!apiKey) return [];
+    try {
+      const url = `https://api.themoviedb.org/3/movie/upcoming?api_key=${apiKey}&language=es-ES&page=${page}`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.results || []) as TmdbMovieResult[];
+    } catch (err) {
+      console.warn('[TMDb] Error al obtener próximos estrenos:', err);
+      return [];
+    }
+  }
+
+  /**
+   * 🍿 Obtiene los estrenos actuales en cartelera / streaming (ESTRENO) desde TMDb
+   */
+  public static async getNowPlayingMovies(page: number = 1): Promise<TmdbMovieResult[]> {
+    const apiKey = this.getApiKey();
+    if (!apiKey) return [];
+    try {
+      const url = `https://api.themoviedb.org/3/movie/now_playing?api_key=${apiKey}&language=es-ES&page=${page}`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.results || []) as TmdbMovieResult[];
+    } catch (err) {
+      console.warn('[TMDb] Error al obtener estrenos en cartelera:', err);
+      return [];
+    }
+  }
+
+  /**
+   * 🔥 Obtiene películas en tendencia de la semana
+   */
+  public static async getTrendingMovies(): Promise<TmdbMovieResult[]> {
+    const apiKey = this.getApiKey();
+    if (!apiKey) return [];
+    try {
+      const url = `https://api.themoviedb.org/3/trending/movie/week?api_key=${apiKey}&language=es-ES`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.results || []) as TmdbMovieResult[];
+    } catch (err) {
+      console.warn('[TMDb] Error al obtener películas en tendencia:', err);
+      return [];
+    }
+  }
+
+  /**
+   * 🎬 Obtiene el ID del trailer oficial de YouTube para una película
+   */
+  public static async getMovieTrailer(movieId: number): Promise<string | null> {
+    const apiKey = this.getApiKey();
+    if (!apiKey) return null;
+    try {
+      // 1. Intentar trailer en español
+      let url = `https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${apiKey}&language=es-ES`;
+      let res = await fetch(url);
+      let data = await res.json();
+      let videos = (data.results || []) as any[];
+
+      // 2. Si no hay en español, intentar en inglés
+      if (videos.length === 0) {
+        url = `https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${apiKey}&language=en-US`;
+        res = await fetch(url);
+        data = await res.json();
+        videos = (data.results || []) as any[];
+      }
+
+      // Buscar un Trailer oficial en YouTube
+      const trailer = videos.find(
+        (v) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser')
+      ) || videos.find((v) => v.site === 'YouTube');
+
+      return trailer?.key || null;
+    } catch (err) {
+      console.warn(`[TMDb] Error al obtener trailer para película ${movieId}:`, err);
+      return null;
+    }
+  }
 }
