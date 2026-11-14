@@ -7,7 +7,6 @@ import {
   Heart, 
   Settings, 
   Search, 
-  SlidersHorizontal, 
   ChevronDown, 
   Play, 
   ChevronLeft, 
@@ -22,7 +21,6 @@ import { useFavoritesStore } from '../../store/useFavoritesStore';
 import { useAdminFeaturedStore } from '../../store/useAdminFeaturedStore';
 import { QuickFavoriteModal, type QuickFavoriteItem } from '../common/QuickFavoriteModal';
 import { HoldProgressIndicator } from '../common/HoldProgressIndicator';
-import { PLAN_CONFIGS } from '../../types/auth';
 import type { PlaylistAccount } from '../../types';
 import { 
   SERIVIA_HERO_MOVIES, 
@@ -33,7 +31,6 @@ import {
 
 export type SeriviaFocusZone = 
   | 'sidebar' 
-  | 'top_bar' 
   | 'hero' 
   | 'genres' 
   | 'catalog';
@@ -62,11 +59,12 @@ interface SidebarItemDef {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  action: 'home' | 'live' | 'movies' | 'series' | 'favorites' | 'settings' | 'logout';
+  action: 'home' | 'search' | 'live' | 'movies' | 'series' | 'favorites' | 'settings' | 'logout';
 }
 
 const SIDEBAR_ITEMS: SidebarItemDef[] = [
   { id: 'home', label: 'Inicio', icon: Home, action: 'home' },
+  { id: 'search', label: 'Buscar', icon: Search, action: 'search' },
   { id: 'live', label: 'TV en Vivo', icon: Tv, action: 'live' },
   { id: 'movies', label: 'Películas', icon: Film, action: 'movies' },
   { id: 'series', label: 'Series', icon: Video, action: 'series' },
@@ -86,7 +84,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   homeFeed,
   isActive = true,
 }) => {
-  const { currentUser, isAdmin } = useAuthStore();
+  const { isAdmin } = useAuthStore();
   const { featuredItems: adminFeaturedItems } = useAdminFeaturedStore();
   const [sectionType, setSectionType] = useState<'movies' | 'series'>('movies');
   const [activeNav, setActiveNav] = useState('home');
@@ -107,7 +105,6 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   // 🎮 Control Remoto D-Pad: Zonas de foco espacial
   const [focusZone, setFocusZone] = useState<SeriviaFocusZone>('sidebar');
   const [focusedSidebarIdx, setFocusedSidebarIdx] = useState(0);
-  const [focusedTopIdx, setFocusedTopIdx] = useState(0); // 0: Selector sección, 1: Buscador, 2: Ajustes/Perfil
   const [focusedHeroBtn, setFocusedHeroBtn] = useState(0); // 0: Play, 1: Favorito, 2: Siguiente carta
   const [focusedGenreIdx, setFocusedGenreIdx] = useState(0);
   const [focusedCatalogIdx, setFocusedCatalogIdx] = useState(0);
@@ -325,7 +322,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         } else if (focusZone === 'genres') {
           setFocusZone('hero');
           setFocusedHeroBtn(0);
-        } else if (focusZone === 'hero' || focusZone === 'top_bar') {
+        } else if (focusZone === 'hero') {
           setFocusZone('sidebar');
         } else if (focusZone === 'sidebar') {
           if (onOpenExitModal) {
@@ -352,6 +349,8 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
           if (item.action === 'home') {
             setActiveNav('home');
             setFocusZone('hero');
+          } else if (item.action === 'search') {
+            onOpenSearch();
           } else if (item.action === 'live') {
             onOpenExplorer('live');
           } else if (item.action === 'movies') {
@@ -370,34 +369,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         return;
       }
 
-      // ─── ZONA 2: BARRA SUPERIOR (TOP BAR) ───
-      if (focusZone === 'top_bar') {
-        if (e.key === 'ArrowLeft') {
-          if (focusedTopIdx > 0) {
-            setFocusedTopIdx((prev) => prev - 1);
-          } else {
-            setFocusZone('sidebar');
-          }
-        } else if (e.key === 'ArrowRight') {
-          if (focusedTopIdx < 2) {
-            setFocusedTopIdx((prev) => prev + 1);
-          }
-        } else if (e.key === 'ArrowDown') {
-          setFocusZone('hero');
-          setFocusedHeroBtn(0);
-        } else if (isOk) {
-          if (focusedTopIdx === 0) {
-            handleToggleSection();
-          } else if (focusedTopIdx === 1) {
-            onOpenSearch();
-          } else if (focusedTopIdx === 2) {
-            onOpenSettings();
-          }
-        }
-        return;
-      }
-
-      // ─── ZONA 3: HERO CARD (CARTAS SUPERIORES) ───
+      // ─── ZONA 2: HERO CARD (CARTAS SUPERIORES) ───
       if (focusZone === 'hero') {
         if (e.key === 'ArrowLeft') {
           if (focusedHeroBtn > 0) {
@@ -410,8 +382,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
             setFocusedHeroBtn((prev) => prev + 1);
           }
         } else if (e.key === 'ArrowUp') {
-          setFocusZone('top_bar');
-          setFocusedTopIdx(0);
+          // Permanecer en la zona hero activa
         } else if (e.key === 'ArrowDown') {
           setFocusZone('genres');
           setFocusedGenreIdx(0);
@@ -431,7 +402,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         return;
       }
 
-      // ─── ZONA 4: PÍLDORAS DE GÉNEROS / CATEGORÍAS ───
+      // ─── ZONA 3: PÍLDORAS DE GÉNEROS / CATEGORÍAS ───
       if (focusZone === 'genres') {
         if (e.key === 'ArrowLeft') {
           if (focusedGenreIdx > 0) {
@@ -564,7 +535,6 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
     isActive,
     focusZone,
     focusedSidebarIdx,
-    focusedTopIdx,
     focusedHeroBtn,
     focusedGenreIdx,
     focusedCatalogIdx,
@@ -594,7 +564,7 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
 
           {/* Menú Principal de Navegación */}
           <nav className="space-y-1.5">
-            {SIDEBAR_ITEMS.slice(0, 5).map((item, idx) => {
+            {SIDEBAR_ITEMS.slice(0, 6).map((item, idx) => {
               const Icon = item.icon;
               const isSelected = activeNav === item.id;
               const isFocused = focusZone === 'sidebar' && focusedSidebarIdx === idx;
@@ -607,6 +577,8 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
                     setFocusedSidebarIdx(idx);
                     if (item.action === 'home') {
                       setActiveNav('home');
+                    } else if (item.action === 'search') {
+                      onOpenSearch();
                     } else if (item.action === 'live') {
                       onOpenExplorer('live');
                     } else if (item.action === 'movies') {
@@ -635,8 +607,8 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
 
         {/* Menú Secundario Inferior: Ajustes y Cerrar Sesión */}
         <div className="pt-4 border-t border-white/5 space-y-1.5">
-          {SIDEBAR_ITEMS.slice(5).map((item, relIdx) => {
-            const idx = relIdx + 5;
+          {SIDEBAR_ITEMS.slice(6).map((item, relIdx) => {
+            const idx = relIdx + 6;
             const Icon = item.icon;
             const isFocused = focusZone === 'sidebar' && focusedSidebarIdx === idx;
             const isLogout = item.action === 'logout';
@@ -672,94 +644,10 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
         </div>
       </aside>
 
-      {/* 2. ÁREA DE CONTENIDO PRINCIPAL */}
-      <main className="flex-1 h-full flex flex-col justify-start overflow-hidden px-8 pt-3 pb-3 space-y-2.5">
-        {/* Cabecera Superior: Selector de Sección + Buscador + Perfil de Usuario */}
-        <header className="flex items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center space-x-3">
-            {/* 0: Selector Películas / Series */}
-            <button
-              onClick={handleToggleSection}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${
-                focusZone === 'top_bar' && focusedTopIdx === 0
-                  ? 'bg-cyan-500 text-black ring-3 ring-cyan-400 shadow-lg shadow-cyan-500/30 scale-105'
-                  : 'bg-[#131824] border border-white/10 text-white hover:bg-white/10'
-              }`}
-            >
-              <span>{sectionType === 'movies' ? 'Películas' : 'Series'}</span>
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
-
-            {/* 1: Buscador estilo Pill */}
-            <div
-              onClick={onOpenSearch}
-              className={`w-80 lg:w-96 flex items-center justify-between px-4 py-2 rounded-xl text-xs cursor-pointer transition-all ${
-                focusZone === 'top_bar' && focusedTopIdx === 1
-                  ? 'bg-[#1a2233] border-2 border-cyan-400 text-white ring-3 ring-cyan-400/40 shadow-lg shadow-cyan-500/20 scale-[1.02]'
-                  : 'bg-[#131824] border border-white/10 text-zinc-400 hover:border-zinc-500'
-              }`}
-            >
-              <div className="flex items-center space-x-2.5">
-                <Search className={`w-4 h-4 ${focusZone === 'top_bar' && focusedTopIdx === 1 ? 'text-cyan-400' : 'text-zinc-400'}`} />
-                <span>Buscar películas, series, shows...</span>
-              </div>
-              <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-500" />
-            </div>
-          </div>
-
-          {/* Notificaciones, Puntos del Carrusel y Perfil Usuario */}
-          <div className="flex items-center space-x-4">
-            {/* Puntos del Carrusel */}
-            <div className="flex items-center space-x-1.5 mr-2">
-              {heroList.slice(0, 5).map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setHeroIndex(idx)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    idx === heroIndex ? 'w-5 bg-cyan-400 shadow-sm shadow-cyan-400' : 'w-1.5 bg-white/30 hover:bg-white/60'
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* 2: Perfil / Ajustes */}
-            <div 
-              onClick={onOpenSettings}
-              className={`flex items-center space-x-2.5 px-3 py-1.5 rounded-xl cursor-pointer transition-all ${
-                focusZone === 'top_bar' && focusedTopIdx === 2
-                  ? 'bg-[#1a2233] border-2 border-cyan-400 ring-3 ring-cyan-400/40 shadow-lg shadow-cyan-500/20 scale-105'
-                  : 'bg-[#131824] border border-white/10 hover:bg-white/10'
-              }`}
-              title="Ajustes y Perfil de Usuario"
-            >
-              <div 
-                className="w-6 h-6 rounded-full border flex items-center justify-center text-[10px] font-black"
-                style={{
-                  backgroundColor: currentUser ? `${PLAN_CONFIGS[currentUser.plan].color}25` : '#22D3EE25',
-                  borderColor: currentUser ? PLAN_CONFIGS[currentUser.plan].color : '#22D3EE',
-                  color: currentUser ? PLAN_CONFIGS[currentUser.plan].color : '#22D3EE',
-                }}
-              >
-                {currentUser?.displayName.charAt(0).toUpperCase() || 'XN'}
-              </div>
-              <div className="text-left">
-                <p className="text-xs font-bold text-white leading-tight">
-                  {currentUser?.displayName || 'Cliente XNova'}
-                </p>
-                <p 
-                  className="text-[10px] font-bold leading-tight uppercase"
-                  style={{ color: currentUser ? PLAN_CONFIGS[currentUser.plan].color : '#F59E0B' }}
-                >
-                  Plan {currentUser ? PLAN_CONFIGS[currentUser.plan].badge : 'VIP'}
-                </p>
-              </div>
-              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
-            </div>
-          </div>
-        </header>
-
-        {/* 3. VISTA DE CARRUSEL SUPERIOR (COMPACTO, CINEMÁTICO Y ELEGANTE) */}
-        <div className="relative w-full h-44 md:h-48 lg:h-52 shrink-0 flex items-center space-x-3.5">
+      {/* 2. ÁREA DE CONTENIDO PRINCIPAL (LIMPIO Y ESPACIOSO) */}
+      <main className="flex-1 h-full flex flex-col justify-start overflow-hidden px-8 pt-4 pb-4 space-y-4">
+        {/* 1. VISTA DE CARRUSEL SUPERIOR CINEMÁTICO (HASTA 5 TÍTULOS) */}
+        <div className="relative w-full h-48 md:h-52 lg:h-56 shrink-0 flex items-center space-x-4">
           {/* Carta 1: Principal Activa (Panorámica con degradado suave) */}
           <div className="relative flex-1 h-full rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl bg-zinc-950 border border-white/15 flex flex-col justify-between p-4 md:p-5 z-10 transition-all duration-500">
             <img
@@ -772,26 +660,41 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
             <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/75 to-black/30" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
 
-            {/* Fila Superior: Badges e Información de Calidad */}
-            <div className="relative z-10 flex items-center space-x-2">
-              {currentHero.badge && (
-                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/25 border border-cyan-400 text-[10px] font-black tracking-wider text-cyan-300 uppercase shadow-sm">
-                  ⭐ {currentHero.badge}
+            {/* Fila Superior: Badges e Indicadores del Carrusel */}
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {currentHero.badge && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/25 border border-cyan-400 text-[10px] font-black tracking-wider text-cyan-300 uppercase shadow-sm">
+                    ⭐ {currentHero.badge}
+                  </span>
+                )}
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-[10px] font-bold text-amber-300 flex items-center space-x-1">
+                  <Star className="w-3 h-3 fill-amber-400" />
+                  <span>{currentHero.rating || '8.5'}</span>
                 </span>
-              )}
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-[10px] font-bold text-amber-300 flex items-center space-x-1">
-                <Star className="w-3 h-3 fill-amber-400" />
-                <span>{currentHero.rating || '8.5'}</span>
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-semibold text-zinc-300 border border-white/10">
-                {currentHero.year || '2026'}
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-semibold text-zinc-300 border border-white/10">
-                {currentHero.duration || (sectionType === 'movies' ? 'Película' : 'Serie')}
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-semibold text-zinc-300 border border-white/10">
-                {currentHero.genre || currentHero.genresText || (sectionType === 'movies' ? 'Acción' : 'Drama')}
-              </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-semibold text-zinc-300 border border-white/10">
+                  {currentHero.year || '2026'}
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-semibold text-zinc-300 border border-white/10">
+                  {currentHero.duration || (sectionType === 'movies' ? 'Película' : 'Serie')}
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-semibold text-zinc-300 border border-white/10">
+                  {currentHero.genre || currentHero.genresText || (sectionType === 'movies' ? 'Acción' : 'Drama')}
+                </span>
+              </div>
+
+              {/* Puntos Indicadores del Carrusel (hasta 5) */}
+              <div className="flex items-center space-x-1.5 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                {heroList.slice(0, 5).map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setHeroIndex(idx)}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      idx === heroIndex ? 'w-5 bg-cyan-400 shadow-sm shadow-cyan-400' : 'w-1.5 bg-white/30 hover:bg-white/60'
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* Fila Inferior: Título, Sinopsis breve y Botones de Acción */}
@@ -875,9 +778,18 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
           </div>
         </div>
 
-        {/* 4. FILA DE PÍLDORAS DE GÉNERO / CATEGORÍAS */}
+        {/* 2. FILA DE SELECTOR PELÍCULAS/SERIES + PÍLDORAS DE GÉNERO */}
         <div className="flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
+          <div className="flex items-center space-x-2.5 overflow-x-auto no-scrollbar py-1">
+            {/* Selector Películas / Series integrado */}
+            <button
+              onClick={handleToggleSection}
+              className="px-3.5 py-1.5 rounded-full text-xs font-black bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 hover:bg-cyan-500/30 flex items-center space-x-1.5 transition shrink-0"
+              title="Alternar entre Películas y Series"
+            >
+              <span>{sectionType === 'movies' ? '🎬 Películas' : '📺 Series'}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+            </button>
             {genresList.map((genre, idx) => {
               const isSelected = selectedGenre === genre;
               const isFocused = focusZone === 'genres' && focusedGenreIdx === idx;
