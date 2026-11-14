@@ -71,6 +71,7 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
   const initialCover = normalizeMediaUrl(rawCover, server);
 
   const [imgSrc, setImgSrc] = useState<string>(initialCover);
+  const [imageLoaded, setImageLoaded] = useState<boolean>(false);
   const [hasFailed, setHasFailed] = useState<boolean>(false);
   const title = item.name || (item as any).title || 'Sin Título';
   const rating = item.rating || '7.0';
@@ -79,24 +80,27 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
     let isMounted = true;
     const coverUrl = normalizeMediaUrl(rawCover, server);
 
+    setImageLoaded(false);
+
     if (coverUrl) {
       setImgSrc(coverUrl);
       setHasFailed(false);
-    }
-
-    // 🚀 Motor de Asignación Automática HD (igual que TiviMate y Kai TV):
-    // Si es película o serie, resolver en segundo plano con la cola de TMDb
-    // para reemplazar carátulas genéricas o faltantes por el póster oficial en alta definición
-    if (contentType === 'movies' || contentType === 'series') {
-      PosterResolutionService.resolvePoster(title, coverUrl).then((resolvedPoster) => {
-        if (isMounted && resolvedPoster && resolvedPoster.startsWith('http')) {
-          setImgSrc(resolvedPoster);
-          setHasFailed(false);
-        } else if (isMounted && !coverUrl) {
-          setHasFailed(true);
+      // La carátula del proveedor existe: no saturamos TMDb ni IndexedDB
+    } else if (contentType === 'movies' || contentType === 'series') {
+      // 🚀 Si no hay carátula (ej. carpeta Plex 2026), resolver mediante TMDb de forma ordenada
+      PosterResolutionService.resolvePoster(title).then((resolvedPoster) => {
+        if (isMounted) {
+          if (resolvedPoster && resolvedPoster.startsWith('http')) {
+            setImgSrc(resolvedPoster);
+            setHasFailed(false);
+          } else {
+            setHasFailed(true);
+          }
         }
+      }).catch(() => {
+        if (isMounted) setHasFailed(true);
       });
-    } else if (!coverUrl) {
+    } else {
       setHasFailed(true);
     }
 
@@ -104,17 +108,21 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
   }, [rawCover, server, title, contentType]);
 
   const handleImageError = () => {
-    // Si la imagen actual falló, consultar a TMDb mediante la cola controlada
-    PosterResolutionService.resolvePoster(title).then((resolved) => {
-      if (resolved && resolved !== imgSrc && resolved.startsWith('http')) {
-        setImgSrc(resolved);
-        setHasFailed(false);
-      } else {
+    // Si la imagen del proveedor falla (404 o enlace caído), resolver con TMDb como respaldo
+    if (contentType === 'movies' || contentType === 'series') {
+      PosterResolutionService.resolvePoster(title).then((resolved) => {
+        if (resolved && resolved !== imgSrc && resolved.startsWith('http')) {
+          setImgSrc(resolved);
+          setHasFailed(false);
+        } else {
+          setHasFailed(true);
+        }
+      }).catch(() => {
         setHasFailed(true);
-      }
-    }).catch(() => {
+      });
+    } else {
       setHasFailed(true);
-    });
+    }
   };
 
   return (
@@ -127,14 +135,20 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
           : 'hover:scale-105'
       }`}
     >
-      <div className="aspect-[2/3] w-full rounded-2xl overflow-hidden bg-gradient-to-b from-zinc-800 to-zinc-950 border border-white/10 group-hover:border-cyan-400 relative shadow-lg flex items-center justify-center">
+      <div className={`aspect-[2/3] w-full rounded-2xl overflow-hidden bg-gradient-to-b from-zinc-800 to-zinc-950 border border-white/10 group-hover:border-cyan-400 relative shadow-lg flex items-center justify-center ${
+        !imageLoaded && !hasFailed ? 'shimmer-effect' : ''
+      }`}>
         {!hasFailed && imgSrc ? (
           <img
             src={imgSrc}
             alt={title}
             referrerPolicy="no-referrer"
+            loading="lazy"
+            onLoad={() => setImageLoaded(true)}
             onError={handleImageError}
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover transition-opacity duration-300 ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
           />
         ) : (
           <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0A0F1D]">
@@ -219,7 +233,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 }) => {
   const [contentType] = useState<'movies' | 'series' | 'live'>(initialType);
   const [categories, setCategories] = useState<XtreamCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [streams, setStreams] = useState<(XtreamStream | XtreamSeries)[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingStreams, setLoadingStreams] = useState(false);
@@ -305,7 +319,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   useEffect(() => {
     let isMounted = true;
     const loadStreams = async () => {
-      if (!selectedCategoryId) return;
+      if (!selectedCategoryId || selectedCategoryId.trim() === '') return;
       setLoadingStreams(true);
       try {
         let items: (XtreamStream | XtreamSeries)[] = [];
@@ -332,27 +346,21 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     return () => { isMounted = false; };
   }, [selectedCategoryId, contentType, server, user, pass]);
 
-  // 🚀 Precarga ultra-rápida de pósters en memoria RAM (estilo Glide en Kai TV)
+  // 🚀 Precarga suave de pósters en memoria RAM (estilo Glide en Kai TV)
   useEffect(() => {
     if (streams && streams.length > 0) {
-      const urls = streams.slice(0, 30).map((item) => {
+      const urls = streams.slice(0, 20).map((item) => {
         const rawCover = (item as any).icon || (item as any).stream_icon || (item as any).cover;
         return normalizeMediaUrl(rawCover, server);
-      });
-      ImagePreloadService.preloadBatch(urls);
+      }).filter((u): u is string => Boolean(u));
+
+      const timer = setTimeout(() => {
+        ImagePreloadService.preloadBatch(urls);
+      }, 300);
+
+      return () => clearTimeout(timer);
     }
   }, [streams, server]);
-
-  // ⚡ Pre-cargar catálogo desde la caché ultra-compacta de IndexedDB al entrar a la sección (0ms)
-  useEffect(() => {
-    let isMounted = true;
-    CatalogCacheService.get(playlist.id, contentType).then((cached) => {
-      if (isMounted && cached && cached.length > 0) {
-        setAllSectionStreams(cached as any);
-      }
-    });
-    return () => { isMounted = false; };
-  }, [contentType, playlist.id]);
 
   // 🔍 Cargar/Refrescar catálogo completo de la sección en segundo plano para búsqueda
   const loadOrRefreshSectionCache = useCallback(async (force = false) => {
@@ -1231,6 +1239,25 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                   ? 'Intenta buscar con otra palabra clave en esta sección.' 
                   : 'Selecciona otra categoría en el menú lateral.'}
               </p>
+            </div>
+          )}
+
+          {/* Skeleton Shimmer durante la carga inicial de la categoría */}
+          {loadingStreams && displayedStreams.length === 0 && (
+            <div className={contentType !== 'live' ? "grid grid-cols-5 gap-5 pb-8" : "grid grid-cols-4 gap-3 pb-8"}>
+              {Array.from({ length: contentType !== 'live' ? 10 : 8 }).map((_, i) => (
+                contentType !== 'live' ? (
+                  <div key={i} className="flex flex-col space-y-2">
+                    <div className="aspect-[2/3] w-full rounded-2xl shimmer-effect border border-white/5" />
+                    <div className="h-3 w-3/4 rounded-md shimmer-effect opacity-60" />
+                  </div>
+                ) : (
+                  <div key={i} className="p-3.5 rounded-2xl bg-[#0E1424] border border-white/5 flex items-center space-x-3 shimmer-effect">
+                    <div className="w-12 h-12 rounded-xl bg-black/40 shrink-0" />
+                    <div className="h-3 flex-1 rounded-md bg-white/10" />
+                  </div>
+                )
+              ))}
             </div>
           )}
 

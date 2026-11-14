@@ -18,6 +18,7 @@ interface QueueTask {
 
 class PosterResolutionEngine {
   private memoryCache = new Map<string, string>();
+  private inFlight = new Map<string, Promise<string>>();
   private queue: QueueTask[] = [];
   private activeWorkers = 0;
   private maxConcurrency = 3; // Máximo 3 descargas simultáneas en segundo plano (igual que Glide/TiviMate)
@@ -51,30 +52,44 @@ class PosterResolutionEngine {
       return this.memoryCache.get(cacheKey)!;
     }
 
-    // 2. Comprobar almacenamiento persistente IndexedDB (1-3ms)
-    try {
-      const persisted = await get<string>(cacheKey);
-      if (persisted) {
-        this.memoryCache.set(cacheKey, persisted);
-        return persisted;
-      }
-    } catch {
-      // Continuar a la cola si hay fallo de lectura
+    // 2. Si ya hay una resolución en curso para este título, devolver la misma promesa
+    if (this.inFlight.has(cacheKey)) {
+      return this.inFlight.get(cacheKey)!;
     }
 
-    // 3. Encolar la petición para resolver con TMDb de forma ordenada
-    return new Promise<string>((resolve) => {
-      this.queue.push({
-        title: clean,
-        fallbackUrl,
-        resolve: (url) => {
-          this.memoryCache.set(cacheKey, url);
-          set(cacheKey, url).catch(() => {});
-          resolve(url);
-        },
+    const promise = (async () => {
+      // 3. Comprobar almacenamiento persistente IndexedDB (1-3ms)
+      try {
+        const persisted = await get<string>(cacheKey);
+        if (persisted) {
+          this.memoryCache.set(cacheKey, persisted);
+          return persisted;
+        }
+      } catch {
+        // Continuar a la cola si hay fallo de lectura
+      }
+
+      // 4. Encolar la petición para resolver con TMDb de forma ordenada
+      return new Promise<string>((resolve) => {
+        this.queue.push({
+          title: clean,
+          fallbackUrl,
+          resolve: (url) => {
+            this.memoryCache.set(cacheKey, url);
+            set(cacheKey, url).catch(() => {});
+            resolve(url);
+          },
+        });
+        this.processQueue();
       });
-      this.processQueue();
+    })();
+
+    this.inFlight.set(cacheKey, promise);
+    promise.finally(() => {
+      this.inFlight.delete(cacheKey);
     });
+
+    return promise;
   }
 
   private async processQueue(): Promise<void> {
