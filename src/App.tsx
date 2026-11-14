@@ -27,6 +27,7 @@ import { CatalogMatcherService } from './services/catalogMatcherService';
 import { ImagePreloadService } from './services/imagePreloadService';
 import { TrailerModal } from './components/player/TrailerModal';
 import { TmdbService } from './services/tmdb';
+import { XtreamService } from './services/xtream';
 
 type FocusSection = 'sidebar' | 'hero_buttons' | 'thumbnails';
 
@@ -35,6 +36,7 @@ export function App() {
   const { 
     activePlaylist, 
     liveStreams, 
+    vodMovies,
     loadStoredPlaylists, 
     loadUserPlaylists 
   } = usePlaylistStore();
@@ -59,15 +61,31 @@ export function App() {
   const [heroBtnIndex, setHeroBtnIndex] = useState(0); // 0: Watch now, 1: Trailer
   
   // Catálogo activo según pestaña (Películas o Series)
-  // Prioridad: feed real de Xtream → vodMovies del store → datos de demostración
+  // Prioridad: 100% contenidos reales del servidor Xtream activo
   const currentCatalog: ShowcaseItem[] = (activeTab === 'series') 
-    ? SHOWCASE_SERIES 
-    : homeFeed.featured.length > 0
-      // ✅ Películas REALES combinadas (TMDb Estrenos/Próximamente + Xtream)
-      ? homeFeed.featured.map((m) => ({
+    ? (homeFeed.featuredSeries && homeFeed.featuredSeries.length > 0)
+      ? homeFeed.featuredSeries.map((s) => ({
+          id: s.id,
+          title: s.title.toUpperCase(),
+          subtitle: s.title,
+          backdropUrl: s.backdropUrl,
+          thumbnailUrl: s.posterUrl,
+          releaseDateText: 'Serie en Catálogo',
+          statusBadge: (s.tag || 'ESTRENO') as 'ESTRENO' | 'PRÓXIMAMENTE' | 'NUEVO' | 'TENDENCIA',
+          genresText: s.genres?.join(', ') || 'Serie TV',
+          year: s.year || '2026',
+          rating: s.rating || '8.8 ★',
+          duration: 'Temporadas',
+          synopsis: s.synopsis || 'Disfruta de esta serie en tu catálogo.',
+          type: 'series' as const,
+          streamUrl: s.streamUrl,
+        }))
+      : SHOWCASE_SERIES 
+    : (homeFeed.featuredMovies && homeFeed.featuredMovies.length > 0)
+      ? homeFeed.featuredMovies.map((m) => ({
           id: m.id,
           title: m.title.toUpperCase(),
-          subtitle: `${m.title} (${m.year})`,
+          subtitle: `${m.title} (${m.year || '2026'})`,
           backdropUrl: m.backdropUrl,
           thumbnailUrl: m.posterUrl,
           releaseDateText: tagToReleaseDateText(m.tag),
@@ -82,7 +100,43 @@ export function App() {
           trailerYoutubeKey: m.trailerYoutubeKey,
           tmdbId: m.tmdbId,
         }))
-      : SHOWCASE_MOVIES; // Fallback con películas de demo si no hay lista
+      : homeFeed.featured.length > 0
+        ? homeFeed.featured.map((m) => ({
+            id: m.id,
+            title: m.title.toUpperCase(),
+            subtitle: `${m.title} (${m.year})`,
+            backdropUrl: m.backdropUrl,
+            thumbnailUrl: m.posterUrl,
+            releaseDateText: tagToReleaseDateText(m.tag),
+            statusBadge: m.tag as 'ESTRENO' | 'PRÓXIMAMENTE' | 'NUEVO' | 'TENDENCIA',
+            genresText: m.genres.join(', '),
+            year: m.year,
+            rating: m.rating,
+            duration: m.duration,
+            synopsis: m.synopsis,
+            type: 'movie' as const,
+            streamUrl: m.streamUrl,
+            trailerYoutubeKey: m.trailerYoutubeKey,
+            tmdbId: m.tmdbId,
+          }))
+        : (vodMovies && vodMovies.length > 0)
+          ? vodMovies.map((m: any) => ({
+              id: `vod_${m.id}`,
+              title: (m.title || 'PELÍCULA').toUpperCase(),
+              subtitle: `${m.title} (${m.year || '2026'})`,
+              backdropUrl: m.backdropUrl,
+              thumbnailUrl: m.posterUrl,
+              releaseDateText: 'Recién Añadido',
+              statusBadge: 'ESTRENO',
+              genresText: Array.isArray(m.genres) ? m.genres.join(', ') : (m.genresText || 'Película'),
+              year: m.year,
+              rating: m.rating,
+              duration: m.duration,
+              synopsis: m.synopsis,
+              type: 'movie' as const,
+              streamUrl: m.streamUrl,
+            }))
+          : SHOWCASE_MOVIES; // Fallback con películas de demo si no hay lista
   const [carouselIndex, setCarouselIndex] = useState(0);
   
   // Estados de modales y reproductor
@@ -127,11 +181,63 @@ export function App() {
 
   // 🎯 Reproducción inteligente con Deep Link / Smart Matching y Fallback a Trailer
   const handlePlayShowcaseItem = async (item: ShowcaseItem) => {
+    // 0. Si es una serie de la lista Xtream, resolver el episodio 1 y reproducirlo de inmediato
+    if (item.type === 'series' || item.id.startsWith('series_')) {
+      const seriesId = item.id.replace('series_', '');
+      const server = activePlaylist?.serverUrl || '';
+      const user = activePlaylist?.username || '';
+      const pass = activePlaylist?.password || '';
+
+      if (server && user && pass) {
+        try {
+          const details = await XtreamService.getSeriesInfo(server, user, pass, seriesId);
+          const episodesMap = details?.episodes || {};
+          const seasons = Object.keys(episodesMap).sort((a, b) => Number(a) - Number(b));
+          const firstSeason = seasons[0];
+          const firstEp = firstSeason && episodesMap[firstSeason] ? episodesMap[firstSeason][0] : null;
+
+          if (firstEp) {
+            const epUrl = XtreamService.buildSeriesStreamUrl(
+              server,
+              user,
+              pass,
+              firstEp.id,
+              firstEp.container_extension || 'mp4'
+            );
+            const epTitle = `${item.title} - T${firstSeason}:E${firstEp.episode_num || 1} ${firstEp.title || ''}`;
+
+            if (
+              playWithNativePlayer({
+                streamUrl: epUrl,
+                title: epTitle,
+                posterUrl: item.thumbnailUrl || item.backdropUrl,
+                isLive: false,
+              })
+            ) {
+              return;
+            }
+
+            setPlayingItem({
+              ...item,
+              title: epTitle,
+              streamUrl: epUrl,
+            });
+            return;
+          }
+        } catch (err) {
+          console.warn('Error al obtener info de serie para reproducir:', err);
+        }
+      }
+
+      // Si no pudo resolver el episodio, abrir el catálogo de series directamente
+      setExplorerType('series');
+      setIsExplorerOpen(true);
+      return;
+    }
+
     // 1. Si ya tiene URL de Xtream con usuario activo, reproducir de inmediato con Google Media3 ExoPlayer
     if (
       item.streamUrl &&
-      activePlaylist?.username &&
-      item.streamUrl.includes(activePlaylist.username) &&
       !item.streamUrl.includes('test-streams.mux.dev')
     ) {
       if (
@@ -139,10 +245,13 @@ export function App() {
           streamUrl: item.streamUrl,
           title: item.title,
           posterUrl: item.backdropUrl,
+          isLive: false,
         })
       ) {
         return;
       }
+      setPlayingItem(item);
+      return;
     }
 
     // 2. Si no tiene URL directa o viene de TMDb, intentar resolverla en la lista Xtream local en 0-5ms
@@ -159,10 +268,16 @@ export function App() {
             streamUrl: match.resolvedUrl,
             title: match.matchedItem?.name || item.title,
             posterUrl: match.matchedItem?.icon || item.backdropUrl,
+            isLive: false,
           })
         ) {
           return;
         }
+        setPlayingItem({
+          ...item,
+          streamUrl: match.resolvedUrl,
+        });
+        return;
       }
     }
 
@@ -184,8 +299,9 @@ export function App() {
       return;
     }
 
-    // 4. Fallback al reproductor web integrado si se corre en navegador
-    setPlayingItem(item);
+    // 4. Fallback al explorador de catálogo
+    setExplorerType('movies');
+    setIsExplorerOpen(true);
   };
 
   const handleOpenTrailer = async (item: ShowcaseItem) => {

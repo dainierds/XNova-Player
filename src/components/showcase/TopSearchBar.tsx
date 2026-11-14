@@ -11,25 +11,25 @@ export const TopSearchBar: React.FC<TopSearchBarProps> = ({
   planBadge,
 }) => {
   return (
-    <header className="relative z-20 w-full px-12 pt-6 pb-2 flex items-center justify-between select-none">
-      {/* Logotipo Oficial XNova Player a la izquierda */}
-      <div className="flex items-center space-x-3">
+    <header className="relative z-20 w-full px-8 py-2.5 flex items-center justify-between select-none bg-gradient-to-b from-black/80 via-black/30 to-transparent pointer-events-none">
+      {/* Logotipo Oficial XNova Player a la izquierda (ultra-fino y elegante) */}
+      <div className="flex items-center space-x-3 pointer-events-auto">
         <img
           src={BRANDING.assets.logo}
           alt={BRANDING.name}
-          className="h-10 w-auto object-contain drop-shadow-lg"
+          className="h-7 w-auto object-contain drop-shadow-md"
         />
       </div>
 
       {/* Indicadores Elegantes a la derecha: Estado de Suscripción y Vencimiento */}
-      <div className="flex items-center space-x-3">
-        <div className="flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md text-xs text-zinc-300 font-semibold tracking-wider">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400 animate-pulse" />
-          <span>VENCE: <strong className="text-white">{expDate}</strong></span>
+      <div className="flex items-center space-x-2.5 pointer-events-auto">
+        <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-[11px] text-zinc-300 font-semibold tracking-wider shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400 animate-pulse" />
+          <span>VENCE: <strong className="text-white font-bold">{expDate}</strong></span>
         </div>
 
         {planBadge && (
-          <span className="px-3.5 py-1.5 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-xs font-black text-cyan-300 uppercase tracking-wider backdrop-blur-md shadow-md shadow-cyan-950/40">
+          <span className="px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-[11px] font-black text-cyan-300 uppercase tracking-wider backdrop-blur-md shadow-sm">
             PLAN {planBadge}
           </span>
         )}
