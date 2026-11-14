@@ -3,13 +3,16 @@ package com.xnovaplayer.app;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.net.http.SslError;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.webkit.JavascriptInterface;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
+import com.getcapacitor.BridgeWebViewClient;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -26,6 +29,16 @@ public class MainActivity extends BridgeActivity {
 
                 // Permitir cargar imágenes y recursos HTTP en orígenes HTTPS sin ser bloqueados por Mixed Content
                 settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+
+                // Permitir cargar imágenes de servidores IPTV aunque tengan certificados SSL autofirmados o expirados (igual que OkHttp en TiviMate y Kai TV)
+                webView.setWebViewClient(new BridgeWebViewClient(getBridge()) {
+                    @Override
+                    public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+                        if (handler != null) {
+                            handler.proceed();
+                        }
+                    }
+                });
 
                 // User-Agent idéntico a TiviMate para que los servidores IPTV y CDNs no rechacen la descarga de pósters ni flujos
                 settings.setUserAgentString("TiviMate/4.7.0 (Linux; Android 11; Media3; WebView)");

@@ -20,6 +20,7 @@ import { openExternalPlayer } from '../../utils/externalPlayer';
 import { BRANDING } from '../../config/branding';
 import { CatalogCacheService, type CompactCatalogItem } from '../../services/catalogCacheService';
 import { ImagePreloadService } from '../../services/imagePreloadService';
+import { PosterResolutionService } from '../../services/posterResolutionService';
 
 /**
  * Normaliza URLs de imágenes de servidores IPTV / Xtream Codes y TMDb
@@ -81,49 +82,39 @@ const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
     if (coverUrl) {
       setImgSrc(coverUrl);
       setHasFailed(false);
-    } else {
-      // Si la lista Xtream no provee carátula, consultar automáticamente TMDb (igual que TiviMate)
-      const cleaned = TmdbService.cleanTitle(title);
-      if (cleaned && cleaned.length > 1) {
-        TmdbService.enrichMovie(cleaned)
-          .then((meta) => {
-            if (isMounted && meta?.posterUrl) {
-              setImgSrc(meta.posterUrl);
-              setHasFailed(false);
-            } else if (isMounted) {
-              setHasFailed(true);
-            }
-          })
-          .catch(() => {
-            if (isMounted) setHasFailed(true);
-          });
-      } else {
-        setHasFailed(true);
-      }
+    }
+
+    // 🚀 Motor de Asignación Automática HD (igual que TiviMate y Kai TV):
+    // Si es película o serie, resolver en segundo plano con la cola de TMDb
+    // para reemplazar carátulas genéricas o faltantes por el póster oficial en alta definición
+    if (contentType === 'movies' || contentType === 'series') {
+      PosterResolutionService.resolvePoster(title, coverUrl).then((resolvedPoster) => {
+        if (isMounted && resolvedPoster && resolvedPoster.startsWith('http')) {
+          setImgSrc(resolvedPoster);
+          setHasFailed(false);
+        } else if (isMounted && !coverUrl) {
+          setHasFailed(true);
+        }
+      });
+    } else if (!coverUrl) {
+      setHasFailed(true);
     }
 
     return () => { isMounted = false; };
-  }, [rawCover, server, title]);
+  }, [rawCover, server, title, contentType]);
 
   const handleImageError = () => {
-    // Si la imagen del servidor IPTV falló, intentar fallback automático a TMDb (igual que TiviMate)
-    const cleaned = TmdbService.cleanTitle(title);
-    if (cleaned && cleaned.length > 1 && !imgSrc.includes('tmdb.org')) {
-      TmdbService.enrichMovie(cleaned)
-        .then((meta) => {
-          if (meta?.posterUrl && meta.posterUrl !== imgSrc) {
-            setImgSrc(meta.posterUrl);
-            setHasFailed(false);
-          } else {
-            setHasFailed(true);
-          }
-        })
-        .catch(() => {
-          setHasFailed(true);
-        });
-    } else {
+    // Si la imagen actual falló, consultar a TMDb mediante la cola controlada
+    PosterResolutionService.resolvePoster(title).then((resolved) => {
+      if (resolved && resolved !== imgSrc && resolved.startsWith('http')) {
+        setImgSrc(resolved);
+        setHasFailed(false);
+      } else {
+        setHasFailed(true);
+      }
+    }).catch(() => {
       setHasFailed(true);
-    }
+    });
   };
 
   return (
