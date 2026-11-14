@@ -41,10 +41,10 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
   const titleLength = item.title?.length || 0;
   const titleSizeClass = 
     titleLength > 45
-      ? 'text-2xl md:text-3xl lg:text-4xl'
+      ? 'text-lg sm:text-xl md:text-2xl lg:text-3xl'
       : titleLength > 24
-        ? 'text-3xl md:text-4xl lg:text-5xl'
-        : 'text-4xl md:text-5xl lg:text-6xl';
+        ? 'text-2xl sm:text-3xl md:text-4xl'
+        : 'text-3xl sm:text-4xl md:text-5xl';
 
   return (
     <div className="relative flex-1 w-full h-full flex flex-col justify-between px-8 md:px-12 pb-4 pt-0 select-none overflow-hidden font-sans">
@@ -98,8 +98,19 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
           </span>
         </div>
 
-        {/* Título Monumental en Mayúsculas con límite estricto de 2 líneas */}
-        <h1 className={`${titleSizeClass} font-black text-white tracking-wider leading-tight drop-shadow-2xl line-clamp-2`}>
+        {/* Título Monumental en Mayúsculas con límite estricto de 2 líneas y protección absoluta contra desbordamientos */}
+        <h1 
+          className={`${titleSizeClass} font-black text-white tracking-wider leading-tight drop-shadow-2xl line-clamp-2`}
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxHeight: titleLength > 45 ? '3.8rem' : '5.5rem',
+            wordBreak: 'break-word',
+          }}
+        >
           {item.title}
         </h1>
 
