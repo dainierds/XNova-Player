@@ -729,8 +729,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div>
                       <h4 className="text-sm font-bold text-white">{BRANDING.name}</h4>
                       <p className="text-xs text-zinc-400">{BRANDING.tagline}</p>
-                      <span className="inline-block mt-1 text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-cyan-400 border border-cyan-500/20">
-                        Versión {BRANDING.version} • Android TV & Fire TV
+                      <span className="inline-block mt-1 text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-white/10">
+                        Android TV & Fire TV
                       </span>
                     </div>
                   </div>

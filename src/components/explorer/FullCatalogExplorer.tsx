@@ -17,7 +17,6 @@ import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
 import { TmdbService } from '../../services/tmdb';
 import { openExternalPlayer } from '../../utils/externalPlayer';
-import { BRANDING } from '../../config/branding';
 import { CatalogCacheService, type CompactCatalogItem } from '../../services/catalogCacheService';
 import { ImagePreloadService } from '../../services/imagePreloadService';
 import { PosterResolutionService } from '../../services/posterResolutionService';
@@ -1160,14 +1159,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               </button>
             );
           })}
-        </div>
-
-        {/* Pie de la barra lateral con versión oficial de la aplicación */}
-        <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-zinc-400 bg-black/20 shrink-0 select-none">
-          <span className="font-semibold text-zinc-300">XNova Player</span>
-          <span className="text-cyan-400 font-bold bg-cyan-950/50 border border-cyan-500/25 px-2 py-0.5 rounded-full shadow-sm">
-            v{BRANDING.version}
-          </span>
         </div>
       </aside>
 
