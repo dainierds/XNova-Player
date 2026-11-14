@@ -36,6 +36,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
     private String title = "";
     private boolean isLive = false;
     private boolean hasTriedAudioFallback = false;
+    private boolean hasTriedExtensionFallback = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,6 +65,8 @@ public class ExoPlayerActivity extends AppCompatActivity {
         // Configurar botones del diálogo de error
         btnErrorBack.setOnClickListener(v -> finish());
         btnRetry.setOnClickListener(v -> {
+            hasTriedAudioFallback = false;
+            hasTriedExtensionFallback = false;
             errorLayout.setVisibility(View.GONE);
             loadingSpinner.setVisibility(View.VISIBLE);
             initPlayer();
@@ -121,9 +124,9 @@ public class ExoPlayerActivity extends AppCompatActivity {
         releasePlayer();
 
         try {
-            // Habilitar fallback automático de decodificadores de hardware a software para evitar pantalla negra
+            // Habilitar decodificadores de software y hardware con preferencia inteligente
             DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(this)
-                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
                     .setEnableDecoderFallback(true);
 
             // User-Agent de alta compatibilidad (idéntico a TiviMate) para evitar rechazos de servidores IPTV
@@ -163,7 +166,25 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 public void onPlayerError(PlaybackException error) {
                     loadingSpinner.setVisibility(View.GONE);
 
-                    // Si el audio falló por códec no compatible en el chip del TV (ej. DTS 7.1 o AC3 multicanal),
+                    // 1. Fallback automático de extensión para Series y VOD (.mp4 <-> .mkv)
+                    // Si el servidor IPTV responde con 404/recurso no encontrado porque el archivo real es .mkv y no .mp4 (o viceversa),
+                    // reintentar silenciosamente con la otra extensión exactamente como hace TiviMate
+                    if ((error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
+                         error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND) &&
+                        !hasTriedExtensionFallback && streamUrl != null && !streamUrl.isEmpty()) {
+                        hasTriedExtensionFallback = true;
+                        if (streamUrl.endsWith(".mp4")) {
+                            streamUrl = streamUrl.substring(0, streamUrl.length() - 4) + ".mkv";
+                            initPlayer();
+                            return;
+                        } else if (streamUrl.endsWith(".mkv")) {
+                            streamUrl = streamUrl.substring(0, streamUrl.length() - 4) + ".mp4";
+                            initPlayer();
+                            return;
+                        }
+                    }
+
+                    // 2. Si el audio falló por códec no compatible en el chip del TV (ej. DTS 7.1 o AC3 multicanal),
                     // intentar automáticamente forzar downmixing a 2 canales estéreo
                     if (error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED && !hasTriedAudioFallback) {
                         hasTriedAudioFallback = true;

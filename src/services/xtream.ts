@@ -261,7 +261,8 @@ export class XtreamService {
     containerExtension: string = 'mp4'
   ): string {
     const base = this.normalizeUrl(serverUrl);
-    return `${base}/movie/${username}/${password}/${streamId}.${containerExtension}`;
+    const cleanExt = (containerExtension || 'mp4').toString().replace(/^\.+/, '').trim() || 'mp4';
+    return `${base}/movie/${username}/${password}/${streamId}.${cleanExt}`;
   }
 
   public static buildSeriesStreamUrl(
@@ -272,7 +273,8 @@ export class XtreamService {
     containerExtension: string = 'mp4'
   ): string {
     const base = this.normalizeUrl(serverUrl);
-    return `${base}/series/${username}/${password}/${episodeId}.${containerExtension}`;
+    const cleanExt = (containerExtension || 'mp4').toString().replace(/^\.+/, '').trim() || 'mp4';
+    return `${base}/series/${username}/${password}/${episodeId}.${cleanExt}`;
   }
 
   public static buildLiveStreamUrl(

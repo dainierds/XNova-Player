@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   ArrowLeft, 
   Folder, 
@@ -9,7 +9,8 @@ import {
   Video, 
   X, 
   Radio,
-  Film
+  Film,
+  Search
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
@@ -179,7 +180,7 @@ interface FullCatalogExplorerProps {
   }) => void;
 }
 
-type FocusZone = 'sidebar_back' | 'categories' | 'grid' | 'movie_detail' | 'series_modal';
+type FocusZone = 'sidebar_back' | 'sidebar_search' | 'categories' | 'grid' | 'movie_detail' | 'series_modal';
 
 interface MediaMetadata {
   title: string;
@@ -197,11 +198,16 @@ interface MediaMetadata {
 }
 
 interface EpisodeItem {
-  id: string | number;
-  episode_num: number;
-  title: string;
+  id?: string | number;
+  episode_id?: string | number;
+  stream_id?: string | number;
+  episode_num?: number;
+  title?: string;
   container_extension?: string;
-  info?: { plot?: string; duration_secs?: number; movie_image?: string };
+  extension?: string;
+  ext?: string;
+  direct_source?: string;
+  info?: { plot?: string; duration_secs?: number; movie_image?: string; container_extension?: string; extension?: string };
 }
 
 interface SeriesDetails {
@@ -223,6 +229,12 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   const [streams, setStreams] = useState<(XtreamStream | XtreamSeries)[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingStreams, setLoadingStreams] = useState(false);
+
+  // 🔍 Búsqueda general dentro de la sección activa (Películas, Series o Canales)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [allSectionStreams, setAllSectionStreams] = useState<(XtreamStream | XtreamSeries)[] | null>(null);
+  const [loadingSearchAll, setLoadingSearchAll] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // 🎮 Estados de navegación D-Pad para TV
   const [focusZone, setFocusZone] = useState<FocusZone>('categories');
@@ -325,6 +337,52 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     loadStreams();
     return () => { isMounted = false; };
   }, [selectedCategoryId, contentType, server, user, pass]);
+
+  // 🔍 Cargar catálogo completo de la sección (Películas, Series o Canales) en segundo plano al buscar
+  useEffect(() => {
+    if (!searchQuery.trim() || allSectionStreams !== null || loadingSearchAll) return;
+
+    let isMounted = true;
+    const fetchAllSectionStreams = async () => {
+      setLoadingSearchAll(true);
+      try {
+        let all: (XtreamStream | XtreamSeries)[] = [];
+        if (contentType === 'movies') {
+          all = await XtreamService.getVodStreams(server, user, pass);
+        } else if (contentType === 'series') {
+          all = await XtreamService.getSeries(server, user, pass);
+        } else {
+          all = await XtreamService.getLiveStreams(server, user, pass);
+        }
+        if (isMounted) {
+          setAllSectionStreams(all || []);
+        }
+      } catch (err) {
+        console.error('Error al cargar catálogo completo para búsqueda:', err);
+      } finally {
+        if (isMounted) setLoadingSearchAll(false);
+      }
+    };
+
+    fetchAllSectionStreams();
+    return () => { isMounted = false; };
+  }, [searchQuery, allSectionStreams, loadingSearchAll, contentType, server, user, pass]);
+
+  // Contenidos mostrados: si hay búsqueda filtra sobre TODO el catálogo de la sección; si no, la categoría activa
+  const displayedStreams = useMemo(() => {
+    if (!searchQuery.trim()) return streams;
+    const q = searchQuery.toLowerCase().trim();
+    const pool = allSectionStreams || streams;
+    return pool.filter((item) => {
+      const name = item.name || (item as any).title || '';
+      return name.toLowerCase().includes(q);
+    });
+  }, [searchQuery, allSectionStreams, streams]);
+
+  // Al cambiar la búsqueda, restablecer el foco a la primera tarjeta
+  useEffect(() => {
+    setFocusedGridIndex(0);
+  }, [searchQuery]);
 
   // Auto-scroll del elemento enfocado en categorías
   useEffect(() => {
@@ -443,13 +501,13 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
   // Ejecutar carga de metadatos cuando cambia el ítem enfocado
   useEffect(() => {
-    if (streams.length > 0 && streams[focusedGridIndex]) {
+    if (displayedStreams.length > 0 && displayedStreams[focusedGridIndex]) {
       const timer = setTimeout(() => {
-        fetchMetadataForFocusedItem(streams[focusedGridIndex]);
+        fetchMetadataForFocusedItem(displayedStreams[focusedGridIndex]);
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [focusedGridIndex, streams, fetchMetadataForFocusedItem]);
+  }, [focusedGridIndex, displayedStreams, fetchMetadataForFocusedItem]);
 
   // Manejar cuando el usuario pulsa OK/Enter en una tarjeta
   const handleItemSelect = async (item: XtreamStream | XtreamSeries) => {
@@ -537,10 +595,36 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   const playEpisode = (episode: EpisodeItem) => {
     if (!selectedSeriesDetails) return;
     const series = selectedSeriesDetails.series;
-    const streamUrl = XtreamService.buildSeriesStreamUrl(server, user, pass, episode.id, episode.container_extension || 'mp4');
+
+    // 1. Obtener ID del episodio de forma exhaustiva (id, episode_id, stream_id)
+    const epId = (episode as any).id ?? (episode as any).episode_id ?? (episode as any).stream_id;
+    if (!epId) {
+      console.error('[Series] No se encontró ID válido para el episodio:', episode);
+      return;
+    }
+
+    // 2. Extraer y limpiar extensión sin punto (ej. "mp4", "mkv", "avi")
+    const rawExt = (episode as any).container_extension || 
+                   (episode as any).extension || 
+                   (episode as any).ext || 
+                   episode.info?.container_extension || 
+                   (episode.info as any)?.extension || 
+                   'mp4';
+    const cleanExt = String(rawExt).replace(/^\.+/, '').trim() || 'mp4';
+
+    // 3. Generar enlace de reproducción con XtreamService o direct_source si viene lista
+    const streamUrl = (episode as any).direct_source && String((episode as any).direct_source).startsWith('http')
+      ? (episode as any).direct_source
+      : XtreamService.buildSeriesStreamUrl(server, user, pass, epId, cleanExt);
+
+    const epNum = episode.episode_num ?? (episode as any).num ?? 1;
+    const epTitle = episode.title || `Episodio ${epNum}`;
+
+    console.log(`[Series Play] Serie: ${series.name}, Temporada: ${selectedSeasonNumber}, Ep: ${epNum}, ID: ${epId}, Ext: ${cleanExt}, URL: ${streamUrl}`);
+
     onPlayStream({
-      id: `series_${episode.id}`,
-      title: `${series.name} - T${selectedSeasonNumber}E${episode.episode_num}: ${episode.title}`,
+      id: `series_${epId}`,
+      title: `${series.name} - T${selectedSeasonNumber}E${epNum}: ${epTitle}`,
       streamUrl,
       posterUrl: episode.info?.movie_image || series.cover,
       isLive: false,
@@ -723,8 +807,13 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         case 'ArrowLeft':
           if (focusZone === 'grid') {
             if (focusedGridIndex % numCols === 0) {
-              // Si está en la primera columna, pasa al panel de categorías
-              setFocusZone('categories');
+              // Si está en la primera columna, pasa al panel de categorías o barra de búsqueda
+              if (searchQuery.trim().length > 0) {
+                setFocusZone('sidebar_search');
+                searchInputRef.current?.focus();
+              } else {
+                setFocusZone('categories');
+              }
             } else {
               setFocusedGridIndex((prev) => Math.max(0, prev - 1));
             }
@@ -732,13 +821,14 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           break;
 
         case 'ArrowRight':
-          if (focusZone === 'categories') {
-            if (streams.length > 0) {
+          if (focusZone === 'categories' || focusZone === 'sidebar_search') {
+            if (displayedStreams.length > 0) {
               setFocusZone('grid');
               setFocusedGridIndex(0);
+              searchInputRef.current?.blur();
             }
           } else if (focusZone === 'grid') {
-            if (focusedGridIndex < streams.length - 1) {
+            if (focusedGridIndex < displayedStreams.length - 1) {
               setFocusedGridIndex((prev) => prev + 1);
             }
           }
@@ -747,6 +837,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         case 'ArrowUp':
           if (focusZone === 'sidebar_back') {
             // Ya está en el botón superior
+          } else if (focusZone === 'sidebar_search') {
+            setFocusZone('sidebar_back');
+            searchInputRef.current?.blur();
           } else if (focusZone === 'categories') {
             if (focusedCatIndex > 0) {
               const nextIdx = focusedCatIndex - 1;
@@ -755,8 +848,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 setSelectedCategoryId(categories[nextIdx].category_id);
               }
             } else {
-              // Subir al botón "Volver" en la cabecera del sidebar
-              setFocusZone('sidebar_back');
+              // Subir a la barra de búsqueda de la sección
+              setFocusZone('sidebar_search');
+              searchInputRef.current?.focus();
             }
           } else if (focusZone === 'grid') {
             if (focusedGridIndex >= numCols) {
@@ -767,8 +861,12 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
         case 'ArrowDown':
           if (focusZone === 'sidebar_back') {
+            setFocusZone('sidebar_search');
+            searchInputRef.current?.focus();
+          } else if (focusZone === 'sidebar_search') {
             setFocusZone('categories');
             setFocusedCatIndex(0);
+            searchInputRef.current?.blur();
           } else if (focusZone === 'categories') {
             if (focusedCatIndex < categories.length - 1) {
               const nextIdx = focusedCatIndex + 1;
@@ -778,10 +876,10 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               }
             }
           } else if (focusZone === 'grid') {
-            if (focusedGridIndex + numCols < streams.length) {
+            if (focusedGridIndex + numCols < displayedStreams.length) {
               setFocusedGridIndex((prev) => prev + numCols);
-            } else if (focusedGridIndex < streams.length - 1) {
-              setFocusedGridIndex(streams.length - 1);
+            } else if (focusedGridIndex < displayedStreams.length - 1) {
+              setFocusedGridIndex(displayedStreams.length - 1);
             }
           }
           break;
@@ -791,17 +889,19 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           e.preventDefault();
           if (focusZone === 'sidebar_back') {
             onClose();
+          } else if (focusZone === 'sidebar_search') {
+            searchInputRef.current?.focus();
           } else if (focusZone === 'categories') {
             if (categories[focusedCatIndex]) {
               setSelectedCategoryId(categories[focusedCatIndex].category_id);
-              if (streams.length > 0) {
+              if (displayedStreams.length > 0) {
                 setFocusZone('grid');
                 setFocusedGridIndex(0);
               }
             }
           } else if (focusZone === 'grid') {
-            if (streams[focusedGridIndex]) {
-              handleItemSelect(streams[focusedGridIndex]);
+            if (displayedStreams[focusedGridIndex]) {
+              handleItemSelect(displayedStreams[focusedGridIndex]);
             }
           }
           break;
@@ -812,7 +912,18 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           e.preventDefault();
           e.stopPropagation();
           if (focusZone === 'grid') {
-            setFocusZone('categories');
+            if (searchQuery.trim().length > 0) {
+              setFocusZone('sidebar_search');
+              searchInputRef.current?.focus();
+            } else {
+              setFocusZone('categories');
+            }
+          } else if (focusZone === 'sidebar_search') {
+            if (searchQuery.trim().length > 0) {
+              setSearchQuery('');
+            } else {
+              onClose();
+            }
           } else {
             onClose();
           }
@@ -829,6 +940,8 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     focusedGridIndex,
     categories,
     streams,
+    displayedStreams,
+    searchQuery,
     numCols,
     onClose,
     selectedMovieDetail,
@@ -861,6 +974,54 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           </button>
 
           {loading && <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />}
+        </div>
+
+        {/* 🔍 Barra de Búsqueda de la Sección (Películas, Series o Canales) */}
+        <div className="px-4 py-2.5 border-b border-white/5">
+          <div
+            onClick={() => {
+              setFocusZone('sidebar_search');
+              searchInputRef.current?.focus();
+            }}
+            className={`relative rounded-xl border transition-all flex items-center px-3 py-2 cursor-pointer ${
+              focusZone === 'sidebar_search'
+                ? 'bg-zinc-800 border-cyan-400 ring-2 ring-cyan-400/60 shadow-lg'
+                : 'bg-white/5 border-white/10 hover:border-white/20'
+            }`}
+          >
+            <Search className={`w-4 h-4 mr-2.5 shrink-0 ${focusZone === 'sidebar_search' ? 'text-cyan-400' : 'text-zinc-400'}`} />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setFocusZone('sidebar_search')}
+              placeholder={
+                contentType === 'movies'
+                  ? 'Buscar en películas...'
+                  : contentType === 'series'
+                    ? 'Buscar en series...'
+                    : 'Buscar en canales...'
+              }
+              className="bg-transparent text-xs text-white placeholder-zinc-500 focus:outline-none w-full"
+            />
+            {loadingSearchAll && (
+              <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin mr-1 shrink-0" />
+            )}
+            {searchQuery && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSearchQuery('');
+                  searchInputRef.current?.focus();
+                }}
+                className="p-1 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white"
+                title="Limpiar búsqueda"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Encabezado de la lista */}
@@ -963,27 +1124,61 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
         {/* 🎞️ 2. SECCIÓN INFERIOR: CARRUSEL DE TARJETAS (IMAGEN 1) */}
         <div className="flex-1 overflow-y-auto px-10 py-4 flex flex-col scroll-smooth">
-          {/* Título de la Categoría Activa */}
+          {/* Título de la Categoría Activa o Búsqueda */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-black uppercase text-white flex items-center space-x-2">
-              <span className="text-cyan-400">{activeCategory?.category_name || 'Contenido'}</span>
-              <span className="text-xs text-zinc-500 font-normal">
-                ({streams.length} {contentType === 'live' ? 'canales' : 'títulos'})
-              </span>
+              {searchQuery.trim() ? (
+                <>
+                  <span className="text-cyan-400">Resultados para &quot;{searchQuery}&quot;</span>
+                  <span className="text-xs text-zinc-500 font-normal">
+                    ({displayedStreams.length} {contentType === 'live' ? 'canales' : contentType === 'series' ? 'series' : 'películas'})
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-cyan-400">{activeCategory?.category_name || 'Contenido'}</span>
+                  <span className="text-xs text-zinc-500 font-normal">
+                    ({displayedStreams.length} {contentType === 'live' ? 'canales' : 'títulos'})
+                  </span>
+                </>
+              )}
             </h2>
 
-            {(loadingStreams || loadingSeriesModal) && (
+            {(loadingStreams || loadingSeriesModal || loadingSearchAll) && (
               <div className="flex items-center space-x-2 text-xs text-cyan-400">
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>{loadingSeriesModal ? 'Cargando episodios de la serie...' : 'Cargando lista...'}</span>
+                <span>
+                  {loadingSeriesModal 
+                    ? 'Cargando episodios de la serie...' 
+                    : loadingSearchAll 
+                      ? 'Buscando en todo el catálogo...' 
+                      : 'Cargando lista...'}
+                </span>
               </div>
             )}
           </div>
 
+          {/* Estado Vacío de Búsqueda */}
+          {displayedStreams.length === 0 && !loadingStreams && !loadingSearchAll && (
+            <div className="flex-1 flex flex-col items-center justify-center py-20 text-zinc-500">
+              <Search className="w-12 h-12 mb-3 text-zinc-600 opacity-60" />
+              <p className="text-sm font-bold text-zinc-300">
+                {searchQuery.trim() 
+                  ? `No se encontraron resultados para "${searchQuery}"` 
+                  : 'No hay contenidos disponibles en esta categoría'}
+              </p>
+              <p className="text-xs mt-1 text-zinc-500">
+                {searchQuery.trim() 
+                  ? 'Intenta buscar con otra palabra clave en esta sección.' 
+                  : 'Selecciona otra categoría en el menú lateral.'}
+              </p>
+            </div>
+          )}
+
           {/* Cuadrícula / Fila de Posters (5 Columnas fijas para D-Pad 1:1) */}
           {contentType !== 'live' ? (
             <div className="grid grid-cols-5 gap-5 pb-8">
-              {streams.map((item, idx) => (
+              {displayedStreams.map((item, idx) => (
                 <CatalogPosterCard
                   key={(item as any).stream_id || (item as any).series_id || idx}
                   item={item}
@@ -1001,7 +1196,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           ) : (
             /* Lista de Canales de TV en Vivo */
             <div className="grid grid-cols-4 gap-3 pb-8">
-              {streams.map((live, idx) => {
+              {displayedStreams.map((live, idx) => {
                 const stream = live as XtreamStream;
                 const title = stream.name || `Canal #${stream.stream_id}`;
                 const isFocused = focusZone === 'grid' && focusedGridIndex === idx;
