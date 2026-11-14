@@ -79,6 +79,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     lastUpdated: null,
   });
   const [isClearingCache, setIsClearingCache] = useState(false);
+  const [isUpdatingCache, setIsUpdatingCache] = useState(false);
+  const [cacheProgress, setCacheProgress] = useState<{ step: string; percent: number } | null>(null);
 
   useEffect(() => {
     if (isOpen && activePlaylist?.id) {
@@ -92,6 +94,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     await CatalogCacheService.clear(activePlaylist.id);
     setCacheStats({ movies: 0, series: 0, live: 0, lastUpdated: null });
     setIsClearingCache(false);
+  };
+
+  const handleUpdateCache = async () => {
+    if (!activePlaylist?.id || activePlaylist.type !== 'xtream') return;
+    setIsUpdatingCache(true);
+    setCacheProgress({ step: 'Iniciando...', percent: 0 });
+    try {
+      const result = await CatalogCacheService.syncFullCatalog(
+        {
+          id: activePlaylist.id,
+          serverUrl: activePlaylist.serverUrl,
+          username: activePlaylist.username,
+          password: activePlaylist.password,
+        },
+        (step, percent) => setCacheProgress({ step, percent })
+      );
+      setCacheStats({
+        movies: result.moviesCount,
+        series: result.seriesCount,
+        live: result.liveCount,
+        lastUpdated: Date.now(),
+      });
+    } catch (err) {
+      console.error('[Settings] Error actualizando caché:', err);
+    } finally {
+      setIsUpdatingCache(false);
+      setCacheProgress(null);
+    }
   };
 
   useEffect(() => {
@@ -199,7 +229,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     // 8. Switch Splash
     items.push({ id: 'toggle_splash', onSelect: handleToggleSplash });
 
-    // 9. Botón Vaciar Caché
+    // 9. Botones de Caché
+    items.push({ id: 'update_cache', onSelect: handleUpdateCache });
     items.push({ id: 'clear_cache', onSelect: handleClearCache });
 
     return items;
@@ -219,6 +250,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     syncCurrentPlaylist,
     handleSelectTheme,
     handleToggleSplash,
+    handleUpdateCache,
     handleClearCache,
   ]);
 
@@ -687,33 +719,83 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Sección de Rendimiento y Caché Ultra-Rápida */}
               <div className="pt-6 border-t border-zinc-800/80">
-                <div className="p-5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 flex items-center justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <Database className="w-4 h-4 text-cyan-400" />
-                      <h4 className="text-sm font-bold text-white">Caché Ultra-Rápida de Búsqueda</h4>
+                <div className="p-5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 space-y-4">
+                  {/* Cabecera + Stats */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center space-x-2">
+                        <Database className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <h4 className="text-sm font-bold text-white">Caché Ultra-Rápida de Búsqueda</h4>
+                      </div>
+                      <p className="text-xs text-zinc-400">
+                        Retiene películas, series y canales de forma compacta para búsquedas instantáneas (0-10ms) en la TV.
+                      </p>
+                      <div className="flex items-center flex-wrap gap-x-3 gap-y-1 pt-1 text-[11px] font-mono">
+                        <span className={cacheStats.movies > 0 ? 'text-cyan-400' : 'text-zinc-500'}>
+                          {cacheStats.movies.toLocaleString()} películas
+                        </span>
+                        <span className="text-zinc-600">•</span>
+                        <span className={cacheStats.series > 0 ? 'text-blue-400' : 'text-zinc-500'}>
+                          {cacheStats.series.toLocaleString()} series
+                        </span>
+                        <span className="text-zinc-600">•</span>
+                        <span className={cacheStats.live > 0 ? 'text-emerald-400' : 'text-zinc-500'}>
+                          {cacheStats.live.toLocaleString()} canales
+                        </span>
+                      </div>
+                      {cacheStats.lastUpdated && (
+                        <p className="text-[10px] text-zinc-500 pt-0.5">
+                          Última actualización: {new Date(cacheStats.lastUpdated).toLocaleString('es-ES', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit'
+                          })}
+                        </p>
+                      )}
+                      {cacheStats.movies === 0 && cacheStats.series === 0 && cacheStats.live === 0 && !isUpdatingCache && (
+                        <p className="text-[11px] text-amber-400 pt-0.5 font-semibold">
+                          ⚠ Caché vacía — pulsa "Actualizar" para descargar el catálogo
+                        </p>
+                      )}
                     </div>
-                    <p className="text-xs text-zinc-400">
-                      Retiene películas, series y canales de forma compacta (menos de 2 MB) para búsquedas instantáneas (0-10ms) en la TV.
-                    </p>
-                    <div className="flex items-center space-x-3 pt-1 text-[11px] font-mono text-zinc-400">
-                      <span className="text-cyan-400">{cacheStats.movies.toLocaleString()} películas</span>
-                      <span>•</span>
-                      <span className="text-blue-400">{cacheStats.series.toLocaleString()} series</span>
-                      <span>•</span>
-                      <span className="text-emerald-400">{cacheStats.live.toLocaleString()} canales</span>
+
+                    {/* Botones */}
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <button
+                        ref={(el) => { itemRefs.current['update_cache'] = el; }}
+                        onClick={handleUpdateCache}
+                        disabled={isUpdatingCache || isClearingCache || !activePlaylist || activePlaylist.type !== 'xtream'}
+                        className={`px-3.5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white border border-cyan-500/50 transition flex items-center space-x-2 cursor-pointer ${getFocusClass('update_cache')}`}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isUpdatingCache ? 'animate-spin' : ''}`} />
+                        <span>{isUpdatingCache ? 'Actualizando...' : 'Actualizar Caché'}</span>
+                      </button>
+                      <button
+                        ref={(el) => { itemRefs.current['clear_cache'] = el; }}
+                        onClick={handleClearCache}
+                        disabled={isClearingCache || isUpdatingCache || (cacheStats.movies === 0 && cacheStats.series === 0 && cacheStats.live === 0)}
+                        className={`px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-zinc-300 hover:text-white border border-zinc-700 transition flex items-center space-x-2 cursor-pointer ${getFocusClass('clear_cache')}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>{isClearingCache ? 'Limpiando...' : 'Vaciar Caché'}</span>
+                      </button>
                     </div>
                   </div>
 
-                  <button
-                    ref={(el) => { itemRefs.current['clear_cache'] = el; }}
-                    onClick={handleClearCache}
-                    disabled={isClearingCache || (cacheStats.movies === 0 && cacheStats.series === 0 && cacheStats.live === 0)}
-                    className={`px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-xs font-bold text-zinc-300 hover:text-white border border-zinc-700 transition flex items-center space-x-2 shrink-0 cursor-pointer ${getFocusClass('clear_cache')}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                    <span>{isClearingCache ? 'Limpiando...' : 'Vaciar Caché'}</span>
-                  </button>
+                  {/* Barra de progreso cuando está actualizando */}
+                  {isUpdatingCache && cacheProgress && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-cyan-300 font-semibold">{cacheProgress.step}</span>
+                        <span className="text-zinc-400 font-mono">{cacheProgress.percent}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${cacheProgress.percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
