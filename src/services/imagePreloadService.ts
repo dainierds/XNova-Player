@@ -9,6 +9,7 @@
 class ImagePreloadEngine {
   private preloadedUrls = new Set<string>();
   private activeImages = new Map<string, HTMLImageElement>();
+  private pendingImages = new Set<HTMLImageElement>();
   private maxCacheSize = 120; // Máximo 120 imágenes activas en RAM para no saturar dispositivos TV
 
   /**
@@ -26,8 +27,10 @@ class ImagePreloadEngine {
     return new Promise((resolve) => {
       const img = new Image();
       img.decoding = 'async'; // Decodificación asíncrona para no congelar el hilo principal de renderizado
+      this.pendingImages.add(img);
 
       img.onload = () => {
+        this.pendingImages.delete(img);
         this.preloadedUrls.add(url);
         this.activeImages.set(url, img);
 
@@ -42,12 +45,30 @@ class ImagePreloadEngine {
       };
 
       img.onerror = () => {
+        this.pendingImages.delete(img);
         // No bloquear la app si una imagen falla
         resolve(false);
       };
 
       img.src = url;
     });
+  }
+
+  /**
+   * Cancela inmediatamente todas las descargas de imágenes en curso.
+   * Libera instantáneamente los sockets HTTP del WebView al cambiar de carpeta o categoría.
+   */
+  public cancelAllPending(): void {
+    for (const img of this.pendingImages) {
+      try {
+        img.onload = null;
+        img.onerror = null;
+        img.src = '';
+      } catch {
+        // Ignorar posibles excepciones al abortar
+      }
+    }
+    this.pendingImages.clear();
   }
 
   /**

@@ -63,146 +63,156 @@ interface CatalogPosterCardProps {
   innerRef: (el: HTMLDivElement | null) => void;
 }
 
-const CatalogPosterCard: React.FC<CatalogPosterCardProps> = ({
-  item,
-  isFocused,
-  contentType,
-  server,
-  onSelect,
-  innerRef,
-}) => {
-  const isSeries = contentType === 'series';
-  const rawCover = isSeries
-    ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
-    : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
-  const initialCover = normalizeMediaUrl(rawCover, server);
-  const title = item.name || (item as any).title || 'Sin Título';
-  const rating = item.rating || '7.0';
+const CatalogPosterCard = React.memo<CatalogPosterCardProps>(
+  ({
+    item,
+    isFocused,
+    contentType,
+    server,
+    onSelect,
+    innerRef,
+  }) => {
+    const isSeries = contentType === 'series';
+    const rawCover = isSeries
+      ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
+      : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
+    const initialCover = normalizeMediaUrl(rawCover, server);
+    const title = item.name || (item as any).title || 'Sin Título';
+    const rating = item.rating || '7.0';
 
-  // Si no hay portada en el proveedor, buscar inmediatamente si ya está resuelta en RAM (0ms)
-  const cachedPoster = !initialCover ? PosterResolutionService.getCachedPoster(title) : null;
-  const initialSrc = initialCover || cachedPoster || '';
+    // Si no hay portada en el proveedor, buscar inmediatamente si ya está resuelta en RAM (0ms)
+    const cachedPoster = !initialCover ? PosterResolutionService.getCachedPoster(title) : null;
+    const initialSrc = initialCover || cachedPoster || '';
 
-  const [imgSrc, setImgSrc] = useState<string>(initialSrc);
-  const [imageLoaded, setImageLoaded] = useState<boolean>(() => {
-    return initialSrc ? ImagePreloadService.isCached(initialSrc) : false;
-  });
-  const [hasFailed, setHasFailed] = useState<boolean>(false);
+    const [imgSrc, setImgSrc] = useState<string>(initialSrc);
+    const [imageLoaded, setImageLoaded] = useState<boolean>(() => {
+      return initialSrc ? ImagePreloadService.isCached(initialSrc) : false;
+    });
+    const [hasFailed, setHasFailed] = useState<boolean>(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    const coverUrl = normalizeMediaUrl(rawCover, server);
+    useEffect(() => {
+      let isMounted = true;
+      const coverUrl = normalizeMediaUrl(rawCover, server);
 
-    if (coverUrl) {
-      setImgSrc(coverUrl);
-      setHasFailed(false);
-      if (ImagePreloadService.isCached(coverUrl)) {
+      if (coverUrl) {
+        setImgSrc(coverUrl);
+        setHasFailed(false);
+        if (ImagePreloadService.isCached(coverUrl)) {
+          setImageLoaded(true);
+        }
+      } else if (cachedPoster) {
+        setImgSrc(cachedPoster);
+        setHasFailed(false);
         setImageLoaded(true);
+      } else if (contentType === 'movies' || contentType === 'series') {
+        PosterResolutionService.resolvePoster(title).then((resolvedPoster) => {
+          if (isMounted) {
+            if (resolvedPoster && resolvedPoster.startsWith('http')) {
+              setImgSrc(resolvedPoster);
+              setHasFailed(false);
+            } else {
+              setHasFailed(true);
+            }
+          }
+        }).catch(() => {
+          if (isMounted) setHasFailed(true);
+        });
+      } else {
+        setHasFailed(true);
       }
-    } else if (cachedPoster) {
-      setImgSrc(cachedPoster);
-      setHasFailed(false);
-      setImageLoaded(true);
-    } else if (contentType === 'movies' || contentType === 'series') {
-      PosterResolutionService.resolvePoster(title).then((resolvedPoster) => {
-        if (isMounted) {
-          if (resolvedPoster && resolvedPoster.startsWith('http')) {
-            setImgSrc(resolvedPoster);
+
+      return () => { isMounted = false; };
+    }, [rawCover, server, title, contentType, cachedPoster]);
+
+    const handleImageError = () => {
+      if (contentType === 'movies' || contentType === 'series') {
+        PosterResolutionService.resolvePoster(title).then((resolved) => {
+          if (resolved && resolved !== imgSrc && resolved.startsWith('http')) {
+            setImgSrc(resolved);
             setHasFailed(false);
           } else {
             setHasFailed(true);
           }
-        }
-      }).catch(() => {
-        if (isMounted) setHasFailed(true);
-      });
-    } else {
-      setHasFailed(true);
-    }
-
-    return () => { isMounted = false; };
-  }, [rawCover, server, title, contentType, cachedPoster]);
-
-  const handleImageError = () => {
-    if (contentType === 'movies' || contentType === 'series') {
-      PosterResolutionService.resolvePoster(title).then((resolved) => {
-        if (resolved && resolved !== imgSrc && resolved.startsWith('http')) {
-          setImgSrc(resolved);
-          setHasFailed(false);
-        } else {
+        }).catch(() => {
           setHasFailed(true);
-        }
-      }).catch(() => {
+        });
+      } else {
         setHasFailed(true);
-      });
-    } else {
-      setHasFailed(true);
-    }
-  };
+      }
+    };
 
-  return (
-    <div
-      ref={innerRef}
-      onClick={onSelect}
-      className={`group relative flex flex-col cursor-pointer transition-all duration-200 ${
-        isFocused
-          ? 'scale-105 ring-4 ring-cyan-400 shadow-2xl shadow-cyan-500/60 z-20 -translate-y-1'
-          : 'hover:scale-105'
-      }`}
-    >
-      <div className={`aspect-[2/3] w-full rounded-2xl overflow-hidden bg-gradient-to-b from-zinc-800 to-zinc-950 border border-white/10 group-hover:border-cyan-400 relative shadow-lg flex items-center justify-center ${
-        !imageLoaded && !hasFailed && !imgSrc ? 'shimmer-effect' : ''
-      }`}>
-        {!hasFailed && imgSrc ? (
-          <img
-            ref={(el) => {
-              if (el && (el.complete || el.naturalWidth > 0) && !imageLoaded) {
-                setImageLoaded(true);
-              }
-            }}
-            src={imgSrc}
-            alt={title}
-            referrerPolicy="no-referrer"
-            decoding="async"
-            onLoad={() => setImageLoaded(true)}
-            onError={handleImageError}
-            className={`w-full h-full object-cover transition-opacity duration-200 ${
-              imageLoaded ? 'opacity-100' : 'opacity-90'
-            }`}
-          />
-        ) : (
-          <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0A0F1D]">
-            <Film className="w-10 h-10 text-cyan-400/60 mb-3" />
-            <span className="text-xs font-bold text-zinc-300 line-clamp-3 leading-tight">{title}</span>
-          </div>
-        )}
-
-        {/* Calificación en la esquina inferior izquierda (estilo TiviMate) */}
-        {rating && rating !== '0' && rating !== '0.0' && (
-          <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-cyan-600/90 backdrop-blur-md text-[11px] font-black text-white shadow-md border border-cyan-400/40">
-            {rating}
-          </div>
-        )}
-
-        {/* Barra de progreso de reproducción para Continuar Viendo */}
-        {typeof (item as any).progressPercent === 'number' && (item as any).progressPercent > 0 && (
-          <div className="absolute bottom-0 inset-x-0 h-1.5 bg-black/75 overflow-hidden">
-            <div
-              className="h-full bg-cyan-400 shadow-sm"
-              style={{ width: `${Math.min(100, Math.max(5, (item as any).progressPercent))}%` }}
+    return (
+      <div
+        ref={innerRef}
+        onClick={onSelect}
+        className={`group relative flex flex-col cursor-pointer transition-all duration-200 ${
+          isFocused
+            ? 'scale-105 ring-4 ring-cyan-400 shadow-2xl shadow-cyan-500/60 z-20 -translate-y-1'
+            : 'hover:scale-105'
+        }`}
+      >
+        <div className={`aspect-[2/3] w-full rounded-2xl overflow-hidden bg-gradient-to-b from-zinc-800 to-zinc-950 border border-white/10 group-hover:border-cyan-400 relative shadow-lg flex items-center justify-center ${
+          !imageLoaded && !hasFailed && !imgSrc ? 'shimmer-effect' : ''
+        }`}>
+          {!hasFailed && imgSrc ? (
+            <img
+              ref={(el) => {
+                if (el && (el.complete || el.naturalWidth > 0) && !imageLoaded) {
+                  setImageLoaded(true);
+                }
+              }}
+              src={imgSrc}
+              alt={title}
+              referrerPolicy="no-referrer"
+              decoding="async"
+              onLoad={() => setImageLoaded(true)}
+              onError={handleImageError}
+              className={`w-full h-full object-cover transition-opacity duration-200 ${
+                imageLoaded ? 'opacity-100' : 'opacity-90'
+              }`}
             />
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0A0F1D]">
+              <Film className="w-10 h-10 text-cyan-400/60 mb-3" />
+              <span className="text-xs font-bold text-zinc-300 line-clamp-3 leading-tight">{title}</span>
+            </div>
+          )}
 
-      <h3 className={`text-xs font-bold mt-2 truncate transition ${
-        isFocused ? 'text-cyan-300 font-extrabold' : 'text-zinc-200'
-      }`}>
-        {title}
-      </h3>
-    </div>
-  );
-};
+          {/* Calificación en la esquina inferior izquierda (estilo TiviMate) */}
+          {rating && rating !== '0' && rating !== '0.0' && (
+            <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-cyan-600/90 backdrop-blur-md text-[11px] font-black text-white shadow-md border border-cyan-400/40">
+              {rating}
+            </div>
+          )}
+
+          {/* Barra de progreso de reproducción para Continuar Viendo */}
+          {typeof (item as any).progressPercent === 'number' && (item as any).progressPercent > 0 && (
+            <div className="absolute bottom-0 inset-x-0 h-1.5 bg-black/75 overflow-hidden">
+              <div
+                className="h-full bg-cyan-400 shadow-sm"
+                style={{ width: `${Math.min(100, Math.max(5, (item as any).progressPercent))}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        <h3 className={`text-xs font-bold mt-2 truncate transition ${
+          isFocused ? 'text-cyan-300 font-extrabold' : 'text-zinc-200'
+        }`}>
+          {title}
+        </h3>
+      </div>
+    );
+  },
+  (prev, next) => {
+    return (
+      prev.isFocused === next.isFocused &&
+      prev.item === next.item &&
+      prev.contentType === next.contentType &&
+      prev.server === next.server
+    );
+  }
+);
 
 interface FullCatalogExplorerProps {
   playlist: PlaylistAccount;
@@ -287,6 +297,8 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   const [streams, setStreams] = useState<(XtreamStream | XtreamSeries)[]>(initialCachedStreams);
   const [loading, setLoading] = useState(initialCachedCats.length === 0);
   const [loadingStreams, setLoadingStreams] = useState(initialCachedStreams.length === 0);
+  // 🚀 Fila actual de scroll para la ventana de renderizado virtualizada (Opción 1)
+  const [scrollRow, setScrollRow] = useState<number>(0);
 
   // ⏱️ Historial / Continuar Viendo persistente
   const {
@@ -678,8 +690,8 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       const cached = globalCategoryStreamsCache.get(streamsKey)!;
       setStreams(cached);
       setLoadingStreams(false);
-      // Precarga suave en segundo plano de las primeras 60 carátulas
-      const urls = cached.slice(0, 60).map((item) => {
+      // Precarga suave en segundo plano de las primeras 15 carátulas (filas inmediatamente visibles)
+      const urls = cached.slice(0, 15).map((item) => {
         const rawCover = contentType === 'series'
           ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
           : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
@@ -706,7 +718,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             setLoadingStreams(false);
             setFocusedGridIndex(0);
 
-            const urls = filtered.slice(0, 60).map((item: any) => {
+            const urls = filtered.slice(0, 15).map((item: any) => {
               return normalizeMediaUrl(item.icon, server);
             });
             ImagePreloadService.preloadBatch(urls);
@@ -737,7 +749,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         if (isMounted) {
           setStreams(validItems);
           setFocusedGridIndex(0);
-          const urls = validItems.slice(0, 60).map((item) => {
+          const urls = validItems.slice(0, 15).map((item) => {
             const rawCover = contentType === 'series'
               ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
               : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
@@ -910,13 +922,26 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     return () => window.removeEventListener('contextmenu', handleContextMenu, true);
   }, [isActive, openQuickMenu]);
 
-  // Al cambiar la búsqueda o categoría, restablecer el foco y scroll al inicio
+  // Al cambiar la búsqueda o categoría, cancelar descargas obsoletas y restablecer el foco y scroll al inicio
   useEffect(() => {
+    // 🚀 Opción 2: Cancelación inmediata de imágenes y peticiones TMDb de la carpeta previa
+    ImagePreloadService.cancelAllPending();
+    PosterResolutionService.clearQueue();
+
+    setScrollRow(0);
     setFocusedGridIndex(0);
     if (gridScrollContainerRef.current) {
       gridScrollContainerRef.current.scrollTop = 0;
     }
   }, [searchQuery, selectedCategoryId]);
+
+  // Al desmontar el explorador, limpiar colas de red activas
+  useEffect(() => {
+    return () => {
+      ImagePreloadService.cancelAllPending();
+      PosterResolutionService.clearQueue();
+    };
+  }, []);
 
   // Auto-scroll del elemento enfocado en categorías
   useEffect(() => {
@@ -1955,6 +1980,13 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         {/* 🎞️ 2. SECCIÓN INFERIOR: CARRUSEL DE TARJETAS (IMAGEN 1) */}
         <div 
           ref={gridScrollContainerRef}
+          onScroll={(e) => {
+            const rowHeight = contentType === 'live' ? 80 : 380;
+            const newRow = Math.floor(e.currentTarget.scrollTop / rowHeight);
+            if (newRow !== scrollRow) {
+              setScrollRow(newRow);
+            }
+          }}
           className="flex-1 overflow-y-auto px-10 pt-4 pb-12 flex flex-col scroll-smooth"
         >
           {/* Estado Vacío de Búsqueda o Continuar Viendo */}
@@ -2007,77 +2039,138 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             </div>
           )}
 
-          {/* Cuadrícula / Fila de Posters (5 Columnas fijas para D-Pad 1:1) */}
-          {contentType !== 'live' ? (
-            <div className="grid grid-cols-5 gap-5 pt-2 pb-8">
-              {displayedStreams.map((item, idx) => (
-                <CatalogPosterCard
-                  key={(item as any).stream_id || (item as any).series_id || idx}
-                  item={item}
-                  isFocused={focusZone === 'grid' && focusedGridIndex === idx}
-                  contentType={contentType}
-                  server={server}
-                  onSelect={() => {
-                    setFocusedGridIndex(idx);
-                    handleItemSelect(item);
-                  }}
-                  innerRef={(el) => { gridItemRefs.current[idx] = el; }}
-                />
-              ))}
-            </div>
-          ) : (
-            /* Lista de Canales de TV en Vivo */
-            <div className="grid grid-cols-4 gap-3 pt-2 pb-8">
-              {displayedStreams.map((live, idx) => {
-                const stream = live as XtreamStream;
-                const title = stream.name || `Canal #${stream.stream_id}`;
-                const isFocused = focusZone === 'grid' && focusedGridIndex === idx;
+          {/* 🚀 Opción 1: Ventana de renderizado virtualizada por filas */}
+          {(() => {
+            const focusedRow = Math.floor(focusedGridIndex / numCols);
+            const minVisibleRow = Math.max(0, Math.min(focusedRow, scrollRow) - 2);
+            const maxVisibleRow = Math.max(focusedRow, scrollRow) + 4;
 
-                return (
-                  <div
-                    key={stream.stream_id || idx}
-                    ref={(el) => { gridItemRefs.current[idx] = el; }}
-                    onClick={() => {
-                      setFocusedGridIndex(idx);
-                      handleItemSelect(stream);
-                    }}
-                    className={`p-3.5 rounded-2xl flex items-center space-x-3 cursor-pointer transition shadow-md ${
-                      isFocused
-                        ? 'bg-gradient-to-r from-cyan-900/70 to-blue-900/70 border-2 border-cyan-400 ring-4 ring-cyan-400/50 scale-105 z-10'
-                        : 'bg-[#0E1424] hover:bg-cyan-950/40 border border-white/5'
-                    }`}
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 p-1">
-                      {stream.stream_icon ? (
-                        <img
-                          src={normalizeMediaUrl(stream.stream_icon, server)}
-                          alt={title}
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                          className="w-full h-full object-contain"
-                        />
-                      ) : (
-                        <Radio className="w-5 h-5 text-cyan-400" />
-                      )}
+            return contentType !== 'live' ? (
+              /* Cuadrícula / Fila de Posters (5 Columnas fijas para D-Pad 1:1) */
+              <div className="grid grid-cols-5 gap-5 pt-2 pb-8">
+                {displayedStreams.map((item, idx) => {
+                  const row = Math.floor(idx / numCols);
+                  const isVisible = row >= minVisibleRow && row <= maxVisibleRow;
+                  const isFocused = focusZone === 'grid' && focusedGridIndex === idx;
+
+                  if (isVisible) {
+                    return (
+                      <CatalogPosterCard
+                        key={(item as any).stream_id || (item as any).series_id || idx}
+                        item={item}
+                        isFocused={isFocused}
+                        contentType={contentType}
+                        server={server}
+                        onSelect={() => {
+                          setFocusedGridIndex(idx);
+                          handleItemSelect(item);
+                        }}
+                        innerRef={(el) => { gridItemRefs.current[idx] = el; }}
+                      />
+                    );
+                  }
+
+                  // Placeholder ultraligero que conserva tamaño y refs D-pad 1:1
+                  return (
+                    <div
+                      key={(item as any).stream_id || (item as any).series_id || idx}
+                      ref={(el) => { gridItemRefs.current[idx] = el; }}
+                      onClick={() => {
+                        setFocusedGridIndex(idx);
+                        handleItemSelect(item);
+                      }}
+                      className="group relative flex flex-col cursor-pointer"
+                    >
+                      <div className="aspect-[2/3] w-full rounded-2xl bg-zinc-900/40 border border-white/5 flex items-center justify-center p-3 relative overflow-hidden">
+                        <Film className="w-8 h-8 text-zinc-800" />
+                      </div>
+                      <h3 className="text-xs font-bold mt-2 truncate text-zinc-600">
+                        {item.name || (item as any).title || '...'}
+                      </h3>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className={`text-xs font-bold truncate ${isFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>
-                        {title}
-                      </h4>
-                      {(live as any).isContinueWatchingItem && (
-                        <span className="text-[10px] text-amber-400 font-semibold flex items-center space-x-1 mt-0.5">
-                          <Clock className="w-3 h-3 mr-1 inline" /> Visto recientemente
-                        </span>
-                      )}
+                  );
+                })}
+              </div>
+            ) : (
+              /* Lista de Canales de TV en Vivo */
+              <div className="grid grid-cols-4 gap-3 pt-2 pb-8">
+                {displayedStreams.map((live, idx) => {
+                  const stream = live as XtreamStream;
+                  const title = stream.name || `Canal #${stream.stream_id}`;
+                  const row = Math.floor(idx / numCols);
+                  const isVisible = row >= minVisibleRow && row <= maxVisibleRow;
+                  const isFocused = focusZone === 'grid' && focusedGridIndex === idx;
+
+                  if (isVisible) {
+                    return (
+                      <div
+                        key={stream.stream_id || idx}
+                        ref={(el) => { gridItemRefs.current[idx] = el; }}
+                        onClick={() => {
+                          setFocusedGridIndex(idx);
+                          handleItemSelect(stream);
+                        }}
+                        className={`p-3.5 rounded-2xl flex items-center space-x-3 cursor-pointer transition shadow-md ${
+                          isFocused
+                            ? 'bg-gradient-to-r from-cyan-900/70 to-blue-900/70 border-2 border-cyan-400 ring-4 ring-cyan-400/50 scale-105 z-10'
+                            : 'bg-[#0E1424] hover:bg-cyan-950/40 border border-white/5'
+                        }`}
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 p-1">
+                          {stream.stream_icon ? (
+                            <img
+                              src={normalizeMediaUrl(stream.stream_icon, server)}
+                              alt={title}
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                              className="w-full h-full object-contain"
+                            />
+                          ) : (
+                            <Radio className="w-5 h-5 text-cyan-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className={`text-xs font-bold truncate ${isFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>
+                            {title}
+                          </h4>
+                          {(live as any).isContinueWatchingItem && (
+                            <span className="text-[10px] text-amber-400 font-semibold flex items-center space-x-1 mt-0.5">
+                              <Clock className="w-3 h-3 mr-1 inline" /> Visto recientemente
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Placeholder ultraligero para canales fuera de pantalla
+                  return (
+                    <div
+                      key={stream.stream_id || idx}
+                      ref={(el) => { gridItemRefs.current[idx] = el; }}
+                      onClick={() => {
+                        setFocusedGridIndex(idx);
+                        handleItemSelect(stream);
+                      }}
+                      className="p-3.5 rounded-2xl flex items-center space-x-3 bg-[#0E1424]/40 border border-white/5 cursor-pointer"
+                    >
+                      <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center shrink-0">
+                        <Radio className="w-5 h-5 text-zinc-700" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-medium text-zinc-600 truncate">
+                          {title}
+                        </h4>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </main>
 

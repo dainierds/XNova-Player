@@ -24,6 +24,19 @@ class PosterResolutionEngine {
   private maxConcurrency = 3; // Máximo 3 descargas simultáneas en segundo plano (igual que Glide/TiviMate)
 
   /**
+   * Vacía la cola de peticiones de TMDb pendientes de la carpeta anterior.
+   * Evita que búsquedas obsoletas consuman conexiones de red y cuotas de API.
+   */
+  public clearQueue(): void {
+    while (this.queue.length > 0) {
+      const task = this.queue.shift();
+      if (task) {
+        task.resolve(task.fallbackUrl || '');
+      }
+    }
+  }
+
+  /**
    * Limpia marcas de agua, grupos P2P y tags técnicos de IPTV
    */
   public cleanTitle(raw: string): string {
