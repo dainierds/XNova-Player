@@ -12,7 +12,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Star, 
-  LogOut,
   Layers
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -58,7 +57,7 @@ interface SidebarItemDef {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  action: 'home' | 'search' | 'live' | 'movies' | 'series' | 'favorites' | 'settings' | 'logout';
+  action: 'home' | 'search' | 'live' | 'movies' | 'series' | 'favorites' | 'settings';
 }
 
 const SIDEBAR_ITEMS: SidebarItemDef[] = [
@@ -69,7 +68,6 @@ const SIDEBAR_ITEMS: SidebarItemDef[] = [
   { id: 'series', label: 'Series', icon: Video, action: 'series' },
   { id: 'favorites', label: 'Favoritos', icon: Heart, action: 'favorites' },
   { id: 'settings', label: 'Ajustes', icon: Settings, action: 'settings' },
-  { id: 'logout', label: 'Cerrar Sesión', icon: LogOut, action: 'logout' },
 ];
 
 export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
@@ -402,9 +400,6 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
             setActiveNav('favorites');
           } else if (item.action === 'settings') {
             onOpenSettings();
-          } else if (item.action === 'logout') {
-            const { logout } = useAuthStore.getState();
-            logout();
           }
         }
         return;
@@ -591,11 +586,11 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black text-white flex select-none font-sans">
-      {/* 1. BARRA LATERAL IZQUIERDA COMPLETA (Inicio, Buscar, TV en Vivo, Películas, Series, Favoritos, Ajustes, Cerrar Sesión) */}
-      <aside className="w-56 h-full bg-[#0a0a0c] border-r border-white/10 flex flex-col justify-between py-6 px-4 z-20 shrink-0">
+      {/* 1. BARRA LATERAL IZQUIERDA COMPLETA (Inicio, Buscar, TV en Vivo, Películas, Series, Favoritos, Ajustes) */}
+      <aside className="w-60 md:w-64 h-full bg-[#08080a] border-r border-white/10 flex flex-col justify-between py-7 px-4 md:px-5 z-20 shrink-0">
         <div>
           {/* Menú Principal de Navegación */}
-          <nav className="space-y-1.5 pt-1">
+          <nav className="space-y-3 pt-2">
             {SIDEBAR_ITEMS.slice(0, 6).map((item, idx) => {
               const Icon = item.icon;
               const isSelected = activeNav === item.id;
@@ -621,58 +616,49 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
                       setActiveNav('favorites');
                     }
                   }}
-                  className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                  className={`w-full flex items-center space-x-3.5 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-200 ${
                     isFocused
-                      ? 'bg-gradient-to-r from-cyan-500/30 to-zinc-800 text-white ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/20 scale-[1.04]'
+                      ? 'bg-gradient-to-r from-cyan-500/25 via-cyan-500/15 to-white/5 text-white ring-2 ring-cyan-400 shadow-xl shadow-cyan-500/20 scale-[1.03] font-bold'
                       : isSelected
-                      ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/15'
-                      : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                      ? 'bg-white/10 text-white shadow-sm border border-white/15 font-semibold'
+                      : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isFocused ? 'text-cyan-400' : ''}`} />
-                  <span>{item.label}</span>
+                  <Icon className={`w-5 h-5 shrink-0 ${isFocused ? 'text-cyan-400' : isSelected ? 'text-white' : 'text-zinc-400'}`} />
+                  <span className="tracking-wide">{item.label}</span>
                 </button>
               );
             })}
           </nav>
         </div>
 
-        {/* Menú Secundario Inferior: Ajustes y Cerrar Sesión */}
-        <div className="pt-4 border-t border-white/10 space-y-1.5">
-          {SIDEBAR_ITEMS.slice(6).map((item, relIdx) => {
-            const idx = relIdx + 6;
+        {/* Menú Inferior: Ajustes */}
+        <div className="pt-4 border-t border-white/10">
+          {(() => {
+            const item = SIDEBAR_ITEMS[6];
+            if (!item) return null;
             const Icon = item.icon;
-            const isFocused = focusZone === 'sidebar' && focusedSidebarIdx === idx;
-            const isLogout = item.action === 'logout';
+            const isFocused = focusZone === 'sidebar' && focusedSidebarIdx === 6;
 
             return (
               <button
                 key={item.id}
                 onClick={() => {
                   setFocusZone('sidebar');
-                  setFocusedSidebarIdx(idx);
-                  if (item.action === 'settings') {
-                    onOpenSettings();
-                  } else if (item.action === 'logout') {
-                    const { logout } = useAuthStore.getState();
-                    logout();
-                  }
+                  setFocusedSidebarIdx(6);
+                  onOpenSettings();
                 }}
-                className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                className={`w-full flex items-center space-x-3.5 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-200 ${
                   isFocused
-                    ? isLogout
-                      ? 'bg-rose-500/30 text-rose-200 ring-2 ring-rose-400 shadow-lg shadow-rose-500/30 scale-[1.04]'
-                      : 'bg-gradient-to-r from-cyan-500/30 to-zinc-800 text-white ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/20 scale-[1.04]'
-                    : isLogout
-                    ? 'text-rose-400 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-gradient-to-r from-cyan-500/25 via-cyan-500/15 to-white/5 text-white ring-2 ring-cyan-400 shadow-xl shadow-cyan-500/20 scale-[1.03] font-bold'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isFocused ? (isLogout ? 'text-rose-300' : 'text-cyan-400') : ''}`} />
-                <span>{item.label}</span>
+                <Icon className={`w-5 h-5 shrink-0 ${isFocused ? 'text-cyan-400' : 'text-zinc-400'}`} />
+                <span className="tracking-wide">{item.label}</span>
               </button>
             );
-          })}
+          })()}
         </div>
       </aside>
 
