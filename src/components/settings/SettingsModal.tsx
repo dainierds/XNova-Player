@@ -68,7 +68,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   });
 
   const [showSplash, setShowSplash] = useState(true);
-  const [selectedTheme, setSelectedTheme] = useState<'cinematic' | 'serivia'>(currentTheme === 'cinematic' ? 'serivia' : currentTheme);
+  const [selectedTheme, setSelectedTheme] = useState<'cinematic' | 'serivia'>(currentTheme === 'serivia' ? 'cinematic' : currentTheme);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
 
@@ -126,12 +126,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     StorageService.getShowSplashAnimation().then((val) => setShowSplash(val));
-    StorageService.getActiveTheme().then(() => setSelectedTheme('serivia'));
+    StorageService.getActiveTheme().then(() => setSelectedTheme('cinematic'));
   }, []);
 
   const handleSelectTheme = useCallback(async (_theme?: 'cinematic' | 'serivia') => {
-    // Tema 2 desactivado por ahora
-    const targetTheme = 'serivia';
+    // Tema 1 (Serivia Modern Deck) desactivado por ahora
+    const targetTheme = 'cinematic';
     setSelectedTheme(targetTheme);
     await StorageService.setActiveTheme(targetTheme);
     if (onThemeChange) {
@@ -223,8 +223,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       items.push({ id: 'sync', onSelect: () => syncCurrentPlaylist() });
     }
 
-    // 7. Temas (Tema 2 desactivado por ahora)
-    items.push({ id: 'theme_serivia', onSelect: () => handleSelectTheme('serivia') });
+    // 7. Temas (Tema 1 Serivia Modern Deck desactivado por ahora)
+    items.push({ id: 'theme_cinematic', onSelect: () => handleSelectTheme('cinematic') });
 
     // 8. Switch Splash
     items.push({ id: 'toggle_splash', onSelect: handleToggleSplash });
@@ -655,41 +655,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 {/* Selector de Tema Visual */}
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Tema 1: Serivia Modern */}
+                  {/* Tema 1: Cinematic Showcase — ACTIVO */}
                   <div
-                    ref={(el) => { itemRefs.current['theme_serivia'] = el; }}
-                    onClick={() => handleSelectTheme('serivia')}
+                    ref={(el) => { itemRefs.current['theme_cinematic'] = el; }}
+                    onClick={() => handleSelectTheme('cinematic')}
                     className={`p-4 rounded-xl border cursor-pointer transition ${
-                      selectedTheme === 'serivia'
+                      selectedTheme === 'cinematic'
                         ? 'bg-cyan-950/40 border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-950/40'
                         : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-600'
-                    } ${getFocusClass('theme_serivia')}`}
+                    } ${getFocusClass('theme_cinematic')}`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-white">Serivia Modern Deck</span>
-                      {selectedTheme === 'serivia' && (
+                      <span className="text-sm font-bold text-white">Cinematic Showcase</span>
+                      {selectedTheme === 'cinematic' && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500 text-white">
                           Activo
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-zinc-400">
-                      Diseño en tarjetas con hero deck 3D, carrusel con asomo y filtros de categorías por género.
+                      Diseño con hero de pantalla completa, miniaturas ampliadas y carrusel continuo.
                     </p>
                   </div>
 
-                  {/* Tema 2: Cinematic Showcase (Desactivado por ahora) */}
+                  {/* Tema 2: Serivia Modern Deck — DESACTIVADO por ahora */}
                   <div
                     className="p-4 rounded-xl border border-zinc-800/60 bg-zinc-900/30 opacity-40 cursor-not-allowed select-none"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-zinc-400">Cinematic Showcase</span>
+                      <span className="text-sm font-bold text-zinc-400">Serivia Modern Deck</span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-white/10">
                         Desactivado por ahora
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500">
-                      Diseño con hero de pantalla completa y carrusel continuo. (Temporalmente en mantenimiento).
+                      Diseño en tarjetas con hero deck 3D y filtros de categorías. (Temporalmente en mantenimiento).
                     </p>
                   </div>
                 </div>

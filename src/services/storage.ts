@@ -158,16 +158,16 @@ export const StorageService = {
   // --- Estilo / Tema de la Interfaz ---
   async getActiveTheme(): Promise<'cinematic' | 'serivia'> {
     const theme = await get<'cinematic' | 'serivia'>(KEYS.ACTIVE_THEME);
-    if (theme === 'cinematic') {
-      await set(KEYS.ACTIVE_THEME, 'serivia');
-      return 'serivia';
+    if (theme === 'serivia') {
+      await set(KEYS.ACTIVE_THEME, 'cinematic');
+      return 'cinematic';
     }
-    return 'serivia'; // Tema 1 (Serivia) por defecto; Tema 2 desactivado por ahora
+    return 'cinematic'; // Tema 2 (Cinematic Showcase) por defecto; Tema 1 desactivado por ahora
   },
 
   async setActiveTheme(theme: 'cinematic' | 'serivia'): Promise<void> {
-    // Tema 2 desactivado por ahora, siempre forzar 'serivia'
-    const finalTheme = theme === 'cinematic' ? 'serivia' : theme;
+    // Tema 1 (Serivia) desactivado por ahora, siempre forzar 'cinematic'
+    const finalTheme = theme === 'serivia' ? 'cinematic' : theme;
     await set(KEYS.ACTIVE_THEME, finalTheme);
   },
 
