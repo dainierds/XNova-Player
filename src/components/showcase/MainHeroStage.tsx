@@ -65,16 +65,22 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
         <div className="flex items-center space-x-4 text-xs md:text-sm font-medium text-zinc-300">
           <div className="flex items-center space-x-2">
             <span className="font-bold text-white tracking-wide">{item.releaseDateText}</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase border ${
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase border ${
               item.statusBadge === 'ESTRENO'
-                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30'
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40 shadow-sm shadow-cyan-500/20'
                 : item.statusBadge === 'PRÓXIMAMENTE'
-                  ? 'bg-purple-500/20 text-purple-300 border-purple-400/30 animate-pulse'
-                  : item.statusBadge === 'TENDENCIA'
-                    ? 'bg-orange-500/20 text-orange-300 border-orange-400/30'
-                    : 'bg-green-500/20 text-green-300 border-green-400/30'
+                  ? 'bg-purple-500/20 text-purple-300 border-purple-400/40 animate-pulse shadow-sm shadow-purple-500/20'
+                  : item.statusBadge === 'RECIÉN AÑADIDA' || item.statusBadge === 'NUEVO'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40 shadow-sm shadow-emerald-500/20'
+                    : 'bg-orange-500/20 text-orange-300 border-orange-400/40'
             }`}>
-              {item.statusBadge === 'PRÓXIMAMENTE' ? '⏳ PRÓXIMAMENTE' : item.statusBadge}
+              {item.statusBadge === 'PRÓXIMAMENTE' 
+                ? '⏳ PRÓXIMAMENTE' 
+                : item.statusBadge === 'RECIÉN AÑADIDA' 
+                ? '✨ RECIÉN AÑADIDA' 
+                : item.statusBadge === 'ESTRENO'
+                ? '★ ESTRENO'
+                : item.statusBadge}
             </span>
           </div>
 
@@ -152,7 +158,12 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
             return (
               <div
                 key={thumbItem.id}
-                onClick={() => onSelectThumbnail(index)}
+                onClick={() => {
+                  onSelectThumbnail(index);
+                  if (isSelected) {
+                    onPlay();
+                  }
+                }}
                 className={`
                   relative w-28 h-32 md:w-32 md:h-36 rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shrink-0 bg-gradient-to-br from-zinc-800 to-zinc-950 border border-white/10
                   ${isFocused

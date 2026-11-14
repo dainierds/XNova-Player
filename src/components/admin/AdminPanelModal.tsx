@@ -11,26 +11,37 @@ import {
   Crown, 
   Sparkles,
   Server,
-  LogIn
+  LogIn,
+  Film
 } from 'lucide-react';
 import type { UserAccount, UserPlan } from '../../types/auth';
 import { PLAN_CONFIGS } from '../../types/auth';
 import type { PlaylistAccount } from '../../types';
 import { AuthService, isSeedUser } from '../../services/authService';
 import { useAuthStore } from '../../store/useAuthStore';
+import { AdminShowcaseManager } from './AdminShowcaseManager';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectUserToLogin?: (username: string, pass: string) => void;
+  onPlayStream?: (stream: {
+    id: string;
+    title: string;
+    streamUrl: string;
+    posterUrl?: string;
+    isLive?: boolean;
+  }) => void;
 }
 
 export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   isOpen,
   onClose,
   onSelectUserToLogin,
+  onPlayStream,
 }) => {
   const { isAdmin, setAdminStatus } = useAuthStore();
+  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'showcase'>('users');
   const [adminPin, setAdminPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const [users, setUsers] = useState<UserAccount[]>(() => AuthService.getAllUsers());
@@ -327,6 +338,35 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         </div>
       </header>
 
+      {/* Pestañas de Navegación del Modo Administrador */}
+      <div className="flex items-center space-x-3 my-4 shrink-0 border-b border-white/10 pb-3">
+        <button
+          onClick={() => setActiveAdminTab('users')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeAdminTab === 'users'
+              ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/25'
+              : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Gestión de Clientes ({users.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('showcase')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeAdminTab === 'showcase'
+              ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/25'
+              : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          <Film className="w-4 h-4" />
+          <span>Portada y Pantalla Principal</span>
+        </button>
+      </div>
+
+      {activeAdminTab === 'users' ? (
+        <>
       {/* Resumen de Métricas */}
       <div className="grid grid-cols-4 gap-4 my-5 shrink-0">
         <div className="p-4 rounded-xl bg-[#0E1526] border border-white/5">
@@ -479,6 +519,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           );
         })}
       </div>
+      </>
+    ) : (
+      <AdminShowcaseManager onPlayStream={onPlayStream} />
+    )}
 
       {/* 3. MODAL DE CREACIÓN / EDICIÓN DE USUARIO */}
       {showCreateModal && (

@@ -19,6 +19,7 @@ import {
 import { BRANDING } from '../../config/branding';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useFavoritesStore } from '../../store/useFavoritesStore';
+import { useAdminFeaturedStore } from '../../store/useAdminFeaturedStore';
 import { QuickFavoriteModal, type QuickFavoriteItem } from '../common/QuickFavoriteModal';
 import { HoldProgressIndicator } from '../common/HoldProgressIndicator';
 import { PLAN_CONFIGS } from '../../types/auth';
@@ -85,7 +86,8 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   homeFeed,
   isActive = true,
 }) => {
-  const { currentUser } = useAuthStore();
+  const { currentUser, isAdmin } = useAuthStore();
+  const { featuredItems: adminFeaturedItems } = useAdminFeaturedStore();
   const [sectionType, setSectionType] = useState<'movies' | 'series'>('movies');
   const [activeNav, setActiveNav] = useState('home');
   const [heroIndex, setHeroIndex] = useState(0);
@@ -114,9 +116,25 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
   const genreRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const catalogRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // 🌟 Fuente de datos real con fallback
+  // 🌟 Fuente de datos real con fallback (priorizando los seleccionados por el Administrador)
   const heroList = useMemo(() => {
+    const adminMovies = adminFeaturedItems.filter((i) => i.type === 'movie');
+    const adminSeries = adminFeaturedItems.filter((i) => i.type === 'series');
+
     if (sectionType === 'movies') {
+      if (adminMovies.length > 0) {
+        return adminMovies.map((m) => ({
+          id: m.id,
+          title: m.title,
+          streamUrl: m.streamUrl,
+          backdropUrl: m.backdropUrl || m.posterUrl,
+          posterUrl: m.posterUrl,
+          year: m.year,
+          rating: m.rating,
+          ageRating: m.badge,
+          synopsis: m.synopsis,
+        }));
+      }
       if (homeFeed?.featuredMovies && homeFeed.featuredMovies.length > 0) {
         return homeFeed.featuredMovies;
       }
@@ -125,12 +143,25 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
       }
       return SERIVIA_HERO_MOVIES;
     } else {
+      if (adminSeries.length > 0) {
+        return adminSeries.map((s) => ({
+          id: s.id,
+          title: s.title,
+          streamUrl: s.streamUrl,
+          backdropUrl: s.backdropUrl || s.posterUrl,
+          posterUrl: s.posterUrl,
+          year: s.year,
+          rating: s.rating,
+          ageRating: s.badge,
+          synopsis: s.synopsis,
+        }));
+      }
       if (homeFeed?.featuredSeries && homeFeed.featuredSeries.length > 0) {
         return homeFeed.featuredSeries;
       }
       return SERIVIA_HERO_SERIES;
     }
-  }, [sectionType, homeFeed]);
+  }, [sectionType, homeFeed, adminFeaturedItems]);
 
   const rawCatalogList = useMemo(() => {
     if (activeNav === 'favorites') {
@@ -250,7 +281,8 @@ export const SeriviaLayout: React.FC<SeriviaLayoutProps> = ({
 
   // 🎮 MOTOR D-PAD PARA CONTROL REMOTO DE ANDROID TV / FIRE TV
   useEffect(() => {
-    if (!isActive) return;
+    // Si la app está en modo Administrador, desactivar control por mando (solo cursor de PC)
+    if (!isActive || isAdmin) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Prevenir el scroll por defecto del navegador en la TV

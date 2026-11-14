@@ -29,13 +29,14 @@ import { TrailerModal } from './components/player/TrailerModal';
 import { TmdbService } from './services/tmdb';
 import { XtreamService } from './services/xtream';
 import { useFavoritesStore } from './store/useFavoritesStore';
+import { useAdminFeaturedStore } from './store/useAdminFeaturedStore';
 import { QuickFavoriteModal, type QuickFavoriteItem } from './components/common/QuickFavoriteModal';
 import { HoldProgressIndicator } from './components/common/HoldProgressIndicator';
 
 type FocusSection = 'sidebar' | 'hero_buttons' | 'thumbnails';
 
 export function App() {
-  const { currentUser, isAuthenticated, initializeAuth, login } = useAuthStore();
+  const { currentUser, isAuthenticated, isAdmin, initializeAuth, login } = useAuthStore();
   const { 
     activePlaylist, 
     liveStreams, 
@@ -43,6 +44,8 @@ export function App() {
     loadStoredPlaylists, 
     loadUserPlaylists 
   } = usePlaylistStore();
+
+  const { featuredItems: adminFeaturedItems, loadFeaturedItems } = useAdminFeaturedStore();
 
   // ─── Hook de Feed Real desde Xtream ───────────────────────────────────────
   // Carga las películas REALES de la lista activa, enriquecidas con TMDb
@@ -68,7 +71,16 @@ export function App() {
 
   useEffect(() => {
     loadFavorites();
-  }, [loadFavorites]);
+    loadFeaturedItems();
+  }, [loadFavorites, loadFeaturedItems]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      document.body.classList.add('admin-mode');
+    } else {
+      document.body.classList.remove('admin-mode');
+    }
+  }, [isAdmin]);
 
   // Modal y feedback de pulsación larga (3 segundos) para Favoritos
   const [quickFavItem, setQuickFavItem] = useState<QuickFavoriteItem | null>(null);
@@ -115,7 +127,25 @@ export function App() {
           type: 'movie' as const,
         }]
     : (activeTab === 'series') 
-    ? (homeFeed.featuredSeries && homeFeed.featuredSeries.length > 0)
+    ? (adminFeaturedItems.filter((i) => i.type === 'series').length > 0)
+      ? adminFeaturedItems.filter((i) => i.type === 'series').map((s) => ({
+          id: s.id,
+          title: s.title.toUpperCase(),
+          subtitle: `${s.title} (${s.year || '2026'})`,
+          backdropUrl: s.backdropUrl || s.posterUrl,
+          thumbnailUrl: s.posterUrl,
+          releaseDateText: s.badge === 'ESTRENO' ? 'Estreno' : s.badge === 'PRÓXIMAMENTE' ? 'Próximamente' : 'Recién Añadida',
+          statusBadge: s.badge,
+          genresText: s.genresText || 'Serie TV',
+          year: s.year || '2026',
+          rating: s.rating || '8.8 ★',
+          duration: s.duration || 'Temporadas',
+          synopsis: s.synopsis || 'Disfruta de esta serie en tu catálogo.',
+          type: 'series' as const,
+          streamUrl: s.streamUrl,
+          trailerYoutubeKey: s.trailerYoutubeKey,
+        }))
+      : (homeFeed.featuredSeries && homeFeed.featuredSeries.length > 0)
       ? homeFeed.featuredSeries.map((s) => ({
           id: s.id,
           title: s.title.toUpperCase(),
@@ -123,7 +153,7 @@ export function App() {
           backdropUrl: s.backdropUrl,
           thumbnailUrl: s.posterUrl,
           releaseDateText: 'Serie en Catálogo',
-          statusBadge: (s.tag || 'ESTRENO') as 'ESTRENO' | 'PRÓXIMAMENTE' | 'NUEVO' | 'TENDENCIA',
+          statusBadge: (s.tag || 'ESTRENO') as any,
           genresText: s.genres?.join(', ') || 'Serie TV',
           year: s.year || '2026',
           rating: s.rating || '8.8 ★',
@@ -133,7 +163,26 @@ export function App() {
           streamUrl: s.streamUrl,
         }))
       : SHOWCASE_SERIES 
-    : (homeFeed.featuredMovies && homeFeed.featuredMovies.length > 0)
+    : (activeTab === 'movies')
+    ? (adminFeaturedItems.filter((i) => i.type === 'movie').length > 0)
+      ? adminFeaturedItems.filter((i) => i.type === 'movie').map((m) => ({
+          id: m.id,
+          title: m.title.toUpperCase(),
+          subtitle: `${m.title} (${m.year || '2026'})`,
+          backdropUrl: m.backdropUrl || m.posterUrl,
+          thumbnailUrl: m.posterUrl,
+          releaseDateText: m.badge === 'ESTRENO' ? 'Estreno' : m.badge === 'PRÓXIMAMENTE' ? 'Próximamente' : 'Recién Añadida',
+          statusBadge: m.badge,
+          genresText: m.genresText || 'Película',
+          year: m.year || '2026',
+          rating: m.rating || '8.5 ★',
+          duration: m.duration || 'Película',
+          synopsis: m.synopsis || 'Disfruta de esta película en tu catálogo.',
+          type: 'movie' as const,
+          streamUrl: m.streamUrl,
+          trailerYoutubeKey: m.trailerYoutubeKey,
+        }))
+      : (homeFeed.featuredMovies && homeFeed.featuredMovies.length > 0)
       ? homeFeed.featuredMovies.map((m) => ({
           id: m.id,
           title: m.title.toUpperCase(),
@@ -141,7 +190,7 @@ export function App() {
           backdropUrl: m.backdropUrl,
           thumbnailUrl: m.posterUrl,
           releaseDateText: tagToReleaseDateText(m.tag),
-          statusBadge: m.tag as 'ESTRENO' | 'PRÓXIMAMENTE' | 'NUEVO' | 'TENDENCIA',
+          statusBadge: m.tag as any,
           genresText: m.genres.join(', '),
           year: m.year,
           rating: m.rating,
@@ -152,7 +201,43 @@ export function App() {
           trailerYoutubeKey: m.trailerYoutubeKey,
           tmdbId: m.tmdbId,
         }))
-      : homeFeed.featured.length > 0
+      : (vodMovies && vodMovies.length > 0)
+        ? vodMovies.map((m: any) => ({
+            id: `vod_${m.id}`,
+            title: (m.title || 'PELÍCULA').toUpperCase(),
+            subtitle: `${m.title} (${m.year || '2026'})`,
+            backdropUrl: m.backdropUrl,
+            thumbnailUrl: m.posterUrl,
+            releaseDateText: 'Recién Añadido',
+            statusBadge: 'ESTRENO' as const,
+            genresText: Array.isArray(m.genres) ? m.genres.join(', ') : (m.genresText || 'Película'),
+            year: m.year,
+            rating: m.rating,
+            duration: m.duration,
+            synopsis: m.synopsis,
+            type: 'movie' as const,
+            streamUrl: m.streamUrl,
+          }))
+        : SHOWCASE_MOVIES
+    : (adminFeaturedItems.length > 0)
+      ? adminFeaturedItems.map((item) => ({
+          id: item.id,
+          title: item.title.toUpperCase(),
+          subtitle: `${item.title} (${item.year || '2026'})`,
+          backdropUrl: item.backdropUrl || item.posterUrl,
+          thumbnailUrl: item.posterUrl,
+          releaseDateText: item.badge === 'ESTRENO' ? 'Estreno' : item.badge === 'PRÓXIMAMENTE' ? 'Próximamente' : 'Recién Añadida',
+          statusBadge: item.badge,
+          genresText: item.genresText || (item.type === 'series' ? 'Serie TV' : 'Película'),
+          year: item.year || '2026',
+          rating: item.rating || '8.5 ★',
+          duration: item.duration || (item.type === 'series' ? 'Temporadas' : 'Película'),
+          synopsis: item.synopsis || (item.type === 'series' ? 'Disfruta de esta serie en tu catálogo.' : 'Disfruta de esta película en tu catálogo.'),
+          type: item.type,
+          streamUrl: item.streamUrl,
+          trailerYoutubeKey: item.trailerYoutubeKey,
+        }))
+      : (homeFeed.featured.length > 0)
         ? homeFeed.featured.map((m) => ({
             id: m.id,
             title: m.title.toUpperCase(),
@@ -160,7 +245,7 @@ export function App() {
             backdropUrl: m.backdropUrl,
             thumbnailUrl: m.posterUrl,
             releaseDateText: tagToReleaseDateText(m.tag),
-            statusBadge: m.tag as 'ESTRENO' | 'PRÓXIMAMENTE' | 'NUEVO' | 'TENDENCIA',
+            statusBadge: m.tag as any,
             genresText: m.genres.join(', '),
             year: m.year,
             rating: m.rating,
@@ -171,22 +256,24 @@ export function App() {
             trailerYoutubeKey: m.trailerYoutubeKey,
             tmdbId: m.tmdbId,
           }))
-        : (vodMovies && vodMovies.length > 0)
-          ? vodMovies.map((m: any) => ({
-              id: `vod_${m.id}`,
-              title: (m.title || 'PELÍCULA').toUpperCase(),
+        : (homeFeed.featuredMovies && homeFeed.featuredMovies.length > 0)
+          ? homeFeed.featuredMovies.map((m) => ({
+              id: m.id,
+              title: m.title.toUpperCase(),
               subtitle: `${m.title} (${m.year || '2026'})`,
               backdropUrl: m.backdropUrl,
               thumbnailUrl: m.posterUrl,
-              releaseDateText: 'Recién Añadido',
-              statusBadge: 'ESTRENO',
-              genresText: Array.isArray(m.genres) ? m.genres.join(', ') : (m.genresText || 'Película'),
+              releaseDateText: tagToReleaseDateText(m.tag),
+              statusBadge: m.tag as any,
+              genresText: m.genres.join(', '),
               year: m.year,
               rating: m.rating,
               duration: m.duration,
               synopsis: m.synopsis,
               type: 'movie' as const,
               streamUrl: m.streamUrl,
+              trailerYoutubeKey: m.trailerYoutubeKey,
+              tmdbId: m.tmdbId,
             }))
           : SHOWCASE_MOVIES; // Fallback con películas de demo si no hay lista
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -443,12 +530,14 @@ export function App() {
 
   // Motor de navegación D-pad para este concepto de interfaz
   useEffect(() => {
-    // Si el tema activo es Serivia, SeriviaLayout se encarga de su propio motor D-pad
+    // 🚀 Si está en modo Administrador, desactivar COMPLETAMENTE el control por mando (solo cursor de PC)
     if (
+      isAdmin ||
       activeTheme === 'serivia' ||
       isSplashVisible ||
       !isAuthenticated ||
       isSettingsOpen ||
+      isAdminPanelOpen ||
       isSearchOpen ||
       isProfileOpen ||
       isExitModalOpen ||
@@ -723,7 +812,9 @@ export function App() {
   ]);
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden bg-[#0A0E1A] text-white flex select-none font-sans">
+    <main className={`relative w-screen h-screen overflow-hidden bg-[#0A0E1A] text-white flex font-sans ${
+      isAdmin ? 'admin-mode cursor-default select-text' : 'select-none'
+    }`}>
       {/* 1. Splash Screen oficial con animación */}
       {isSplashVisible && (
         <SplashScreen onFinish={() => setIsSplashVisible(false)} />
@@ -893,6 +984,10 @@ export function App() {
         onSelectUserToLogin={(username, pass) => {
           setIsAdminPanelOpen(false);
           login(username, pass);
+        }}
+        onPlayStream={(stream) => {
+          setIsAdminPanelOpen(false);
+          handlePlayShowcaseItem(stream as any);
         }}
       />
 

@@ -10,7 +10,9 @@ import {
   Film,
   Search,
   RotateCw,
-  Heart
+  Heart,
+  Star,
+  Check
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
@@ -20,6 +22,8 @@ import { ImagePreloadService } from '../../services/imagePreloadService';
 import { PosterResolutionService } from '../../services/posterResolutionService';
 import { usePlaylistStore } from '../../store/usePlaylistStore';
 import { useFavoritesStore } from '../../store/useFavoritesStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useAdminFeaturedStore, type FeaturedBadge } from '../../store/useAdminFeaturedStore';
 import { QuickFavoriteModal, type QuickFavoriteItem } from '../common/QuickFavoriteModal';
 import { HoldProgressIndicator } from '../common/HoldProgressIndicator';
 
@@ -269,6 +273,13 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   const [streams, setStreams] = useState<(XtreamStream | XtreamSeries)[]>(initialCachedStreams);
   const [loading, setLoading] = useState(initialCachedCats.length === 0);
   const [loadingStreams, setLoadingStreams] = useState(initialCachedStreams.length === 0);
+
+  // 👑 Modo Administrador: fijar contenido en Portada y control por ratón
+  const { isAdmin } = useAuthStore();
+  const { addFeaturedItem } = useAdminFeaturedStore();
+  const [adminPinModalItem, setAdminPinModalItem] = useState<any | null>(null);
+  const [adminPinBadge, setAdminPinBadge] = useState<FeaturedBadge>('ESTRENO');
+  const [adminPinSuccessToast, setAdminPinSuccessToast] = useState<string | null>(null);
 
   // 🔍 Búsqueda general dentro de la sección activa (Películas, Series o Canales)
   const [searchQuery, setSearchQuery] = useState('');
@@ -793,7 +804,8 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
   // 🎮 Motor de Navegación D-Pad para Control Remoto TV
   useEffect(() => {
-    if (!isActive) return;
+    // Si la app está en modo Administrador, desactivar control por mando (solo cursor de PC)
+    if (!isActive || isAdmin) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Bloquear scroll nativo
@@ -1657,6 +1669,30 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               <Video className="w-4 h-4" />
               <span>Ver Tráiler</span>
             </button>
+
+            {/* 4. Botón Poner en Portada (Solo Administrador) */}
+            {isAdmin && (
+              <button
+                onClick={() => setAdminPinModalItem({
+                  id: `movie_${selectedMovieDetail.item.stream_id}`,
+                  streamId: selectedMovieDetail.item.stream_id,
+                  title: selectedMovieDetail.meta.title,
+                  type: 'movie',
+                  posterUrl: selectedMovieDetail.meta.posterUrl || '',
+                  backdropUrl: selectedMovieDetail.meta.backdropUrl || selectedMovieDetail.meta.posterUrl || '',
+                  streamUrl: selectedMovieDetail.streamUrl,
+                  year: selectedMovieDetail.meta.year || '2026',
+                  rating: selectedMovieDetail.meta.rating || '8.0',
+                  genresText: selectedMovieDetail.meta.genres || 'Película',
+                  synopsis: selectedMovieDetail.meta.plot || '',
+                })}
+                className="px-6 py-3.5 rounded-xl font-bold text-sm transition-all duration-200 flex items-center space-x-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 cursor-pointer shadow-lg"
+                title="Fijar esta película en la pantalla principal de la app"
+              >
+                <Star className="w-4 h-4 fill-current text-amber-400" />
+                <span>Poner en Portada (Admin)</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1683,19 +1719,43 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={() => {
-                setSelectedSeriesDetails(null);
-                setFocusZone('grid');
-              }}
-              className={`p-3 rounded-full transition ${
-                focusZone === 'series_modal' && seriesFocusZone === 'close'
-                  ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-110 shadow-lg'
-                  : 'bg-white/10 hover:bg-white/20 text-white'
-              }`}
-            >
-              <X className="w-6 h-6" />
-            </button>
+            <div className="flex items-center space-x-3">
+              {isAdmin && (
+                <button
+                  onClick={() => setAdminPinModalItem({
+                    id: `series_${selectedSeriesDetails.series.series_id}`,
+                    streamId: selectedSeriesDetails.series.series_id,
+                    title: selectedSeriesDetails.series.name,
+                    type: 'series',
+                    posterUrl: normalizeMediaUrl(selectedSeriesDetails.series.cover, server) || '',
+                    backdropUrl: normalizeMediaUrl(selectedSeriesDetails.series.cover, server) || '',
+                    year: selectedSeriesDetails.series.releaseDate ? selectedSeriesDetails.series.releaseDate.substring(0, 4) : '2026',
+                    rating: selectedSeriesDetails.series.rating || '8.8',
+                    genresText: selectedSeriesDetails.series.genre || 'Serie TV',
+                    synopsis: selectedSeriesDetails.series.plot || '',
+                  })}
+                  className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-md"
+                  title="Fijar esta serie en la Pantalla Principal"
+                >
+                  <Star className="w-3.5 h-3.5 fill-current text-amber-400" />
+                  <span>Poner en Portada (Admin)</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setSelectedSeriesDetails(null);
+                  setFocusZone('grid');
+                }}
+                className={`p-3 rounded-full transition ${
+                  focusZone === 'series_modal' && seriesFocusZone === 'close'
+                    ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-110 shadow-lg'
+                    : 'bg-white/10 hover:bg-white/20 text-white'
+                }`}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
           </div>
 
           {/* Temporadas */}
@@ -1798,6 +1858,100 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         progress={holdProgress}
         title={displayedStreams[focusedGridIndex]?.name || (displayedStreams[focusedGridIndex] as any)?.title}
       />
+
+      {/* ── MODAL EXCLUSIVO ADMIN: FIJAR EN PANTALLA PRINCIPAL CON ETIQUETA ── */}
+      {adminPinModalItem && (
+        <div className="fixed inset-0 z-70 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0E1526] border border-white/20 rounded-3xl p-6 text-white shadow-2xl animate-fadeIn">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                <span>Fijar en Pantalla Principal</span>
+              </h3>
+              <button
+                onClick={() => setAdminPinModalItem(null)}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-300 mb-3">
+              ¿Cómo deseas clasificar <strong>&quot;{adminPinModalItem.title}&quot;</strong> en la portada de inicio?
+            </p>
+
+            <div className="grid grid-cols-3 gap-2 mb-5">
+              <button
+                type="button"
+                onClick={() => setAdminPinBadge('ESTRENO')}
+                className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer ${
+                  adminPinBadge === 'ESTRENO'
+                    ? 'bg-cyan-500/25 border-cyan-400 text-cyan-300 shadow-sm shadow-cyan-500/30'
+                    : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                }`}
+              >
+                <span>★ ESTRENO</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAdminPinBadge('RECIÉN AÑADIDA')}
+                className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer ${
+                  adminPinBadge === 'RECIÉN AÑADIDA'
+                    ? 'bg-emerald-500/25 border-emerald-400 text-emerald-300 shadow-sm shadow-emerald-500/30'
+                    : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                }`}
+              >
+                <span>✨ RECIÉN AÑADIDA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAdminPinBadge('PRÓXIMAMENTE')}
+                className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer ${
+                  adminPinBadge === 'PRÓXIMAMENTE'
+                    ? 'bg-purple-500/25 border-purple-400 text-purple-300 shadow-sm shadow-purple-500/30'
+                    : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                }`}
+              >
+                <span>⏳ PRÓXIMAMENTE</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3">
+              <button
+                onClick={() => setAdminPinModalItem(null)}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-zinc-400"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  await addFeaturedItem({
+                    ...adminPinModalItem,
+                    badge: adminPinBadge,
+                  });
+                  setAdminPinSuccessToast(`"${adminPinModalItem.title}" fijada como [${adminPinBadge}] en Portada`);
+                  setTimeout(() => setAdminPinSuccessToast(null), 3000);
+                  setAdminPinModalItem(null);
+                }}
+                className="flex items-center space-x-1.5 px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs shadow-lg shadow-cyan-500/30 transition cursor-pointer"
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>Guardar en Portada</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast de confirmación admin */}
+      {adminPinSuccessToast && (
+        <div className="fixed bottom-8 right-8 z-80 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs px-4 py-3 rounded-2xl shadow-2xl flex items-center space-x-2 animate-fadeIn">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="font-bold">{adminPinSuccessToast}</span>
+        </div>
+      )}
     </div>
   );
 };

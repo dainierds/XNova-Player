@@ -229,7 +229,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // 🎮 Motor Oficial de Navegación D-Pad para Ajustes en Android TV
   useEffect(() => {
-    if (!isOpen) return;
+    // Si la app está en modo Administrador, desactivar control por mando (solo cursor de PC)
+    if (!isOpen || isAdmin) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isEditing) {

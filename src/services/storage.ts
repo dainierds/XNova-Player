@@ -16,6 +16,7 @@ const KEYS = {
   MANAGED_USERS: 'xnova_managed_users_v2',
   ACTIVE_SESSION: 'xnova_active_session_v2',
   USERS_INITIALIZED: 'xnova_users_initialized_v2',
+  ADMIN_FEATURED_ITEMS: 'xnova_admin_featured_items_v1',
 };
 
 export interface WatchProgressItem {
@@ -195,5 +196,15 @@ export const StorageService = {
 
   async clearPersistentSession(): Promise<void> {
     await del(KEYS.ACTIVE_SESSION);
+  },
+
+  // --- Contenido Destacado de Portada configurado por el Administrador ---
+  async getAdminFeaturedItems(): Promise<any[]> {
+    const items = await get<any[]>(KEYS.ADMIN_FEATURED_ITEMS);
+    return items || [];
+  },
+
+  async saveAdminFeaturedItems(items: any[]): Promise<void> {
+    await set(KEYS.ADMIN_FEATURED_ITEMS, items);
   },
 };

@@ -58,6 +58,23 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Modo Administrador exclusivo para PC con ratón / cursor */
+body.admin-mode, .admin-mode, .admin-mode * {
+  cursor: default !important;
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
+}
+
+body.admin-mode button, body.admin-mode a, body.admin-mode [role="button"], body.admin-mode .cursor-pointer,
+.admin-mode button, .admin-mode a, .admin-mode [role="button"], .admin-mode .cursor-pointer {
+  cursor: pointer !important;
+}
+
+body.admin-mode input, body.admin-mode textarea, body.admin-mode select,
+.admin-mode input, .admin-mode textarea, .admin-mode select {
+  cursor: text !important;
+}
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
