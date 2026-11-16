@@ -172,27 +172,25 @@ public class ExoPlayerActivity extends AppCompatActivity {
                     loadingSpinner.setVisibility(View.GONE);
 
                     // 1. Fallback automático de extensión para Canales en Vivo (.ts <-> .m3u8) y Series/VOD (.mp4 <-> .mkv)
-                    // Si el servidor IPTV responde con 404/recurso no encontrado porque el canal requiere .ts y no .m3u8 (o viceversa),
+                    // Si el servidor IPTV responde con 404/recurso no encontrado o error de contenedor,
                     // reintentar silenciosamente con la otra extensión exactamente como hace TiviMate
                     if ((error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
                          error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
                          error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) &&
                         !hasTriedExtensionFallback && streamUrl != null && !streamUrl.isEmpty()) {
                         hasTriedExtensionFallback = true;
-                        if (streamUrl.endsWith(".m3u8")) {
-                            streamUrl = streamUrl.substring(0, streamUrl.length() - 5) + ".ts";
-                            initPlayer();
-                            return;
-                        } else if (streamUrl.endsWith(".ts")) {
-                            streamUrl = streamUrl.substring(0, streamUrl.length() - 3) + ".m3u8";
-                            initPlayer();
-                            return;
-                        } else if (streamUrl.endsWith(".mp4")) {
-                            streamUrl = streamUrl.substring(0, streamUrl.length() - 4) + ".mkv";
-                            initPlayer();
-                            return;
-                        } else if (streamUrl.endsWith(".mkv")) {
-                            streamUrl = streamUrl.substring(0, streamUrl.length() - 4) + ".mp4";
+                        String newUrl = streamUrl;
+                        if (streamUrl.matches(".*\\.m3u8(\\?.*)?$")) {
+                            newUrl = streamUrl.replaceFirst("\\.m3u8(\\?|$)", ".ts$1");
+                        } else if (streamUrl.matches(".*\\.ts(\\?.*)?$")) {
+                            newUrl = streamUrl.replaceFirst("\\.ts(\\?|$)", ".m3u8$1");
+                        } else if (streamUrl.matches(".*\\.mp4(\\?.*)?$")) {
+                            newUrl = streamUrl.replaceFirst("\\.mp4(\\?|$)", ".mkv$1");
+                        } else if (streamUrl.matches(".*\\.mkv(\\?.*)?$")) {
+                            newUrl = streamUrl.replaceFirst("\\.mkv(\\?|$)", ".mp4$1");
+                        }
+                        if (!newUrl.equals(streamUrl)) {
+                            streamUrl = newUrl;
                             initPlayer();
                             return;
                         }

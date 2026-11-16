@@ -549,7 +549,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 plot: info.plot || info.description || meta.plot,
                 backdropUrl: backdrop,
                 posterUrl: normalizeMediaUrl(info.cover_big || info.movie_image, server) || meta.posterUrl,
-                containerExtension: info.container_extension || movieData.container_extension || rawExt,
+                containerExtension: movieData.container_extension || info.container_extension || rawExt,
                 youtubeTrailer: info.youtube_trailer || meta.youtubeTrailer,
               };
             } catch {
@@ -1055,7 +1055,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           plot: plot || 'Sin sinopsis disponible para este título.',
           backdropUrl: backdrop,
           posterUrl: poster,
-          containerExtension: info.container_extension || movieData.container_extension || (item as any).container_extension || 'mp4',
+          containerExtension: (item as any).container_extension || movieData.container_extension || info.container_extension || 'mkv',
           youtubeTrailer: info.youtube_trailer,
         };
 
@@ -1105,10 +1105,10 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         rating: vod.rating || '7.0',
         genres: (vod as any).genresText || '',
         plot: 'Presiona reproducir para iniciar la película.',
-        containerExtension: vod.container_extension || 'mp4',
+        containerExtension: vod.container_extension || 'mkv',
       };
 
-      const ext = meta.containerExtension || vod.container_extension || 'mp4';
+      const ext = vod.container_extension || meta.containerExtension || 'mkv';
       const streamUrl = (item as any).streamUrl || XtreamService.buildVodStreamUrl(server, user, pass, streamId, ext);
 
       // Abrir pantalla completa de detalles (Imagen 2)
