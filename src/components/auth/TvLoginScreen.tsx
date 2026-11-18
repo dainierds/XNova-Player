@@ -166,118 +166,158 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
         ))}
       </div>
 
-      {/* Overlay oscuro suave sobre todo el grid */}
-      <div className="absolute inset-0 bg-black/40" />
+      {/* Overlay oscuro suave sobre todo el grid con gradiente más oscuro a la izquierda */}
+      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent pointer-events-none" />
 
       {/* ══════════════════════════════════════════════
-          PANEL DE LOGIN — glassmorphism, centrado a la derecha
+          PANEL DE LOGIN — a la izquierda (despejando la derecha)
           ══════════════════════════════════════════════ */}
-      <div className="absolute inset-0 flex items-center justify-end pr-16">
-      <div className="w-[380px] flex flex-col items-stretch justify-center px-9 py-10 rounded-2xl"
-           style={{
-             background: 'rgba(0,0,0,0.72)',
-             backdropFilter: 'blur(18px)',
-             WebkitBackdropFilter: 'blur(18px)',
-             border: '1px solid rgba(255,255,255,0.08)',
-             boxShadow: '0 8px 60px rgba(0,0,0,0.6)',
-           }}>
-
-        {/* Título */}
-        <h1 className="text-3xl font-black tracking-wide text-white mb-8 uppercase">
-          INICIAR SESIÓN
-        </h1>
-
-        {/* Error */}
-        {errorMessage && (
-          <div className="mb-4 flex items-center space-x-2 bg-red-700/30 border border-red-500/40 text-red-300 text-xs px-3 py-2.5 rounded-lg">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-            <span className="flex-1">{errorMessage}</span>
+      <div className="absolute inset-0 flex items-center justify-start pl-14 z-10">
+        <div
+          className="w-[410px] flex flex-col items-stretch justify-center px-9 py-9 rounded-2xl"
+          style={{
+            background: 'rgba(10, 12, 18, 0.82)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 12px 60px rgba(0,0,0,0.8)',
+          }}
+        >
+          {/* Logo oficial XNova (X roja con pata blanca) */}
+          <div className="flex items-center space-x-3 mb-6">
+            <svg className="w-10 h-10 drop-shadow-[0_0_12px_rgba(255,26,38,0.75)]" viewBox="0 0 100 100" fill="none">
+              {/* Trazo superior izquierdo al centro y a pata inferior izquierda (ROJO) */}
+              <path
+                d="M20 18 L50 50 L20 82"
+                stroke="#FF1A26"
+                strokeWidth="14"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Trazo superior derecho al centro (ROJO) */}
+              <path
+                d="M80 18 L50 50"
+                stroke="#FF1A26"
+                strokeWidth="14"
+                strokeLinecap="round"
+              />
+              {/* Pata inferior derecha (BLANCO NEÓN) */}
+              <path
+                d="M50 50 L80 82"
+                stroke="#FFFFFF"
+                strokeWidth="14"
+                strokeLinecap="round"
+                className="drop-shadow-[0_0_8px_rgba(255,255,255,0.95)]"
+              />
+            </svg>
+            <div className="flex flex-col">
+              <span className="text-xl font-black tracking-wider text-white flex items-center gap-1.5">
+                <span>XNOVA</span>
+                <span className="text-red-500 font-extrabold">PLAYER</span>
+              </span>
+              <span className="text-[10px] tracking-widest uppercase text-zinc-400 font-semibold">
+                PREMIUM STREAMING
+              </span>
+            </div>
           </div>
-        )}
 
-        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="flex flex-col gap-3">
+          {/* Título */}
+          <h1 className="text-2xl font-black tracking-wide text-white mb-6 uppercase">
+            INICIAR SESIÓN
+          </h1>
 
-          {/* Campo Usuario */}
-          <div
-            onClick={() => { setFocusedElement('username'); userInputRef.current?.focus(); }}
-            className={`flex items-center gap-3 px-4 py-3.5 rounded-lg cursor-pointer transition-all duration-150 ${
-              focusedElement === 'username'
-                ? 'bg-zinc-700 ring-2 ring-white/60'
-                : 'bg-zinc-800/90'
-            }`}
-          >
-            <User className="w-5 h-5 text-zinc-400 shrink-0" />
-            <input
-              ref={userInputRef}
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onFocus={() => setFocusedElement('username')}
-              placeholder="Correo Electrónico o Usuario"
-              className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
-            />
-          </div>
+          {/* Error */}
+          {errorMessage && (
+            <div className="mb-4 flex items-center space-x-2 bg-red-700/30 border border-red-500/40 text-red-300 text-xs px-3 py-2.5 rounded-lg">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+              <span className="flex-1">{errorMessage}</span>
+            </div>
+          )}
 
-          {/* Campo Contraseña */}
-          <div
-            onClick={() => { setFocusedElement('password'); passInputRef.current?.focus(); }}
-            className={`flex items-center gap-3 px-4 py-3.5 rounded-lg cursor-pointer transition-all duration-150 ${
-              focusedElement === 'password' || focusedElement === 'toggle_eye'
-                ? 'bg-zinc-700 ring-2 ring-white/60'
-                : 'bg-zinc-800/90'
-            }`}
-          >
-            <Lock className="w-5 h-5 text-zinc-400 shrink-0" />
-            <input
-              ref={passInputRef}
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onFocus={() => setFocusedElement('password')}
-              placeholder="Contraseña"
-              className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setShowPassword(p => !p); }}
-              className={`p-1 rounded text-zinc-400 hover:text-white transition ${
-                focusedElement === 'toggle_eye' ? 'ring-2 ring-white/60 text-white' : ''
+          <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="flex flex-col gap-3">
+
+            {/* Campo Usuario */}
+            <div
+              onClick={() => { setFocusedElement('username'); userInputRef.current?.focus(); }}
+              className={`flex items-center gap-3 px-4 py-3.5 rounded-lg cursor-pointer transition-all duration-150 ${
+                focusedElement === 'username'
+                  ? 'bg-zinc-700 ring-2 ring-white/60'
+                  : 'bg-zinc-800/90'
               }`}
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              <User className="w-5 h-5 text-zinc-400 shrink-0" />
+              <input
+                ref={userInputRef}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onFocus={() => setFocusedElement('username')}
+                placeholder="Correo Electrónico o Usuario"
+                className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
+              />
+            </div>
+
+            {/* Campo Contraseña */}
+            <div
+              onClick={() => { setFocusedElement('password'); passInputRef.current?.focus(); }}
+              className={`flex items-center gap-3 px-4 py-3.5 rounded-lg cursor-pointer transition-all duration-150 ${
+                focusedElement === 'password' || focusedElement === 'toggle_eye'
+                  ? 'bg-zinc-700 ring-2 ring-white/60'
+                  : 'bg-zinc-800/90'
+              }`}
+            >
+              <Lock className="w-5 h-5 text-zinc-400 shrink-0" />
+              <input
+                ref={passInputRef}
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setFocusedElement('password')}
+                placeholder="Contraseña"
+                className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setShowPassword(p => !p); }}
+                className={`p-1 rounded text-zinc-400 hover:text-white transition ${
+                  focusedElement === 'toggle_eye' ? 'ring-2 ring-white/60 text-white' : ''
+                }`}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {/* Botón rojo INICIAR SESIÓN */}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isLoading}
+              className={`
+                w-full mt-1 py-3.5 rounded-lg font-black text-sm tracking-widest uppercase
+                transition-all duration-150 flex items-center justify-center text-white
+                ${focusedElement === 'submit'
+                  ? 'bg-red-500 ring-4 ring-red-400/50 scale-[1.02] shadow-lg shadow-red-600/40'
+                  : 'bg-red-600 hover:bg-red-500'}
+              `}
+            >
+              {isLoading
+                ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : 'INICIAR SESIÓN'
+              }
+            </button>
+          </form>
+
+          {/* Links */}
+          <div className="mt-5 flex flex-col items-center gap-2.5 text-xs text-white/80">
+            <button type="button" className="hover:underline hover:text-white transition">
+              ¿Olvidé mi contraseña?
+            </button>
+            <button type="button" className="hover:underline hover:text-white transition">
+              Crear una cuenta
             </button>
           </div>
-
-          {/* Botón rojo INICIAR SESIÓN */}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isLoading}
-            className={`
-              w-full mt-1 py-3.5 rounded-lg font-black text-sm tracking-widest uppercase
-              transition-all duration-150 flex items-center justify-center text-white
-              ${focusedElement === 'submit'
-                ? 'bg-red-500 ring-4 ring-red-400/50 scale-[1.02] shadow-lg shadow-red-600/40'
-                : 'bg-red-600 hover:bg-red-500'}
-            `}
-          >
-            {isLoading
-              ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              : 'INICIAR SESIÓN'
-            }
-          </button>
-        </form>
-
-        {/* Links */}
-        <div className="mt-6 flex flex-col items-center gap-3 text-sm text-white/80">
-          <button type="button" className="hover:underline hover:text-white transition">
-            Olvidé mi contraseña?
-          </button>
-          <button type="button" className="hover:underline hover:text-white transition">
-            Crear una cuenta
-          </button>
-        </div>
-      </div>{/* fin panel glassmorphism */}
+        </div>{/* fin panel glassmorphism */}
       </div>{/* fin flex container */}
 
     </div>
