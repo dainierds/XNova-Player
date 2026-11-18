@@ -11,9 +11,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xnovaplayer.app.ExoPlayerActivity
 import com.xnovaplayer.app.data.api.XtreamClient
 import com.xnovaplayer.app.data.database.entities.MovieEntity
+import com.xnovaplayer.app.data.security.ParentalControlManager
 import com.xnovaplayer.app.ui.components.CategorySidebar
 import com.xnovaplayer.app.ui.components.HeroPreviewBanner
 import com.xnovaplayer.app.ui.components.MovieGrid
+import com.xnovaplayer.app.ui.components.PinEntryDialog
 import com.xnovaplayer.app.ui.theme.XNovaTvTheme
 import com.xnovaplayer.app.ui.theme.XNovaVoid
 import com.xnovaplayer.app.ui.viewmodel.CatalogViewModel
@@ -26,6 +28,10 @@ fun TvCatalogScreen(
     viewModel: CatalogViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val parentalManager = remember { ParentalControlManager(context) }
+    var pendingCategory by remember { mutableStateOf<com.xnovaplayer.app.data.database.entities.CategoryEntity?>(null) }
+    var isPinDialogOpen by remember { mutableStateOf(false) }
+
     val categories by viewModel.categories.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val movies by viewModel.movies.collectAsState()
@@ -37,19 +43,25 @@ fun TvCatalogScreen(
     }
 
     XNovaTvTheme {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(XNovaVoid)
-        ) {
-            // 1. Barra lateral de categorías (TV D-Pad optimizado)
-            CategorySidebar(
-                categories = categories,
-                selectedCategory = selectedCategory,
-                onCategoryClick = { category ->
-                    viewModel.selectCategory(category)
-                }
-            )
+        Box(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(XNovaVoid)
+            ) {
+                // 1. Barra lateral de categorías (TV D-Pad optimizado)
+                CategorySidebar(
+                    categories = categories,
+                    selectedCategory = selectedCategory,
+                    onCategoryClick = { category ->
+                        if (parentalManager.isCategoryRestricted(category.categoryName)) {
+                            pendingCategory = category
+                            isPinDialogOpen = true
+                        } else {
+                            viewModel.selectCategory(category)
+                        }
+                    }
+                )
 
             // 2. Columna principal (Hero Banner superior + Rejilla de Carátulas)
             Column(
@@ -78,7 +90,22 @@ fun TvCatalogScreen(
                 )
             }
         }
+
+        // Diálogo modal de PIN para categorías restringidas (+18)
+        PinEntryDialog(
+            isOpen = isPinDialogOpen,
+            title = "Contenido para Adultos (+18)",
+            onSuccess = {
+                isPinDialogOpen = false
+                pendingCategory?.let { viewModel.selectCategory(it) }
+            },
+            onDismiss = {
+                isPinDialogOpen = false
+                pendingCategory = null
+            }
+        )
     }
+}
 }
 
 private fun launchMoviePlayback(
