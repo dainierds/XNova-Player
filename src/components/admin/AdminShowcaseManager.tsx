@@ -50,14 +50,14 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
   const [availablePlaylists, setAvailablePlaylists] = useState<PlaylistAccount[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>('');
 
-  // 🎬 / 📺 Pestaña activa: Películas de Portada (hasta 6) o Series de Portada (hasta 6)
+  // 🎬 / 📺 Pestaña activa: Películas de Portada (hasta 20) o Series de Portada (hasta 20)
   const [activeSectionTab, setActiveSectionTab] = useState<'movies' | 'series'>('movies');
 
   const movieItems = useMemo(() => featuredItems.filter((i) => i.type === 'movie'), [featuredItems]);
   const seriesItems = useMemo(() => featuredItems.filter((i) => i.type === 'series'), [featuredItems]);
   const currentItems = activeSectionTab === 'movies' ? movieItems : seriesItems;
   const currentCount = currentItems.length;
-  const isLimitReached = currentCount >= 6;
+  const isLimitReached = currentCount >= 20;
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -323,8 +323,8 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
     const existingTargetCount = targetType === 'series' ? seriesItems.length : movieItems.length;
 
     const isAlreadyAdded = featuredItems.some((f) => f.id === selectedItem.id);
-    if (!isAlreadyAdded && existingTargetCount >= 6) {
-      showToast(`Ya tienes 6 ${targetType === 'series' ? 'series' : 'películas'} fijadas. Elimina una antes de añadir otra.`);
+    if (!isAlreadyAdded && existingTargetCount >= 20) {
+      showToast(`Ya tienes 20 ${targetType === 'series' ? 'series' : 'películas'} fijadas. Elimina una antes de añadir otra.`);
       return;
     }
 
@@ -398,7 +398,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
 
   const handleOpenAddModal = () => {
     if (isLimitReached) {
-      showToast(`Ya has alcanzado el límite de 6 ${activeSectionTab === 'movies' ? 'películas' : 'series'} de portada.`);
+      showToast(`Ya has alcanzado el límite de 20 ${activeSectionTab === 'movies' ? 'películas' : 'series'} de portada.`);
       return;
     }
     setSearchFilter(activeSectionTab === 'movies' ? 'movies' : 'series');
@@ -416,7 +416,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
         </div>
       )}
 
-      {/* Pestañas de Navegación: Películas vs Series (Hasta 6 cada una) */}
+      {/* Pestañas de Navegación: Películas vs Series (Hasta 20 cada una) */}
       <div className="flex items-center space-x-3 mb-4 shrink-0 bg-[#0A0E1A]/80 p-1.5 rounded-2xl border border-white/10 w-fit">
         <button
           onClick={() => setActiveSectionTab('movies')}
@@ -431,7 +431,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
             activeSectionTab === 'movies' ? 'bg-black/25 text-black' : 'bg-cyan-500/20 text-cyan-300'
           }`}>
-            {movieItems.length} / 6
+            {movieItems.length} / 20
           </span>
         </button>
 
@@ -448,7 +448,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
             activeSectionTab === 'series' ? 'bg-black/30 text-white' : 'bg-purple-500/20 text-purple-300'
           }`}>
-            {seriesItems.length} / 6
+            {seriesItems.length} / 20
           </span>
         </button>
       </div>
@@ -458,7 +458,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
         <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs px-4 py-2.5 rounded-xl flex items-center space-x-2 shrink-0">
           <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>
-            ✓ Has completado el cupo de 6 {activeSectionTab === 'movies' ? 'películas' : 'series'} de portada. Se mostrarán en primer lugar en la pantalla principal.
+            ✓ Has completado el cupo de 20 {activeSectionTab === 'movies' ? 'películas' : 'series'} de portada (10 en Top 10 + 10 en Agregadas Recientemente).
           </span>
         </div>
       ) : (
@@ -466,10 +466,10 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           <div className="flex items-center space-x-2">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
             <span>
-              Tienes <strong className="text-white">{currentCount} de 6</strong> {activeSectionTab === 'movies' ? 'películas' : 'series'} fijadas. Puedes añadir {6 - currentCount} más.
+              Tienes <strong className="text-white">{currentCount} de 20</strong> {activeSectionTab === 'movies' ? 'películas' : 'series'} fijadas (Cupos 1-10: Top 10 | Cupos 11-20: Recientes). Puedes añadir {20 - currentCount} más.
             </span>
           </div>
-          <span className="text-[11px] text-zinc-400">Total global fijado: {featuredItems.length}/12</span>
+          <span className="text-[11px] text-zinc-400">Total global fijado: {featuredItems.length}/40</span>
         </div>
       )}
 
@@ -485,13 +485,13 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
                 ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
                 : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
             }`}>
-              {currentCount} / 6 títulos
+              {currentCount} / 20 títulos
             </span>
           </h2>
           <p className="text-xs text-zinc-400 mt-0.5">
             {activeSectionTab === 'movies'
-              ? 'Las películas fijadas aquí aparecerán primero en la portada y carrusel de Películas.'
-              : 'Las series fijadas aquí aparecerán primero en la portada y carrusel de Series.'}
+              ? 'Los primeros 10 títulos forman la fila "TOP 10" y los siguientes 10 forman la fila "Agregadas Recientemente".'
+              : 'Los primeros 10 títulos forman la fila "TOP 10" y los siguientes 10 forman la fila "Agregadas Recientemente".'}
           </p>
         </div>
 
@@ -526,7 +526,7 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           >
             <Plus className="w-4 h-4" />
             <span>
-              AÑADIR {activeSectionTab === 'movies' ? 'PELÍCULA' : 'SERIE'} ({currentCount}/6)
+              AÑADIR {activeSectionTab === 'movies' ? 'PELÍCULA' : 'SERIE'} ({currentCount}/20)
             </span>
           </button>
         </div>
@@ -563,15 +563,32 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
           </div>
         ) : (
           currentItems.map((item, idx) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#0E1526] border border-white/10 hover:border-white/20 transition shadow-md"
-            >
-              {/* Información e Imagen */}
-              <div className="flex items-center space-x-4 min-w-0">
-                <span className="text-sm font-black text-zinc-500 w-6 text-center">
-                  #{idx + 1}
-                </span>
+            <React.Fragment key={item.id}>
+              {idx === 0 && (
+                <div className="flex items-center space-x-2 py-2 px-3.5 bg-gradient-to-r from-rose-600/25 via-rose-500/10 to-transparent border border-rose-500/30 rounded-xl text-rose-300 text-xs font-black tracking-wider uppercase mb-1">
+                  <span className="w-1.5 h-3.5 bg-rose-500 rounded-full" />
+                  <span>🏆 FILA 1: TOP 10 MÁS VISTAS (Cupos #1 al #10)</span>
+                </div>
+              )}
+              {idx === 10 && (
+                <div className="flex items-center space-x-2 py-2 px-3.5 bg-gradient-to-r from-cyan-600/25 via-cyan-500/10 to-transparent border border-cyan-500/30 rounded-xl text-cyan-300 text-xs font-black tracking-wider uppercase mt-4 mb-1">
+                  <span className="w-1.5 h-3.5 bg-cyan-400 rounded-full" />
+                  <span>✨ FILA 2: AGREGADAS RECIENTEMENTE (Cupos #11 al #20)</span>
+                </div>
+              )}
+              <div
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-[#0E1526] border border-white/10 hover:border-white/20 transition shadow-md"
+              >
+                {/* Información e Imagen */}
+                <div className="flex items-center space-x-4 min-w-0">
+                  <div className="flex flex-col items-center justify-center shrink-0 w-8">
+                    <span className="text-sm font-black text-white text-center">
+                      #{idx + 1}
+                    </span>
+                    <span className={`text-[9px] font-bold uppercase ${idx < 10 ? 'text-rose-400' : 'text-cyan-400'}`}>
+                      {idx < 10 ? 'Top 10' : 'Reciente'}
+                    </span>
+                  </div>
 
                 <div className="w-12 h-16 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 relative">
                   {item.posterUrl ? (
@@ -691,7 +708,8 @@ export const AdminShowcaseManager: React.FC<AdminShowcaseManagerProps> = ({ onPl
                 </button>
               </div>
             </div>
-          ))
+          </React.Fragment>
+        ))
         )}
       </div>
 

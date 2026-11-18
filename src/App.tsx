@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { SidebarDock, SIDEBAR_ITEMS } from './components/showcase/SidebarDock';
 import { TopSearchBar } from './components/showcase/TopSearchBar';
 import { MainHeroStage } from './components/showcase/MainHeroStage';
@@ -95,11 +95,11 @@ export function App() {
   const isHoldingOkRef = useRef(false);
   const hasTriggeredLongPressRef = useRef(false);
 
-  // Catálogo activo según pestaña (Favoritos, Películas o Series)
-  // Prioridad: 100% contenidos reales del servidor Xtream activo o favoritos guardados
-  const currentCatalog: ShowcaseItem[] = (activeTab === 'favorites')
-    ? (favorites && favorites.length > 0)
-      ? favorites.map((fav) => ({
+  // Catálogo activo según pestaña (Favoritos, Películas o Series) - 20 Cupos (10 Top 10 + 10 Agregadas Recientemente)
+  const currentCatalog: ShowcaseItem[] = useMemo(() => {
+    if (activeTab === 'favorites') {
+      if (favorites && favorites.length > 0) {
+        return favorites.slice(0, 20).map((fav) => ({
           id: fav.id,
           title: fav.title.toUpperCase(),
           subtitle: fav.title,
@@ -114,64 +114,106 @@ export function App() {
           synopsis: 'Título guardado en tus favoritos.',
           type: fav.type === 'series' ? 'series' as const : 'movie' as const,
           streamUrl: fav.streamUrl,
-        }))
-      : [{
-          id: 'empty_favorites',
-          title: 'AÚN NO TIENES FAVORITOS',
-          subtitle: 'Mantén presionado ENTER durante 3 segundos en cualquier película, serie o canal',
-          backdropUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920',
-          thumbnailUrl: 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400',
-          releaseDateText: 'Acceso Rápido',
-          statusBadge: 'NUEVO' as const,
-          genresText: 'Favoritos',
-          year: '2026',
-          rating: '★ VIP',
-          duration: '3 segundos',
-          synopsis: 'Para agregar cualquier película, serie o canal de TV a Favoritos, simplemente mantén presionado el botón ENTER / OK de tu control remoto durante 3 segundos sobre la carátula o canal.',
-          type: 'movie' as const,
-        }]
-    : (activeTab === 'series') 
-    ? (adminFeaturedItems.filter((i) => i.type === 'series').length > 0)
-      ? adminFeaturedItems.filter((i) => i.type === 'series').map((s) => ({
-          id: s.id,
-          title: s.title.toUpperCase(),
-          subtitle: s.synopsis && s.synopsis.length > 15 && !s.synopsis.startsWith('Disfruta')
-            ? s.synopsis
-            : (s.genresText ? `${s.genresText} • ${s.year || '2026'}` : (s.title.includes(String(s.year || '')) ? s.title : `${s.title} (${s.year || '2026'})`)),
-          backdropUrl: s.backdropUrl || s.posterUrl,
-          thumbnailUrl: s.posterUrl,
-          releaseDateText: s.badge === 'ESTRENO' ? 'Estreno' : s.badge === 'PRÓXIMAMENTE' ? 'Próximamente' : 'Recién Añadida',
-          statusBadge: s.badge,
-          genresText: s.genresText || 'Serie TV',
-          year: s.year || '2026',
-          rating: s.rating || '8.8 ★',
-          duration: s.duration || 'Temporadas',
-          synopsis: s.synopsis || 'Disfruta de esta serie en tu catálogo.',
-          type: 'series' as const,
-          streamUrl: s.streamUrl,
-          trailerYoutubeKey: s.trailerYoutubeKey,
-        }))
-      : (homeFeed.featuredSeries && homeFeed.featuredSeries.length > 0)
-      ? homeFeed.featuredSeries.map((s) => ({
-          id: s.id,
-          title: s.title.toUpperCase(),
-          subtitle: s.title,
-          backdropUrl: s.backdropUrl,
-          thumbnailUrl: s.posterUrl,
-          releaseDateText: 'Serie en Catálogo',
-          statusBadge: (s.tag || 'ESTRENO') as any,
-          genresText: s.genres?.join(', ') || 'Serie TV',
-          year: s.year || '2026',
-          rating: s.rating || '8.8 ★',
-          duration: 'Temporadas',
-          synopsis: s.synopsis || 'Disfruta de esta serie en tu catálogo.',
-          type: 'series' as const,
-          streamUrl: s.streamUrl,
-        }))
-      : SHOWCASE_SERIES 
-    : (activeTab === 'movies')
-    ? (adminFeaturedItems.filter((i) => i.type === 'movie').length > 0)
-      ? adminFeaturedItems.filter((i) => i.type === 'movie').map((m) => ({
+        }));
+      }
+      return [{
+        id: 'empty_favorites',
+        title: 'AÚN NO TIENES FAVORITOS',
+        subtitle: 'Mantén presionado ENTER durante 3 segundos en cualquier película, serie o canal',
+        backdropUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400',
+        releaseDateText: 'Acceso Rápido',
+        statusBadge: 'NUEVO' as const,
+        genresText: 'Favoritos',
+        year: '2026',
+        rating: '★ VIP',
+        duration: '3 segundos',
+        synopsis: 'Para agregar cualquier película, serie o canal de TV a Favoritos, simplemente mantén presionado el botón ENTER / OK de tu control remoto durante 3 segundos sobre la carátula o canal.',
+        type: 'movie' as const,
+      }];
+    }
+
+    if (activeTab === 'series') {
+      const result: ShowcaseItem[] = [];
+      const addedIds = new Set<string>();
+
+      // 1. Añadir series configuradas por el administrador (hasta 20)
+      const adminSeries = adminFeaturedItems.filter((i) => i.type === 'series');
+      for (const s of adminSeries) {
+        if (!addedIds.has(s.id)) {
+          addedIds.add(s.id);
+          result.push({
+            id: s.id,
+            title: s.title.toUpperCase(),
+            subtitle: s.synopsis && s.synopsis.length > 15 && !s.synopsis.startsWith('Disfruta')
+              ? s.synopsis
+              : (s.genresText ? `${s.genresText} • ${s.year || '2026'}` : (s.title.includes(String(s.year || '')) ? s.title : `${s.title} (${s.year || '2026'})`)),
+            backdropUrl: s.backdropUrl || s.posterUrl,
+            thumbnailUrl: s.posterUrl,
+            releaseDateText: s.badge === 'ESTRENO' ? 'Estreno' : s.badge === 'PRÓXIMAMENTE' ? 'Próximamente' : 'Recién Añadida',
+            statusBadge: s.badge,
+            genresText: s.genresText || 'Serie TV',
+            year: s.year || '2026',
+            rating: s.rating || '8.8 ★',
+            duration: s.duration || 'Temporadas',
+            synopsis: s.synopsis || 'Disfruta de esta serie en tu catálogo.',
+            type: 'series',
+            streamUrl: s.streamUrl,
+            trailerYoutubeKey: s.trailerYoutubeKey,
+          });
+        }
+      }
+
+      // 2. Si faltan para completar los 20 cupos, rellenar con series del catálogo
+      if (result.length < 20 && homeFeed.featuredSeries) {
+        for (const s of homeFeed.featuredSeries) {
+          if (result.length >= 20) break;
+          if (!addedIds.has(s.id)) {
+            addedIds.add(s.id);
+            result.push({
+              id: s.id,
+              title: s.title.toUpperCase(),
+              subtitle: s.title,
+              backdropUrl: s.backdropUrl,
+              thumbnailUrl: s.posterUrl,
+              releaseDateText: 'Serie en Catálogo',
+              statusBadge: (s.tag || 'ESTRENO') as any,
+              genresText: s.genres?.join(', ') || 'Serie TV',
+              year: s.year || '2026',
+              rating: s.rating || '8.8 ★',
+              duration: 'Temporadas',
+              synopsis: s.synopsis || 'Disfruta de esta serie en tu catálogo.',
+              type: 'series',
+              streamUrl: s.streamUrl,
+            });
+          }
+        }
+      }
+
+      // 3. Fallback mock si no hay suficientes
+      if (result.length < 20) {
+        for (const s of SHOWCASE_SERIES) {
+          if (result.length >= 20) break;
+          if (!addedIds.has(s.id)) {
+            addedIds.add(s.id);
+            result.push(s);
+          }
+        }
+      }
+
+      return result.slice(0, 20);
+    }
+
+    // activeTab === 'movies' (o cualquier otro caso)
+    const result: ShowcaseItem[] = [];
+    const addedIds = new Set<string>();
+
+    // 1. Añadir películas configuradas por el administrador (hasta 20)
+    const adminMovies = adminFeaturedItems.filter((i) => i.type === 'movie');
+    for (const m of adminMovies) {
+      if (!addedIds.has(m.id)) {
+        addedIds.add(m.id);
+        result.push({
           id: m.id,
           title: m.title.toUpperCase(),
           subtitle: m.synopsis && m.synopsis.length > 15 && !m.synopsis.startsWith('Disfruta')
@@ -186,74 +228,25 @@ export function App() {
           rating: m.rating || '8.5 ★',
           duration: m.duration || 'Película',
           synopsis: m.synopsis || 'Disfruta de esta película en tu catálogo.',
-          type: 'movie' as const,
+          type: 'movie',
           streamUrl: m.streamUrl,
           trailerYoutubeKey: m.trailerYoutubeKey,
-        }))
-      : (homeFeed.featuredMovies && homeFeed.featuredMovies.length > 0)
-      ? homeFeed.featuredMovies.map((m) => ({
-          id: m.id,
-          title: m.title.toUpperCase(),
-          subtitle: m.synopsis && m.synopsis.length > 15 && !m.synopsis.startsWith('Disfruta')
-            ? m.synopsis
-            : (m.genres?.length ? `${m.genres.join(', ')} • ${m.year || '2026'}` : (m.title.includes(String(m.year || '')) ? m.title : `${m.title} (${m.year || '2026'})`)),
-          backdropUrl: m.backdropUrl,
-          thumbnailUrl: m.posterUrl,
-          releaseDateText: tagToReleaseDateText(m.tag),
-          statusBadge: m.tag as any,
-          genresText: m.genres.join(', '),
-          year: m.year,
-          rating: m.rating,
-          duration: m.duration,
-          synopsis: m.synopsis,
-          type: 'movie' as const,
-          streamUrl: m.streamUrl,
-          trailerYoutubeKey: m.trailerYoutubeKey,
-          tmdbId: m.tmdbId,
-        }))
-      : (vodMovies && vodMovies.length > 0)
-        ? vodMovies.map((m: any) => ({
-            id: `vod_${m.id}`,
-            title: (m.title || 'PELÍCULA').toUpperCase(),
-            subtitle: m.synopsis && m.synopsis.length > 15 && !m.synopsis.startsWith('Disfruta')
-            ? m.synopsis
-            : (m.genresText ? `${m.genresText} • ${m.year || '2026'}` : (m.title.includes(String(m.year || '')) ? m.title : `${m.title} (${m.year || '2026'})`)),
-            backdropUrl: m.backdropUrl,
-            thumbnailUrl: m.posterUrl,
-            releaseDateText: 'Recién Añadido',
-            statusBadge: 'ESTRENO' as const,
-            genresText: Array.isArray(m.genres) ? m.genres.join(', ') : (m.genresText || 'Película'),
-            year: m.year,
-            rating: m.rating,
-            duration: m.duration,
-            synopsis: m.synopsis,
-            type: 'movie' as const,
-            streamUrl: m.streamUrl,
-          }))
-        : SHOWCASE_MOVIES
-    : (adminFeaturedItems.length > 0)
-      ? adminFeaturedItems.map((item) => ({
-          id: item.id,
-          title: item.title.toUpperCase(),
-          subtitle: `${item.title} (${item.year || '2026'})`,
-          backdropUrl: item.backdropUrl || item.posterUrl,
-          thumbnailUrl: item.posterUrl,
-          releaseDateText: item.badge === 'ESTRENO' ? 'Estreno' : item.badge === 'PRÓXIMAMENTE' ? 'Próximamente' : 'Recién Añadida',
-          statusBadge: item.badge,
-          genresText: item.genresText || (item.type === 'series' ? 'Serie TV' : 'Película'),
-          year: item.year || '2026',
-          rating: item.rating || '8.5 ★',
-          duration: item.duration || (item.type === 'series' ? 'Temporadas' : 'Película'),
-          synopsis: item.synopsis || (item.type === 'series' ? 'Disfruta de esta serie en tu catálogo.' : 'Disfruta de esta película en tu catálogo.'),
-          type: item.type,
-          streamUrl: item.streamUrl,
-          trailerYoutubeKey: item.trailerYoutubeKey,
-        }))
-      : (homeFeed.featured.length > 0)
-        ? homeFeed.featured.map((m) => ({
+        });
+      }
+    }
+
+    // 2. Si faltan para completar los 20 cupos, rellenar con películas del feed de Xtream
+    if (result.length < 20 && homeFeed.featuredMovies) {
+      for (const m of homeFeed.featuredMovies) {
+        if (result.length >= 20) break;
+        if (!addedIds.has(m.id)) {
+          addedIds.add(m.id);
+          result.push({
             id: m.id,
             title: m.title.toUpperCase(),
-            subtitle: `${m.title} (${m.year})`,
+            subtitle: m.synopsis && m.synopsis.length > 15 && !m.synopsis.startsWith('Disfruta')
+              ? m.synopsis
+              : (m.genres?.length ? `${m.genres.join(', ')} • ${m.year || '2026'}` : (m.title.includes(String(m.year || '')) ? m.title : `${m.title} (${m.year || '2026'})`)),
             backdropUrl: m.backdropUrl,
             thumbnailUrl: m.posterUrl,
             releaseDateText: tagToReleaseDateText(m.tag),
@@ -263,33 +256,57 @@ export function App() {
             rating: m.rating,
             duration: m.duration,
             synopsis: m.synopsis,
-            type: 'movie' as const,
+            type: 'movie',
             streamUrl: m.streamUrl,
             trailerYoutubeKey: m.trailerYoutubeKey,
             tmdbId: m.tmdbId,
-          }))
-        : (homeFeed.featuredMovies && homeFeed.featuredMovies.length > 0)
-          ? homeFeed.featuredMovies.map((m) => ({
-              id: m.id,
-              title: m.title.toUpperCase(),
-              subtitle: m.synopsis && m.synopsis.length > 15 && !m.synopsis.startsWith('Disfruta')
-            ? m.synopsis
-            : (m.genres?.length ? `${m.genres.join(', ')} • ${m.year || '2026'}` : (m.title.includes(String(m.year || '')) ? m.title : `${m.title} (${m.year || '2026'})`)),
-              backdropUrl: m.backdropUrl,
-              thumbnailUrl: m.posterUrl,
-              releaseDateText: tagToReleaseDateText(m.tag),
-              statusBadge: m.tag as any,
-              genresText: m.genres.join(', '),
-              year: m.year,
-              rating: m.rating,
-              duration: m.duration,
-              synopsis: m.synopsis,
-              type: 'movie' as const,
-              streamUrl: m.streamUrl,
-              trailerYoutubeKey: m.trailerYoutubeKey,
-              tmdbId: m.tmdbId,
-            }))
-          : SHOWCASE_MOVIES; // Fallback con películas de demo si no hay lista
+          });
+        }
+      }
+    }
+
+    // 3. Rellenar con VOD si aún faltan
+    if (result.length < 20 && vodMovies) {
+      for (const m of (vodMovies as any[])) {
+        if (result.length >= 20) break;
+        const id = `vod_${m.id}`;
+        if (!addedIds.has(id)) {
+          addedIds.add(id);
+          result.push({
+            id,
+            title: (m.title || 'PELÍCULA').toUpperCase(),
+            subtitle: m.synopsis && m.synopsis.length > 15 && !m.synopsis.startsWith('Disfruta')
+              ? m.synopsis
+              : (m.genresText ? `${m.genresText} • ${m.year || '2026'}` : (m.title.includes(String(m.year || '')) ? m.title : `${m.title} (${m.year || '2026'})`)),
+            backdropUrl: m.backdropUrl,
+            thumbnailUrl: m.posterUrl,
+            releaseDateText: 'Recién Añadido',
+            statusBadge: 'ESTRENO' as const,
+            genresText: Array.isArray(m.genres) ? m.genres.join(', ') : (m.genresText || 'Película'),
+            year: m.year,
+            rating: m.rating,
+            duration: m.duration,
+            synopsis: m.synopsis,
+            type: 'movie',
+            streamUrl: m.streamUrl,
+          });
+        }
+      }
+    }
+
+    // 4. Fallback mock si no hay lista activa
+    if (result.length < 20) {
+      for (const m of SHOWCASE_MOVIES) {
+        if (result.length >= 20) break;
+        if (!addedIds.has(m.id)) {
+          addedIds.add(m.id);
+          result.push(m);
+        }
+      }
+    }
+
+    return result.slice(0, 20);
+  }, [activeTab, favorites, adminFeaturedItems, homeFeed.featuredSeries, homeFeed.featuredMovies, vodMovies]);
   const [carouselIndex, setCarouselIndex] = useState(0);
   
   // Estados de modales y reproductor
@@ -600,10 +617,11 @@ export function App() {
         // --- FLECHA IZQUIERDA ---
         case 'ArrowLeft':
           if (focusedZone === 'thumbnails') {
-            if (carouselIndex > 0) {
-              setCarouselIndex(carouselIndex - 1);
-            } else {
+            // Si está en la primera columna de la Fila 1 (idx 0) o Fila 2 (idx 10), ir a la barra lateral
+            if (carouselIndex === 0 || carouselIndex === 10) {
               setFocusedZone('sidebar');
+            } else {
+              setCarouselIndex(carouselIndex - 1);
             }
           } else if (focusedZone === 'hero_buttons') {
             if (heroBtnIndex > 0) {
@@ -619,7 +637,11 @@ export function App() {
           if (focusedZone === 'sidebar') {
             setFocusedZone('thumbnails');
           } else if (focusedZone === 'thumbnails') {
-            if (carouselIndex < currentCatalog.length - 1) {
+            // En Fila 1 (0..9): avanzar hasta el 9 o fin
+            if (carouselIndex < 9 && carouselIndex < currentCatalog.length - 1) {
+              setCarouselIndex(carouselIndex + 1);
+            } else if (carouselIndex >= 10 && carouselIndex < currentCatalog.length - 1) {
+              // En Fila 2 (10..19): avanzar hasta el final
               setCarouselIndex(carouselIndex + 1);
             }
           } else if (focusedZone === 'hero_buttons') {
@@ -640,7 +662,13 @@ export function App() {
               setActiveTab(nextTab);
             }
           } else if (focusedZone === 'thumbnails') {
-            setFocusedZone('hero_buttons');
+            if (carouselIndex >= 10) {
+              // Subir de la Fila 2 a la Fila 1 en la misma columna
+              setCarouselIndex(carouselIndex - 10);
+            } else {
+              // Subir de la Fila 1 a los botones del Hero
+              setFocusedZone('hero_buttons');
+            }
           }
           break;
 
@@ -655,7 +683,17 @@ export function App() {
               setActiveTab(nextTab);
             }
           } else if (focusedZone === 'hero_buttons') {
+            // Bajar de los botones a la Fila 1
             setFocusedZone('thumbnails');
+            if (carouselIndex >= 10) {
+              setCarouselIndex(carouselIndex % 10);
+            }
+          } else if (focusedZone === 'thumbnails') {
+            // Si está en la Fila 1 (0..9) y existe la Fila 2 (más de 10 elementos):
+            if (carouselIndex < 10 && currentCatalog.length > 10) {
+              const nextIdx = Math.min(carouselIndex + 10, currentCatalog.length - 1);
+              setCarouselIndex(nextIdx);
+            }
           }
           break;
 
@@ -944,6 +982,7 @@ export function App() {
                 }
                 heroButtonIndex={heroBtnIndex}
                 isFavorite={isFavorite(activeItem.id)}
+                activeTab={activeTab}
                 onToggleFavorite={() => {
                   toggleFavorite({
                     id: activeItem.id,
