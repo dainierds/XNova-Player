@@ -1733,7 +1733,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         e.preventDefault();
         e.stopPropagation();
         const seasonsList = selectedSeriesDetails.seasons || [];
-        const numEpisodeCols = 2;
+        const numEpisodeCols = 3;
 
         if (isOk) {
           if (seriesFocusZone === 'episodes' && currentSeasonEpisodes[focusedEpisodeIndex]) {
@@ -1773,7 +1773,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               }
             } else if (seriesFocusZone === 'episodes') {
               setFocusedEpisodeIndex((prev) => {
-                if (prev % numEpisodeCols === 1) {
+                if (prev % numEpisodeCols > 0) {
                   return prev - 1;
                 }
                 return prev;
@@ -1791,7 +1791,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               }
             } else if (seriesFocusZone === 'episodes') {
               setFocusedEpisodeIndex((prev) => {
-                if (prev % numEpisodeCols === 0 && prev + 1 < currentSeasonEpisodes.length) {
+                if (prev % numEpisodeCols < numEpisodeCols - 1 && prev + 1 < currentSeasonEpisodes.length) {
                   return prev + 1;
                 }
                 return prev;
@@ -1826,9 +1826,6 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 const nextDown = prev + numEpisodeCols;
                 if (nextDown < currentSeasonEpisodes.length) {
                   return nextDown;
-                }
-                if (prev % numEpisodeCols === 1 && prev + 1 < currentSeasonEpisodes.length) {
-                  return prev + 1;
                 }
                 return prev;
               });
@@ -2741,140 +2738,202 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       )}
 
       {/* ── 4. MODAL DE EPISODIOS DE SERIES ── */}
-      {selectedSeriesDetails && (
-        <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-xl flex flex-col p-10 animate-fadeIn">
-          <div className="flex items-start justify-between border-b border-white/10 pb-6 shrink-0">
-            <div className="flex items-center space-x-6">
-              {selectedSeriesDetails.series.cover && (
+      {selectedSeriesDetails && (() => {
+        const series = selectedSeriesDetails.series;
+        const title = series.name || (series as any).title || 'Serie';
+        const cover = series.cover || (series as any).stream_icon || (series as any).poster;
+        const sId = series.series_id || (series as any).id;
+        const cachedMeta = metadataCacheRef.current.get(sId);
+        const finalBackdrop = (series as any).backdrop_path?.[0] || (series as any).backdropUrl || cachedMeta?.backdropUrl || cover;
+        const finalRating = series.rating || (series as any).rating || cachedMeta?.rating || '8.5';
+        const finalYear = series.releaseDate ? series.releaseDate.substring(0, 4) : (cachedMeta?.year || (series as any).year || '');
+        const finalGenres = series.genre || (series as any).genresText || cachedMeta?.genres || 'Serie TV';
+        const finalCast = (series as any).cast || (series as any).actors || cachedMeta?.cast || '';
+        const finalPlot = series.plot || (series as any).synopsis || (series as any).description || cachedMeta?.plot || 'Disfruta de todos los capítulos y temporadas disponibles en tu catálogo.';
+        const totalSeasons = selectedSeriesDetails.seasons.length;
+
+        return (
+          <div className="fixed inset-0 z-60 bg-[#070A12] flex flex-col p-6 md:p-8 animate-fadeIn select-none overflow-hidden relative">
+            {/* 🌌 Gran Fondo Cinemático */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              {finalBackdrop && (
                 <img
-                  src={normalizeMediaUrl(selectedSeriesDetails.series.cover, server)}
-                  alt={selectedSeriesDetails.series.name}
+                  src={normalizeMediaUrl(finalBackdrop, server)}
+                  alt={title}
                   referrerPolicy="no-referrer"
-                  className="w-20 h-28 object-cover rounded-xl border border-white/20 shadow-xl"
+                  className="w-full h-full object-cover opacity-20 scale-105"
                 />
               )}
-              <div>
-                <h2 className="text-2xl font-black text-white">{selectedSeriesDetails.series.name}</h2>
-                <div className="flex items-center space-x-4 mt-1.5 text-xs text-zinc-300">
-                  <span className="text-zinc-300 font-semibold">{selectedSeriesDetails.series.genre || 'Serie'}</span>
-                  <span>{selectedSeriesDetails.seasons.length} Temporadas</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-[#070A12] via-[#070A12]/95 to-[#070A12]/80" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#070A12] via-[#070A12]/60 to-transparent" />
+            </div>
+
+            {/* 🎬 PARTE SUPERIOR: DETALLES, PÓSTER, PUNTUACIÓN Y SINOPSIS (IGUAL QUE EN PELÍCULAS) */}
+            <div className="relative z-10 flex items-start justify-between pb-3 border-b border-white/10 shrink-0">
+              <div className="flex items-start space-x-6 max-w-4xl">
+                {/* Póster oficial de la serie */}
+                {cover && (
+                  <div className="w-24 sm:w-28 md:w-32 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shrink-0 bg-black/60 hidden sm:block">
+                    <img
+                      src={normalizeMediaUrl(cover, server)}
+                      alt={title}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
+                {/* Textos y Metadatos de la serie */}
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <h2 className="text-2xl md:text-3xl font-black text-white tracking-wide line-clamp-1 drop-shadow-md">
+                    {title}
+                  </h2>
+
+                  {/* Badges: Rating, Año, Temporadas, Géneros */}
+                  <div className="flex items-center flex-wrap gap-2 text-xs font-bold text-zinc-300">
+                    {finalRating && (
+                      <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[11px] font-black">
+                        ★ {finalRating}
+                      </span>
+                    )}
+                    {finalYear && <span>{finalYear}</span>}
+                    <span>• {totalSeasons} {totalSeasons === 1 ? 'Temporada' : 'Temporadas'}</span>
+                    {finalGenres && <span className="text-zinc-400">• {finalGenres}</span>}
+                  </div>
+
+                  {/* Reparto (Cast) */}
+                  {finalCast && !finalCast.toLowerCase().includes('cargando') && (
+                    <p className="text-xs text-zinc-300 line-clamp-1">
+                      <span className="text-zinc-500 font-bold mr-1.5">Reparto:</span>
+                      {finalCast}
+                    </p>
+                  )}
+
+                  {/* Sinopsis oficial de la serie */}
+                  <p className="text-xs text-zinc-300 leading-relaxed max-w-3xl line-clamp-2 md:line-clamp-3">
+                    {finalPlot}
+                  </p>
                 </div>
+              </div>
+
+              {/* Botones de acción superiores (Admin y Cerrar) */}
+              <div className="flex items-center space-x-3 shrink-0 ml-4">
+                {isAdmin && (
+                  <button
+                    onClick={() => setAdminPinModalItem({
+                      id: `series_${series.series_id}`,
+                      streamId: series.series_id,
+                      title: series.name,
+                      type: 'series',
+                      posterUrl: normalizeMediaUrl(series.cover, server) || '',
+                      backdropUrl: normalizeMediaUrl(finalBackdrop, server) || '',
+                      year: finalYear || '2026',
+                      rating: finalRating || '8.8',
+                      genresText: finalGenres || 'Serie TV',
+                      synopsis: finalPlot || '',
+                    })}
+                    className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-md"
+                    title="Fijar esta serie en la Pantalla Principal"
+                  >
+                    <Star className="w-3.5 h-3.5 fill-current text-amber-400" />
+                    <span>Poner en Portada</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    if (initialSelectedItem) {
+                      onClose();
+                    } else {
+                      setSelectedSeriesDetails(null);
+                      setFocusZone('grid');
+                    }
+                  }}
+                  className={`p-2.5 rounded-full transition ${
+                    focusZone === 'series_modal' && seriesFocusZone === 'close'
+                      ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-110 shadow-lg'
+                      : 'bg-white/10 hover:bg-white/20 text-white'
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
-              {isAdmin && (
-                <button
-                  onClick={() => setAdminPinModalItem({
-                    id: `series_${selectedSeriesDetails.series.series_id}`,
-                    streamId: selectedSeriesDetails.series.series_id,
-                    title: selectedSeriesDetails.series.name,
-                    type: 'series',
-                    posterUrl: normalizeMediaUrl(selectedSeriesDetails.series.cover, server) || '',
-                    backdropUrl: normalizeMediaUrl(selectedSeriesDetails.series.cover, server) || '',
-                    year: selectedSeriesDetails.series.releaseDate ? selectedSeriesDetails.series.releaseDate.substring(0, 4) : '2026',
-                    rating: selectedSeriesDetails.series.rating || '8.8',
-                    genresText: selectedSeriesDetails.series.genre || 'Serie TV',
-                    synopsis: selectedSeriesDetails.series.plot || '',
-                  })}
-                  className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-md"
-                  title="Fijar esta serie en la Pantalla Principal"
-                >
-                  <Star className="w-3.5 h-3.5 fill-current text-amber-400" />
-                  <span>Poner en Portada (Admin)</span>
-                </button>
-              )}
-
-              <button
-                onClick={() => {
-                  if (initialSelectedItem) {
-                    onClose();
-                  } else {
-                    setSelectedSeriesDetails(null);
-                    setFocusZone('grid');
-                  }
-                }}
-                className={`p-3 rounded-full transition ${
-                  focusZone === 'series_modal' && seriesFocusZone === 'close'
-                    ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-110 shadow-lg'
-                    : 'bg-white/10 hover:bg-white/20 text-white'
-                }`}
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-
-          {/* Temporadas */}
-          <div className="flex items-center space-x-3 py-4 shrink-0 border-b border-white/5">
-            {selectedSeriesDetails.seasons.map((season, sIdx) => {
-              const sNum = season.season_number || sIdx + 1;
-              const isSelected = selectedSeasonNumber === sNum;
-              const isFocused = focusZone === 'series_modal' && seriesFocusZone === 'seasons' && focusedSeasonIndex === sIdx;
-
-              return (
-                <button
-                  key={sNum}
-                  onClick={() => {
-                    setSelectedSeasonNumber(sNum);
-                    setFocusedSeasonIndex(sIdx);
-                    setFocusedEpisodeIndex(0);
-                    setSeriesFocusZone('episodes');
-                  }}
-                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
-                    isSelected
-                      ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/40'
-                      : 'bg-[#131826] text-zinc-400 hover:text-white border border-white/10'
-                  } ${isFocused ? 'ring-4 ring-cyan-300 scale-105 z-10' : ''}`}
-                >
-                  {season.name || `Temporada ${sNum}`}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Episodios */}
-          <div className="flex-1 overflow-y-auto py-4 space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              {currentSeasonEpisodes.map((ep, eIdx) => {
-                const isEpFocused = focusZone === 'series_modal' && seriesFocusZone === 'episodes' && focusedEpisodeIndex === eIdx;
+            {/* 🎞️ SELECTOR DE TEMPORADAS (PILLS COMPACTOS) */}
+            <div className="relative z-10 flex items-center space-x-2 py-2.5 shrink-0 border-b border-white/5 overflow-x-auto no-scrollbar">
+              {selectedSeriesDetails.seasons.map((season, sIdx) => {
+                const sNum = season.season_number || sIdx + 1;
+                const isSelected = selectedSeasonNumber === sNum;
+                const isFocused = focusZone === 'series_modal' && seriesFocusZone === 'seasons' && focusedSeasonIndex === sIdx;
 
                 return (
-                  <div
-                    key={ep.id || eIdx}
-                    ref={(el) => { episodeItemRefs.current[eIdx] = el; }}
-                    onClick={() => playEpisode(ep)}
-                    className={`p-4 rounded-2xl flex items-center space-x-4 cursor-pointer transition-all duration-200 border ${
-                      isEpFocused
-                        ? 'bg-gradient-to-r from-cyan-900/70 to-blue-900/70 border-cyan-400 ring-4 ring-cyan-400/50 scale-102 z-10 shadow-xl'
-                        : 'bg-[#0E1424] hover:bg-cyan-950/40 border-white/5'
-                    }`}
+                  <button
+                    key={sNum}
+                    onClick={() => {
+                      setSelectedSeasonNumber(sNum);
+                      setFocusedSeasonIndex(sIdx);
+                      setFocusedEpisodeIndex(0);
+                      setSeriesFocusZone('episodes');
+                    }}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${
+                      isSelected
+                        ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/40 font-black'
+                        : 'bg-[#131826] text-zinc-400 hover:text-white border border-white/10 font-bold'
+                    } ${isFocused ? 'ring-4 ring-cyan-300 scale-105 z-10' : ''}`}
                   >
-                    <div className="w-12 h-12 rounded-xl bg-cyan-500/20 text-cyan-400 font-black text-sm flex items-center justify-center shrink-0 border border-cyan-500/30">
-                      {ep.episode_num || eIdx + 1}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h4 className={`text-sm font-bold truncate ${isEpFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>
-                        {ep.title || `Episodio ${ep.episode_num || eIdx + 1}`}
-                      </h4>
-                      {ep.info?.plot && (
-                        <p className="text-[11px] text-zinc-400 line-clamp-1 mt-0.5">
-                          {ep.info.plot}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className={`p-2.5 rounded-full transition ${isEpFocused ? 'bg-cyan-400 text-black' : 'bg-white/10 text-white'}`}>
-                      <Play className="w-4 h-4 fill-current ml-0.5" />
-                    </div>
-                  </div>
+                    {season.name || `Temporada ${sNum}`}
+                  </button>
                 );
               })}
             </div>
+
+            {/* 📺 GRILLA DE CAPÍTULOS MÁS PEQUEÑOS Y COMPACTOS */}
+            <div className="relative z-10 flex-1 overflow-y-auto pt-3 pb-6">
+              <div className="grid grid-cols-3 xl:grid-cols-4 gap-2.5">
+                {currentSeasonEpisodes.map((ep, eIdx) => {
+                  const isEpFocused = focusZone === 'series_modal' && seriesFocusZone === 'episodes' && focusedEpisodeIndex === eIdx;
+
+                  return (
+                    <div
+                      key={ep.id || eIdx}
+                      ref={(el) => { episodeItemRefs.current[eIdx] = el; }}
+                      onClick={() => playEpisode(ep)}
+                      className={`p-2.5 rounded-xl flex items-center space-x-3 cursor-pointer transition-all duration-150 border ${
+                        isEpFocused
+                          ? 'bg-gradient-to-r from-cyan-900/80 to-blue-900/80 border-cyan-400 ring-4 ring-cyan-400/50 scale-102 z-10 shadow-lg'
+                          : 'bg-[#0E1424] hover:bg-cyan-950/40 border-white/5'
+                      }`}
+                    >
+                      {/* Número de episodio */}
+                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 font-black text-xs flex items-center justify-center shrink-0 border border-cyan-500/30">
+                        {ep.episode_num || eIdx + 1}
+                      </div>
+
+                      {/* Título de episodio */}
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`text-xs font-bold truncate ${isEpFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>
+                          {ep.title || `Episodio ${ep.episode_num || eIdx + 1}`}
+                        </h4>
+                        {ep.info?.duration_secs ? (
+                          <span className="text-[10px] text-zinc-400">
+                            {Math.round(ep.info.duration_secs / 60)} min
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {/* Botón play compacto */}
+                      <div className={`p-1.5 rounded-full transition shrink-0 ${isEpFocused ? 'bg-cyan-400 text-black' : 'bg-white/10 text-white'}`}>
+                        <Play className="w-3 h-3 fill-current ml-0.5" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ⭐ Menú Rápido de Favoritos / Continuar Viendo por pulsación en Catálogo */}
       <QuickFavoriteModal
