@@ -53,6 +53,31 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
     return () => clearTimeout(timer);
   }, [onOpenStateChange]);
 
+  // Escuchar eventos de progreso y error desde el puente nativo Android
+  useEffect(() => {
+    const handleProgress = (e: any) => {
+      const { percent, installing } = e.detail || {};
+      if (percent !== undefined) setDownloadPercent(percent);
+      if (installing) {
+        setDownloadStatus('¡Descarga completa! Abriendo instalador de Android...');
+      } else {
+        setDownloadStatus(`Descargando actualización: ${percent}%`);
+      }
+    };
+
+    const handleError = (e: any) => {
+      setDownloading(false);
+      setDownloadStatus(`Error: ${e.detail?.error || 'Fallo en la descarga'}`);
+    };
+
+    window.addEventListener('native_update_progress', handleProgress);
+    window.addEventListener('native_update_error', handleError);
+    return () => {
+      window.removeEventListener('native_update_progress', handleProgress);
+      window.removeEventListener('native_update_error', handleError);
+    };
+  }, []);
+
   // Al abrir el modal, desenfocar todo elemento activo para evitar teclado en Android TV
   useEffect(() => {
     if (isOpen) {
@@ -70,29 +95,28 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
     }
 
     setDownloading(true);
-    setDownloadStatus('Iniciando descarga del nuevo APK...');
-    setDownloadPercent(20);
+    setDownloadPercent(0);
+    setDownloadStatus('Iniciando descarga interna...');
 
-    setTimeout(() => {
-      setDownloadPercent(55);
+    // Si estamos en la app de Android TV, usar el puente nativo sin abrir Downloader
+    const nativeUpdater = (window as any).NativeUpdaterBridge;
+    if (nativeUpdater && typeof nativeUpdater.downloadAndInstall === 'function') {
+      nativeUpdater.downloadAndInstall(updateInfo.downloadUrl);
+    } else {
+      // Fallback para pruebas en navegador
+      setDownloadPercent(40);
       setDownloadStatus('Descargando paquete de actualización...');
-    }, 800);
-
-    setTimeout(() => {
-      setDownloadPercent(90);
-      setDownloadStatus('Abriendo instalador de Android...');
-      try {
-        window.open(updateInfo.downloadUrl!, '_system');
-      } catch {
-        window.location.href = updateInfo.downloadUrl!;
-      }
-    }, 1800);
-
-    setTimeout(() => {
-      setDownloading(false);
-      setDownloadPercent(100);
-      setDownloadStatus('Listo. Sigue las instrucciones en tu TV para completar.');
-    }, 3000);
+      setTimeout(() => {
+        setDownloadPercent(100);
+        setDownloadStatus('Abriendo instalador...');
+        try {
+          window.open(updateInfo.downloadUrl!, '_system');
+        } catch {
+          window.location.href = updateInfo.downloadUrl!;
+        }
+        setDownloading(false);
+      }, 1500);
+    }
   };
 
   const handleClose = () => {

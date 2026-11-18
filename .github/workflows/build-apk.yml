@@ -52,6 +52,10 @@ jobs:
           echo "Actualizando versión a $BUILD_VER en branding.ts..."
           sed -i "s/version: '.*'/version: '$BUILD_VER'/" src/config/branding.ts
           cat src/config/branding.ts | grep version
+          echo "Actualizando versionCode (${{ github.run_number }}) y versionName ($BUILD_VER) en build.gradle..."
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \".*\"/versionName \"$BUILD_VER\"/" android/app/build.gradle
+          cat android/app/build.gradle | grep -E "versionCode|versionName"
 
       - name: Compilar Frontend React (Vite)
         run: npm run build

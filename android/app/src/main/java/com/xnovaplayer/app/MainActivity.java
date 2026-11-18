@@ -169,6 +169,119 @@ public class MainActivity extends BridgeActivity {
                         });
                     }
                 }, "AppExitBridge");
+
+                // 🔄 Puente nativo oficial para actualización OTA interna sin usar Downloader
+                webView.addJavascriptInterface(new Object() {
+                    @JavascriptInterface
+                    public void downloadAndInstall(String downloadUrl) {
+                        new Thread(() -> {
+                            try {
+                                java.net.URL url = new java.net.URL(downloadUrl);
+                                java.net.HttpURLConnection conn = null;
+                                int redirects = 0;
+                                while (redirects < 5) {
+                                    conn = (java.net.HttpURLConnection) url.openConnection();
+                                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android TV; XNova-Updater)");
+                                    conn.setInstanceFollowRedirects(true);
+                                    conn.connect();
+                                    int status = conn.getResponseCode();
+                                    if (status == java.net.HttpURLConnection.HTTP_MOVED_TEMP
+                                        || status == java.net.HttpURLConnection.HTTP_MOVED_PERM
+                                        || status == 307 || status == 308) {
+                                        String newUrl = conn.getHeaderField("Location");
+                                        if (newUrl != null) {
+                                            url = new java.net.URL(newUrl);
+                                            redirects++;
+                                            continue;
+                                        }
+                                    }
+                                    break;
+                                }
+
+                                int fileLength = conn.getContentLength();
+                                java.io.File cacheDir = getCacheDir();
+                                java.io.File apkFile = new java.io.File(cacheDir, "XNovaUpdate.apk");
+                                if (apkFile.exists()) {
+                                    apkFile.delete();
+                                }
+
+                                java.io.InputStream input = conn.getInputStream();
+                                java.io.FileOutputStream output = new java.io.FileOutputStream(apkFile);
+
+                                byte[] buffer = new byte[16384];
+                                long total = 0;
+                                int count;
+                                long lastProgressTime = 0;
+
+                                while ((count = input.read(buffer)) != -1) {
+                                    total += count;
+                                    output.write(buffer, 0, count);
+                                    long now = System.currentTimeMillis();
+                                    if (fileLength > 0 && (now - lastProgressTime > 200)) {
+                                        lastProgressTime = now;
+                                        final int progress = (int) (total * 100 / fileLength);
+                                        runOnUiThread(() -> {
+                                            webView.evaluateJavascript(
+                                                "window.dispatchEvent(new CustomEvent('native_update_progress', { detail: { percent: " + progress + " } }));",
+                                                null
+                                            );
+                                        });
+                                    }
+                                }
+
+                                output.flush();
+                                output.close();
+                                input.close();
+
+                                // Notificar que la descarga terminó y se abre el instalador
+                                runOnUiThread(() -> {
+                                    webView.evaluateJavascript(
+                                        "window.dispatchEvent(new CustomEvent('native_update_progress', { detail: { percent: 100, installing: true } }));",
+                                        null
+                                    );
+                                });
+
+                                // Si es Android 8+ y no tiene permiso para instalar apps desconocidas, solicitarlo
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                    if (!getPackageManager().canRequestPackageInstalls()) {
+                                        Intent settingsIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                                        settingsIntent.setData(Uri.parse("package:" + getPackageName()));
+                                        settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                        startActivity(settingsIntent);
+                                    }
+                                }
+
+                                // Invocar el instalador oficial del sistema operativo
+                                Uri apkUri = androidx.core.content.FileProvider.getUriForFile(
+                                    MainActivity.this,
+                                    getPackageName() + ".fileprovider",
+                                    apkFile
+                                );
+
+                                Intent installIntent = new Intent(Intent.ACTION_VIEW);
+                                installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                                installIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                startActivity(installIntent);
+
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                final String errMsg = e.getMessage() != null ? e.getMessage().replace("'", "\\'") : "Error de descarga";
+                                runOnUiThread(() -> {
+                                    webView.evaluateJavascript(
+                                        "window.dispatchEvent(new CustomEvent('native_update_error', { detail: { error: '" + errMsg + "' } }));",
+                                        null
+                                    );
+                                });
+                            }
+                        }).start();
+                    }
+
+                    @JavascriptInterface
+                    public boolean isAvailable() {
+                        return true;
+                    }
+                }, "NativeUpdaterBridge");
             }
         } catch (Exception e) {
             e.printStackTrace();
