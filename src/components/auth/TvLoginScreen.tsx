@@ -1,30 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  User, 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  LogIn, 
-  Sparkles, 
-  AlertCircle 
+import {
+  User,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
 } from 'lucide-react';
-import { BRANDING } from '../../config/branding';
 import { useAuthStore } from '../../store/useAuthStore';
+import { SHOWCASE_MOVIES, SHOWCASE_SERIES } from '../../mock/showcaseData';
 
 interface TvLoginScreenProps {
   onOpenAdminPanel: () => void;
   disabled?: boolean;
 }
 
-type FocusedElement = 
+type FocusedElement =
   | 'username'
   | 'password'
   | 'toggle_eye'
   | 'submit';
 
+// Combinamos películas y series para el grid de fondo
+const ALL_POSTERS = [...SHOWCASE_MOVIES, ...SHOWCASE_SERIES].map(i => i.thumbnailUrl);
+// Duplicamos varias veces para llenar el grid completo (apuntamos a ~40 imágenes)
+const BG_POSTERS: string[] = Array.from({ length: 5 }, () => ALL_POSTERS).flat();
+
 export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, disabled = false }) => {
   const { login } = useAuthStore();
-  
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -57,71 +60,43 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
     }, 200);
   };
 
-  // 🎮 Motor de Navegación D-Pad Oficial para TV
+  // 🎮 Motor de Navegación D-Pad para TV
   useEffect(() => {
     if (disabled) {
       userInputRef.current?.blur();
       passInputRef.current?.blur();
-      if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
-      }
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       return;
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (disabled) return;
-      // Si pulsa Enter/OK:
+
       if (e.key === 'Enter') {
-        if (focusedElement === 'username') {
-          // Abrir foco en el input para que aparezca el teclado de Android y no saltar
-          userInputRef.current?.focus();
-          return;
-        } else if (focusedElement === 'password') {
-          passInputRef.current?.focus();
-          return;
-        } else if (focusedElement === 'toggle_eye') {
-          setShowPassword((prev) => !prev);
-          return;
-        } else if (focusedElement === 'submit') {
-          handleSubmit();
-          return;
-        }
+        if (focusedElement === 'username') { userInputRef.current?.focus(); return; }
+        if (focusedElement === 'password') { passInputRef.current?.focus(); return; }
+        if (focusedElement === 'toggle_eye') { setShowPassword(p => !p); return; }
+        if (focusedElement === 'submit') { handleSubmit(); return; }
       }
 
-      // Con las flechas del control remoto:
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
-        }
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         e.preventDefault();
 
         switch (e.key) {
           case 'ArrowDown':
-            if (focusedElement === 'username') {
-              setFocusedElement('password');
-            } else if (focusedElement === 'password' || focusedElement === 'toggle_eye') {
-              setFocusedElement('submit');
-            }
+            if (focusedElement === 'username') setFocusedElement('password');
+            else if (focusedElement === 'password' || focusedElement === 'toggle_eye') setFocusedElement('submit');
             break;
-
           case 'ArrowUp':
-            if (focusedElement === 'submit') {
-              setFocusedElement('password');
-            } else if (focusedElement === 'password' || focusedElement === 'toggle_eye') {
-              setFocusedElement('username');
-            }
+            if (focusedElement === 'submit') setFocusedElement('password');
+            else if (focusedElement === 'password' || focusedElement === 'toggle_eye') setFocusedElement('username');
             break;
-
           case 'ArrowRight':
-            if (focusedElement === 'password') {
-              setFocusedElement('toggle_eye');
-            }
+            if (focusedElement === 'password') setFocusedElement('toggle_eye');
             break;
-
           case 'ArrowLeft':
-            if (focusedElement === 'toggle_eye') {
-              setFocusedElement('password');
-            }
+            if (focusedElement === 'toggle_eye') setFocusedElement('password');
             break;
         }
       }
@@ -132,143 +107,138 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
   }, [focusedElement, username, password, disabled]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0A0E1A] text-white flex flex-col items-center justify-between p-6 select-none font-sans overflow-hidden">
-      {/* Resplandor decorativo de fondo */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[350px] bg-gradient-to-r from-cyan-500/10 via-blue-600/10 to-violet-600/10 blur-[120px] pointer-events-none rounded-full" />
+    <div className="fixed inset-0 z-50 overflow-hidden select-none font-sans">
 
-      {/* ── CABECERA: Logotipo e Icono Oficiales ── */}
-      <header className="relative z-10 flex items-center space-x-3.5 pt-3 shrink-0">
-        <div className="w-12 h-12 rounded-2xl bg-cyan-950/40 border border-cyan-400/40 flex items-center justify-center p-2 shadow-lg shadow-cyan-500/20">
-          <img
-            src={BRANDING.assets.icon512}
-            alt={BRANDING.name}
-            className="w-full h-full object-contain"
-          />
-        </div>
-        <div>
-          <h2 className="text-base font-black tracking-wider text-white">XNOVA PLAYER</h2>
-          <span className="text-[10px] tracking-widest uppercase text-cyan-400 font-bold flex items-center space-x-1">
-            <Sparkles className="w-3 h-3" />
-            <span>Centro de Streaming Premium</span>
-          </span>
-        </div>
-      </header>
+      {/* ══════════════════════════════════════════════
+          FONDO: Grid de posters de películas/series
+          ══════════════════════════════════════════════ */}
+      <div className="absolute inset-0 grid grid-cols-5 gap-0.5 overflow-hidden">
+        {BG_POSTERS.map((url, i) => (
+          <div
+            key={i}
+            className="overflow-hidden"
+            style={{ aspectRatio: '2/3' }}
+          >
+            <img
+              src={url}
+              alt=""
+              className="w-full h-full object-cover"
+              loading="lazy"
+              draggable={false}
+            />
+          </div>
+        ))}
+      </div>
 
-      {/* ── FORMULARIO PRINCIPAL: Limpio, seguro y sin botones de paquetes ── */}
-      <main className="relative z-10 w-full max-w-md bg-[#0E1526]/95 border border-white/10 backdrop-blur-xl rounded-2xl p-6 shadow-2xl flex flex-col justify-center my-auto">
-        <div className="text-center mb-5">
-          <h1 className="text-xl font-black tracking-tight text-white">Iniciar Sesión</h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Ingresa tus credenciales asignadas por tu administrador
-          </p>
-        </div>
+      {/* Overlay oscuro sobre el grid */}
+      <div className="absolute inset-0 bg-black/60" />
 
-        {/* Mensaje de Error */}
+      {/* Gradiente lateral derecho para el panel */}
+      <div className="absolute inset-y-0 right-0 w-[420px] bg-gradient-to-l from-black/95 via-black/80 to-transparent" />
+
+      {/* ══════════════════════════════════════════════
+          PANEL DE LOGIN (derecha)
+          ══════════════════════════════════════════════ */}
+      <div className="absolute inset-y-0 right-0 w-[400px] flex flex-col items-stretch justify-center px-10 py-12">
+
+        {/* Título */}
+        <h1 className="text-3xl font-black tracking-wide text-white mb-8 uppercase">
+          INICIAR SESIÓN
+        </h1>
+
+        {/* Error */}
         {errorMessage && (
-          <div className="mb-4 flex items-center space-x-2.5 bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs px-3.5 py-2.5 rounded-xl animate-fadeIn">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+          <div className="mb-4 flex items-center space-x-2 bg-red-700/30 border border-red-500/40 text-red-300 text-xs px-3 py-2.5 rounded-lg">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
             <span className="flex-1">{errorMessage}</span>
           </div>
         )}
 
-        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="flex flex-col gap-3">
+
           {/* Campo Usuario */}
-          <div>
-            <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-              Usuario
-            </label>
-            <div 
-              onClick={() => {
-                setFocusedElement('username');
-                userInputRef.current?.focus();
-              }}
-              className={`flex items-center space-x-3 px-3.5 py-3 rounded-xl border transition-all cursor-pointer ${
-                focusedElement === 'username'
-                  ? 'border-cyan-400 bg-white/15 ring-4 ring-cyan-400/40 shadow-lg shadow-cyan-500/30'
-                  : 'border-white/10 bg-white/5'
-              }`}
-            >
-              <User className="w-4 h-4 text-cyan-400 shrink-0" />
-              <input
-                ref={userInputRef}
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                onFocus={() => setFocusedElement('username')}
-                placeholder="Tu usuario asignado"
-                className="w-full bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
-              />
-            </div>
+          <div
+            onClick={() => { setFocusedElement('username'); userInputRef.current?.focus(); }}
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-lg cursor-pointer transition-all duration-150 ${
+              focusedElement === 'username'
+                ? 'bg-zinc-700 ring-2 ring-white/60'
+                : 'bg-zinc-800/90'
+            }`}
+          >
+            <User className="w-5 h-5 text-zinc-400 shrink-0" />
+            <input
+              ref={userInputRef}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onFocus={() => setFocusedElement('username')}
+              placeholder="Correo Electrónico o Usuario"
+              className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
+            />
           </div>
 
           {/* Campo Contraseña */}
-          <div>
-            <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-              Contraseña
-            </label>
-            <div 
-              onClick={() => {
-                setFocusedElement('password');
-                passInputRef.current?.focus();
-              }}
-              className={`flex items-center space-x-3 px-3.5 py-3 rounded-xl border transition-all cursor-pointer ${
-                focusedElement === 'password'
-                  ? 'border-cyan-400 bg-white/15 ring-4 ring-cyan-400/40 shadow-lg shadow-cyan-500/30'
-                  : 'border-white/10 bg-white/5'
+          <div
+            onClick={() => { setFocusedElement('password'); passInputRef.current?.focus(); }}
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-lg cursor-pointer transition-all duration-150 ${
+              focusedElement === 'password' || focusedElement === 'toggle_eye'
+                ? 'bg-zinc-700 ring-2 ring-white/60'
+                : 'bg-zinc-800/90'
+            }`}
+          >
+            <Lock className="w-5 h-5 text-zinc-400 shrink-0" />
+            <input
+              ref={passInputRef}
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onFocus={() => setFocusedElement('password')}
+              placeholder="Contraseña"
+              className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowPassword(p => !p); }}
+              className={`p-1 rounded text-zinc-400 hover:text-white transition ${
+                focusedElement === 'toggle_eye' ? 'ring-2 ring-white/60 text-white' : ''
               }`}
             >
-              <Lock className="w-4 h-4 text-cyan-400 shrink-0" />
-              <input
-                ref={passInputRef}
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onFocus={() => setFocusedElement('password')}
-                placeholder="Tu contraseña secreta"
-                className="w-full bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowPassword(!showPassword);
-                }}
-                className={`p-1.5 rounded-lg text-zinc-400 hover:text-white transition ${
-                  focusedElement === 'toggle_eye' ? 'ring-2 ring-cyan-400 text-white bg-white/15' : ''
-                }`}
-                title="Mostrar/Ocultar"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
 
-          {/* Botón Ingresar */}
+          {/* Botón INICIAR SESIÓN — rojo igual que Netflix */}
           <button
             type="button"
             onClick={handleSubmit}
             disabled={isLoading}
             className={`
-              w-full mt-3 py-3.5 px-4 rounded-xl font-black text-xs tracking-wider uppercase transition-all duration-200 flex items-center justify-center space-x-2 shadow-xl
+              w-full mt-1 py-3.5 rounded-lg font-black text-sm tracking-widest uppercase
+              transition-all duration-150 flex items-center justify-center
               ${focusedElement === 'submit'
-                ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-black scale-102 ring-4 ring-cyan-300 shadow-cyan-500/50'
-                : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-cyan-500/20'}
+                ? 'bg-red-500 ring-4 ring-red-400/50 scale-[1.02] shadow-lg shadow-red-600/40'
+                : 'bg-red-600 hover:bg-red-500'}
+              text-white
             `}
           >
-            {isLoading ? (
-              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                <LogIn className="w-4 h-4" />
-                <span>ENTRAR A MI CONTENIDO</span>
-              </>
-            )}
+            {isLoading
+              ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : 'INICIAR SESIÓN'
+            }
           </button>
         </form>
-      </main>
 
-      {/* Espaciador inferior */}
-      <div className="h-2 shrink-0" />
+        {/* Links inferiores */}
+        <div className="mt-6 flex flex-col items-center gap-3 text-sm text-white/80">
+          <button type="button" className="hover:underline hover:text-white transition">
+            Olvidé mi contraseña?
+          </button>
+          <button type="button" className="hover:underline hover:text-white transition">
+            Crear una cuenta
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 };
