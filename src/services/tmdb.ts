@@ -110,15 +110,34 @@ export class TmdbService {
         throw new Error('Sin coincidencia en TMDb');
       }
 
-      // Detalle para obtener duración
+      // Detalle para obtener duración, reparto, director y trailers
       let runtimeMin = 115;
+      let castStr: string | undefined;
+      let directorStr: string | undefined;
+      let trailerKey: string | undefined;
+
       try {
         const detailRes = await fetch(
-          `https://api.themoviedb.org/3/movie/${firstResult.id}?api_key=${apiKey}&language=es-ES`
+          `https://api.themoviedb.org/3/movie/${firstResult.id}?api_key=${apiKey}&language=es-ES&append_to_response=credits,videos`
         );
         if (detailRes.ok) {
           const detailData = await detailRes.json();
           if (detailData.runtime) runtimeMin = detailData.runtime;
+
+          if (detailData.credits) {
+            if (Array.isArray(detailData.credits.cast) && detailData.credits.cast.length > 0) {
+              castStr = detailData.credits.cast.slice(0, 6).map((a: any) => a.name).join(', ');
+            }
+            if (Array.isArray(detailData.credits.crew)) {
+              const dir = detailData.credits.crew.find((c: any) => c.job === 'Director');
+              if (dir) directorStr = dir.name;
+            }
+          }
+
+          if (detailData.videos && Array.isArray(detailData.videos.results)) {
+            const trailer = detailData.videos.results.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube') || detailData.videos.results[0];
+            if (trailer) trailerKey = trailer.key;
+          }
         }
       } catch {
         // Ignorar error secundario de detalle
@@ -153,6 +172,9 @@ export class TmdbService {
         rating: firstResult.vote_average ? `${firstResult.vote_average.toFixed(1)} ★` : 'PG-13',
         isPremiere: true,
         streamUrl: fallbackStreamUrl,
+        cast: castStr,
+        director: directorStr,
+        trailerYoutubeKey: trailerKey,
         // Fecha de estreno real de TMDb (para detectar "Próximamente")
         _tmdbReleaseDate: firstResult.release_date || undefined,
       };
@@ -176,6 +198,106 @@ export class TmdbService {
       };
       cache.set(cacheKey, fallbackItem);
       return fallbackItem;
+    }
+  }
+
+  /**
+   * Enriquecimiento cinemático de Series desde TMDb
+   */
+  public static async enrichSeries(
+    rawTitle: string,
+    fallbackCover: string = ''
+  ): Promise<MovieItem> {
+    const cleanTitle = this.cleanTitle(rawTitle).replace(/ - T\d+:?E\d+.*$/, '');
+    const cacheKey = `series_${cleanTitle.toLowerCase()}`;
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey)!;
+    }
+
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      return {
+        id: `series_${cleanTitle}`,
+        title: cleanTitle,
+        backdropUrl: fallbackCover,
+        posterUrl: fallbackCover,
+        genres: ['Serie', 'Drama'],
+        synopsis: 'Disfruta de esta serie en tu reproductor XNova Player.',
+        duration: 'Serie TV',
+        year: '2026',
+        rating: '8.5',
+      };
+    }
+
+    try {
+      const searchUrl = `https://api.themoviedb.org/3/search/tv?api_key=${apiKey}&query=${encodeURIComponent(
+        cleanTitle
+      )}&language=es-ES&page=1&include_adult=false`;
+
+      const res = await fetch(searchUrl);
+      if (!res.ok) throw new Error('Error buscando serie en TMDb');
+      const data = await res.json();
+      const firstResult = data.results?.[0];
+
+      if (!firstResult) {
+        throw new Error('Serie no encontrada en TMDb');
+      }
+
+      let castStr: string | undefined;
+      let directorStr: string | undefined;
+      let trailerKey: string | undefined;
+
+      try {
+        const detailRes = await fetch(
+          `https://api.themoviedb.org/3/tv/${firstResult.id}?api_key=${apiKey}&language=es-ES&append_to_response=credits,videos`
+        );
+        if (detailRes.ok) {
+          const detailData = await detailRes.json();
+          if (detailData.credits) {
+            if (Array.isArray(detailData.credits.cast) && detailData.credits.cast.length > 0) {
+              castStr = detailData.credits.cast.slice(0, 6).map((a: any) => a.name).join(', ');
+            }
+            if (Array.isArray(detailData.created_by) && detailData.created_by.length > 0) {
+              directorStr = detailData.created_by.map((c: any) => c.name).join(', ');
+            }
+          }
+          if (detailData.videos && Array.isArray(detailData.videos.results)) {
+            const trailer = detailData.videos.results.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube') || detailData.videos.results[0];
+            if (trailer) trailerKey = trailer.key;
+          }
+        }
+      } catch {}
+
+      const year = firstResult.first_air_date ? firstResult.first_air_date.split('-')[0] : '2026';
+      const enriched: MovieItem = {
+        id: `tmdb_tv_${firstResult.id}`,
+        title: firstResult.name || cleanTitle,
+        backdropUrl: firstResult.backdrop_path ? `https://image.tmdb.org/t/p/original${firstResult.backdrop_path}` : fallbackCover,
+        posterUrl: firstResult.poster_path ? `https://image.tmdb.org/t/p/w500${firstResult.poster_path}` : fallbackCover,
+        genres: ['Serie TV'],
+        synopsis: firstResult.overview || 'Sin descripción oficial disponible.',
+        duration: 'Serie TV',
+        year,
+        rating: firstResult.vote_average ? `${firstResult.vote_average.toFixed(1)} ★` : '8.5',
+        cast: castStr,
+        director: directorStr,
+        trailerYoutubeKey: trailerKey,
+      };
+
+      cache.set(cacheKey, enriched);
+      return enriched;
+    } catch {
+      return {
+        id: `series_${cleanTitle}`,
+        title: cleanTitle,
+        backdropUrl: fallbackCover,
+        posterUrl: fallbackCover,
+        genres: ['Serie'],
+        synopsis: 'Disfruta de esta serie en tu reproductor XNova Player.',
+        duration: 'Serie TV',
+        year: '2026',
+        rating: '8.0',
+      };
     }
   }
 

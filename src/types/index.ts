@@ -15,6 +15,9 @@ export interface ContentItem {
   channelNumber?: number;
   progressPercent?: number; // Para la fila "Continuar Viendo"
   isPremiere?: boolean;
+  cast?: string;
+  director?: string;
+  trailerYoutubeKey?: string;
 }
 
 // Alias de compatibilidad

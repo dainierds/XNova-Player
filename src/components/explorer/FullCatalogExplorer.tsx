@@ -5,15 +5,15 @@ import {
   Play, 
   RefreshCw, 
   Video, 
-  X, 
-  Radio,
+  X,
   Film,
   Search,
   RotateCw,
   Heart,
   Star,
   Check,
-  Clock
+  Clock,
+  Tv
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
 import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
@@ -69,7 +69,7 @@ const normalizeMediaUrl = (url?: string, serverBase?: string): string => {
 
 /**
  * Componente robusto de Logo para canales de TV en vivo
- * Prueba stream_icon, icon, logo, tvg_logo, con auto-recuperación y badge de siglas
+ * Prueba stream_icon, icon, logo, tvg_logo, con auto-recuperación y badges inteligentes de ligas y canales
  */
 const ChannelLogo = React.memo<{
   stream: XtreamStream;
@@ -99,15 +99,122 @@ const ChannelLogo = React.memo<{
   };
 
   if (hasFailed || !currentSrc) {
-    const initials = title
-      .replace(/^(fhd|hd|sd|4k|uhd|hevc|vip|\d+)\s*[-:|]\s*/i, '')
-      .trim()
-      .slice(0, 3)
-      .toUpperCase();
+    const lower = title.toLowerCase();
+
+    // ⚾ MLB / Béisbol
+    if (lower.includes('mlb') || lower.includes('baseball') || lower.includes('beisbol') || lower.includes('⚾')) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-900 via-indigo-950 to-red-950 rounded-lg p-0.5 border border-blue-500/40 shadow-inner">
+          <span className="text-[12px] leading-none">⚾</span>
+          <span className="text-[9px] font-black tracking-tighter text-blue-200 mt-0.5">MLB</span>
+        </div>
+      );
+    }
+
+    // 🏀 NBA / WNBA / Baloncesto
+    if (lower.includes('nba') || lower.includes('wnba') || lower.includes('basket') || lower.includes('baloncesto') || lower.includes('🏀')) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-amber-800 via-orange-950 to-black rounded-lg p-0.5 border border-orange-500/40 shadow-inner">
+          <span className="text-[12px] leading-none">🏀</span>
+          <span className="text-[9px] font-black tracking-tighter text-orange-200 mt-0.5">NBA</span>
+        </div>
+      );
+    }
+
+    // 🏈 NFL / American Football
+    if (lower.includes('nfl') || lower.includes('football') || lower.includes('touchdown') || lower.includes('super bowl') || lower.includes('🏈')) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-emerald-900 via-teal-950 to-blue-950 rounded-lg p-0.5 border border-emerald-500/40 shadow-inner">
+          <span className="text-[12px] leading-none">🏈</span>
+          <span className="text-[9px] font-black tracking-tighter text-emerald-200 mt-0.5">NFL</span>
+        </div>
+      );
+    }
+
+    // ⚽ Fútbol / Soccer / Champions / LaLiga / Premier
+    if (lower.includes('futbol') || lower.includes('fútbol') || lower.includes('soccer') || lower.includes('laliga') || lower.includes('premier') || lower.includes('champions') || lower.includes('uefa') || lower.includes('fifa') || lower.includes('⚽')) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-green-900 via-emerald-950 to-black rounded-lg p-0.5 border border-emerald-500/40 shadow-inner">
+          <span className="text-[12px] leading-none">⚽</span>
+          <span className="text-[8px] font-black tracking-tighter text-green-200 mt-0.5 uppercase">LIGA</span>
+        </div>
+      );
+    }
+
+    // 🥊 UFC / MMA / Boxeo / WWE
+    if (lower.includes('ufc') || lower.includes('mma') || lower.includes('box') || lower.includes('wwe') || lower.includes('fight') || lower.includes('pelea') || lower.includes('🥊')) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-red-900 via-rose-950 to-black rounded-lg p-0.5 border border-rose-500/40 shadow-inner">
+          <span className="text-[12px] leading-none">🥊</span>
+          <span className="text-[9px] font-black tracking-tighter text-rose-200 mt-0.5">UFC</span>
+        </div>
+      );
+    }
+
+    // 🏎️ F1 / Motorsport
+    if (lower.includes('f1') || lower.includes('formula') || lower.includes('nascar') || lower.includes('motogp') || lower.includes('racing') || lower.includes('🏁')) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-red-950 via-zinc-900 to-black rounded-lg p-0.5 border border-red-500/40 shadow-inner">
+          <span className="text-[12px] leading-none">🏎️</span>
+          <span className="text-[9px] font-black tracking-tighter text-red-200 mt-0.5">F1</span>
+        </div>
+      );
+    }
+
+    // 📺 Canales famosos de noticias / deportes
+    if (lower.includes('espn')) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-red-700 rounded-lg p-1 border border-red-500 shadow-md">
+          <span className="text-[11px] font-black italic tracking-tighter text-white">ESPN</span>
+        </div>
+      );
+    }
+    if (lower.includes('fox')) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-blue-700 rounded-lg p-1 border border-blue-500 shadow-md">
+          <span className="text-[11px] font-black tracking-tighter text-white">FOX</span>
+        </div>
+      );
+    }
+    if (lower.includes('tudn')) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-amber-600 rounded-lg p-1 border border-amber-400 shadow-md">
+          <span className="text-[10px] font-black tracking-tighter text-white">TUDN</span>
+        </div>
+      );
+    }
+    if (lower.includes('hbo')) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-zinc-900 rounded-lg p-1 border border-zinc-600 shadow-md">
+          <span className="text-[11px] font-black tracking-wider text-white">HBO</span>
+        </div>
+      );
+    }
+
+    // ✅ Canal informativo o actualización
+    if (lower.includes('actual') || lower.includes('aviso') || lower.includes('info') || lower.includes('guia') || lower.includes('✅')) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-teal-900 via-cyan-950 to-black rounded-lg p-0.5 border border-cyan-400/50 shadow-inner">
+          <span className="text-[12px] leading-none">✅</span>
+          <span className="text-[8px] font-black tracking-tighter text-cyan-200 mt-0.5">INFO</span>
+        </div>
+      );
+    }
+
+    // Siglas limpias automáticas (ej: "11/18" -> "11/18", o primeras 3-4 letras del canal)
+    const cleanName = title
+      .replace(/^(fhd|hd|sd|4k|uhd|hevc|vip)\s*[-:|]\s*/i, '')
+      .replace(/[★✅⭐|]/g, '')
+      .trim();
+
+    const initials = cleanName.slice(0, 4).toUpperCase();
 
     return (
-      <div className="w-full h-full flex items-center justify-center bg-cyan-950/40 rounded-lg text-[10px] font-black tracking-wider text-cyan-400">
-        {initials || <Radio className="w-5 h-5 text-cyan-400" />}
+      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-cyan-950 rounded-lg p-1 border border-cyan-500/30 text-cyan-300">
+        <Tv className="w-3.5 h-3.5 text-cyan-400 mb-0.5 opacity-80" />
+        <span className="text-[9px] font-black tracking-tighter truncate max-w-full text-center">
+          {initials || 'TV'}
+        </span>
       </div>
     );
   }
@@ -116,8 +223,10 @@ const ChannelLogo = React.memo<{
     <img
       src={currentSrc}
       alt={title}
+      referrerPolicy="no-referrer"
+      loading="lazy"
       onError={handleError}
-      className="w-full h-full object-contain"
+      className="w-full h-full object-contain p-0.5"
     />
   );
 });
@@ -471,16 +580,21 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       const title = selectedMovieDetail.meta.title;
 
       try {
+        // 1. Consultar Xtream VOD info si el ID es numérico
         let fullInfo: any = null;
         if (/^\d+$/.test(String(streamId))) {
-          const res = await XtreamService.getVodInfo(server, user, pass, streamId);
-          if (res?.info) fullInfo = res.info;
+          try {
+            const res = await XtreamService.getVodInfo(server, user, pass, streamId);
+            if (res?.info) fullInfo = res.info;
+          } catch {}
         }
 
-        // Si Xtream no tiene sinopsis completa o backdrop, consultar TMDb de inmediato
+        // 2. Consultar TMDb para tener sinopsis cinemática, carátula HD, fondo panorámico, reparto y director
         let tmdbInfo: any = null;
-        if (!fullInfo?.plot || !fullInfo?.backdrop_path?.length) {
-          tmdbInfo = await TmdbService.enrichMovie(title).catch(() => null);
+        try {
+          tmdbInfo = await TmdbService.enrichMovie(title);
+        } catch {
+          tmdbInfo = null;
         }
 
         if (isCancelled) return;
@@ -491,6 +605,10 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
         const rawPoster = fullInfo?.cover_big || fullInfo?.movie_image || tmdbInfo?.posterUrl || selectedMovieDetail.meta.posterUrl;
 
+        const cast = fullInfo?.actors || fullInfo?.cast || tmdbInfo?.cast || '';
+        const director = fullInfo?.director || tmdbInfo?.director || '';
+        const plot = fullInfo?.plot || fullInfo?.description || tmdbInfo?.synopsis || 'Disfruta de esta película en máxima calidad.';
+
         setSelectedMovieDetail((prev) => {
           if (!prev) return null;
           return {
@@ -500,14 +618,14 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               title: fullInfo?.name || tmdbInfo?.title || prev.meta.title,
               rating: fullInfo?.rating || tmdbInfo?.rating || prev.meta.rating,
               year: fullInfo?.releasedate ? fullInfo.releasedate.substring(0, 4) : (tmdbInfo?.year || prev.meta.year),
-              duration: fullInfo?.duration || (fullInfo?.episode_run_time ? `${fullInfo.episode_run_time} min` : prev.meta.duration),
+              duration: fullInfo?.duration || (fullInfo?.episode_run_time ? `${fullInfo.episode_run_time} min` : (tmdbInfo?.duration || prev.meta.duration)),
               genres: fullInfo?.genre || (tmdbInfo?.genres ? tmdbInfo.genres.join(', ') : prev.meta.genres),
-              cast: fullInfo?.actors || fullInfo?.cast || 'Reparto oficial en catálogo',
-              director: fullInfo?.director || 'Director en catálogo',
-              plot: fullInfo?.plot || fullInfo?.description || tmdbInfo?.synopsis || prev.meta.plot || 'Disfruta de esta película en máxima calidad.',
+              cast,
+              director,
+              plot,
               backdropUrl: normalizeMediaUrl(rawBackdrop, server) || prev.meta.backdropUrl,
               posterUrl: normalizeMediaUrl(rawPoster, server) || prev.meta.posterUrl,
-              youtubeTrailer: fullInfo?.youtube_trailer || tmdbInfo?.youtubeKey || prev.meta.youtubeTrailer,
+              youtubeTrailer: fullInfo?.youtube_trailer || tmdbInfo?.trailerYoutubeKey || tmdbInfo?.youtubeKey || prev.meta.youtubeTrailer,
             },
           };
         });
@@ -518,7 +636,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
     loadFullDetails();
     return () => { isCancelled = true; };
-  }, [selectedMovieDetail?.item?.stream_id, server, user, pass]);
+  }, [selectedMovieDetail?.item?.stream_id, selectedMovieDetail?.meta?.title, server, user, pass]);
 
   // ⭐ Favoritos y pulsación de 3 segundos
   const { isFavorite, toggleFavorite } = useFavoritesStore();
@@ -1153,27 +1271,94 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     const rawInitialCover = (item as any).cover || (item as any).stream_icon || (item as any).movie_image;
     const initialCover = normalizeMediaUrl(rawInitialCover, server);
 
+    // Si es canal de TV en vivo: configurar metadatos de emisión en directo
+    if (contentType === 'live') {
+      const activeCat = categories.find((c) => String(c.category_id) === String(selectedCategoryId));
+      const catName = activeCat?.category_name || (item as any).category_name || 'En Directo';
+      const liveMeta: MediaMetadata = {
+        title: itemTitle,
+        rating: 'EN VIVO',
+        year: '',
+        duration: undefined,
+        genres: catName,
+        cast: '',
+        director: '',
+        plot: (item as any).epg_now || (item as any).plot || `Señal de televisión en directo (${catName}). Presiona OK para sintonizar en pantalla completa.`,
+        backdropUrl: initialCover,
+        posterUrl: initialCover,
+        containerExtension: 'ts',
+      };
+      metadataCacheRef.current.set(id, liveMeta);
+      setFocusedMetadata(liveMeta);
+      return;
+    }
+
+    // Si es serie: enriquecer con TMDb
+    if (contentType === 'series') {
+      try {
+        const tmdb = await TmdbService.enrichSeries(itemTitle, initialCover);
+        const seriesMeta: MediaMetadata = {
+          title: tmdb.title || itemTitle,
+          rating: tmdb.rating || item.rating || '8.5',
+          year: tmdb.year || '2026',
+          duration: 'Serie TV',
+          genres: tmdb.genres ? tmdb.genres.join(', ') : ((item as any).genre || 'Serie'),
+          cast: tmdb.cast || '',
+          director: tmdb.director || '',
+          plot: tmdb.synopsis || 'Temporadas y capítulos disponibles en tu lista.',
+          backdropUrl: tmdb.backdropUrl || initialCover,
+          posterUrl: tmdb.posterUrl || initialCover,
+          containerExtension: 'mkv',
+          youtubeTrailer: tmdb.trailerYoutubeKey,
+        };
+        metadataCacheRef.current.set(id, seriesMeta);
+        setFocusedMetadata(seriesMeta);
+      } catch {
+        const fallbackMeta: MediaMetadata = {
+          title: itemTitle,
+          rating: item.rating || '8.0',
+          year: '2026',
+          genres: (item as any).genre || 'Serie',
+          cast: '',
+          director: '',
+          plot: (item as any).plot || 'Consulta los episodios disponibles presionando OK.',
+          backdropUrl: initialCover,
+          posterUrl: initialCover,
+          containerExtension: 'mkv',
+        };
+        setFocusedMetadata(fallbackMeta);
+      }
+      return;
+    }
+
     const initialMeta: MediaMetadata = {
       title: itemTitle,
-      rating: item.rating || '7.0',
+      rating: item.rating || '7.5',
       year: (item as any).releaseDate ? (item as any).releaseDate.substring(0, 4) : '2025',
       duration: undefined,
       genres: (item as any).genre || '',
-      cast: 'Cargando información...',
-      director: 'Cargando información...',
-      plot: (item as any).plot || 'Cargando sinopsis oficial...',
+      cast: '',
+      director: '',
+      plot: (item as any).plot || '',
       backdropUrl: initialCover,
       posterUrl: initialCover,
       containerExtension: (item as any).container_extension || 'mp4',
     };
     setFocusedMetadata(initialMeta);
 
-    // Si es película VOD, consultar get_vod_info para sinopsis real, actores y director
+    // Si es película VOD, consultar get_vod_info y TMDb para sinopsis real, actores y director
     if (contentType === 'movies') {
       try {
-        const vodDetails = await XtreamService.getVodInfo(server, user, pass, id);
-        const info = vodDetails?.info || {};
-        const movieData = vodDetails?.movie_data || {};
+        let info: any = {};
+        let movieData: any = {};
+
+        if (/^\d+$/.test(String(id))) {
+          try {
+            const vodDetails = await XtreamService.getVodInfo(server, user, pass, id);
+            info = vodDetails?.info || {};
+            movieData = vodDetails?.movie_data || {};
+          } catch {}
+        }
 
         let rawBackdrop = (info.backdrop_path && info.backdrop_path.length > 0)
           ? info.backdrop_path[0]
@@ -1183,18 +1368,20 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         let plot = info.plot || info.description;
         let cast = info.actors || info.cast;
         let director = info.director;
+        let trailerKey = info.youtube_trailer;
 
-        // Si el servidor Xtream no provee sinopsis o backdrop, recurrir a TMDB
-        if (!plot || !backdrop) {
-          try {
-            const tmdb = await TmdbService.enrichMovie(itemTitle, (item as XtreamStream).stream_icon);
-            if (tmdb) {
-              plot = plot || tmdb.synopsis;
-              backdrop = backdrop || normalizeMediaUrl(tmdb.backdropUrl, server);
-            }
-          } catch {
-            // Continuar con los datos disponibles de Xtream
+        // Consultar TMDb para completar datos faltantes
+        try {
+          const tmdb = await TmdbService.enrichMovie(itemTitle, (item as XtreamStream).stream_icon);
+          if (tmdb) {
+            plot = plot || tmdb.synopsis;
+            backdrop = backdrop || normalizeMediaUrl(tmdb.backdropUrl, server);
+            cast = cast || tmdb.cast;
+            director = director || tmdb.director;
+            trailerKey = trailerKey || tmdb.trailerYoutubeKey;
           }
+        } catch {
+          // Continuar con los datos disponibles de Xtream
         }
 
         const rawPoster = info.cover_big || info.movie_image || (item as any).cover || (item as XtreamStream).stream_icon;
@@ -1202,17 +1389,17 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
         const completeMeta: MediaMetadata = {
           title: info.name || itemTitle,
-          rating: info.rating || item.rating || '7.0',
+          rating: info.rating || item.rating || '7.5',
           year: info.releasedate ? info.releasedate.substring(0, 4) : initialMeta.year,
           duration: info.duration || (info.episode_run_time ? `${info.episode_run_time} min` : '1h 45m'),
           genres: info.genre || initialMeta.genres,
-          cast: cast || 'Reparto no disponible',
-          director: director || 'Director no disponible',
-          plot: plot || 'Sin sinopsis disponible para este título.',
+          cast: cast || '',
+          director: director || '',
+          plot: plot || 'Disfruta de este título en máxima calidad.',
           backdropUrl: backdrop,
           posterUrl: poster,
           containerExtension: (item as any).container_extension || movieData.container_extension || info.container_extension || 'mkv',
-          youtubeTrailer: info.youtube_trailer,
+          youtubeTrailer: trailerKey,
         };
 
         metadataCacheRef.current.set(id, completeMeta);
@@ -1221,7 +1408,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         console.warn('No se pudo obtener información extendida de VOD:', err);
       }
     }
-  }, [contentType, server, user, pass]);
+  }, [contentType, server, user, pass, categories, selectedCategoryId]);
 
   // Ejecutar carga de metadatos cuando cambia el ítem enfocado
   useEffect(() => {
@@ -2067,37 +2254,54 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
             {/* Fila de Insignias y Datos Rápidos: [7.0] 2025 • 1h 57m • Géneros */}
             <div className="flex items-center space-x-3 mt-2 text-xs text-zinc-300 font-bold">
-              {focusedMetadata?.rating && (
-                <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[11px] font-black">
-                  {focusedMetadata.rating}
-                </span>
-              )}
-              {focusedMetadata?.year && <span>{focusedMetadata.year}</span>}
-              {focusedMetadata?.duration && <span>• {focusedMetadata.duration}</span>}
-              {focusedMetadata?.genres && !focusedMetadata.genres.includes('VOD') && !focusedMetadata.genres.includes('Película') && (
-                <span className="text-zinc-400">• {focusedMetadata.genres}</span>
+              {contentType === 'live' ? (
+                <div className="flex items-center space-x-2">
+                  <span className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-rose-600/30 text-rose-300 border border-rose-500/50 text-[11px] font-black uppercase tracking-wider animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 inline-block animate-ping" />
+                    <span>EN VIVO</span>
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-400/40 text-cyan-300 text-[11px] font-bold">
+                    HD
+                  </span>
+                  {focusedMetadata?.genres && (
+                    <span className="text-zinc-400 text-xs font-semibold">• {focusedMetadata.genres}</span>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {focusedMetadata?.rating && (
+                    <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[11px] font-black">
+                      ★ {focusedMetadata.rating}
+                    </span>
+                  )}
+                  {focusedMetadata?.year && <span>{focusedMetadata.year}</span>}
+                  {focusedMetadata?.duration && <span>• {focusedMetadata.duration}</span>}
+                  {focusedMetadata?.genres && !focusedMetadata.genres.includes('VOD') && !focusedMetadata.genres.includes('Película') && (
+                    <span className="text-zinc-400">• {focusedMetadata.genres}</span>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Reparto (Cast) */}
-            {focusedMetadata?.cast && (
+            {/* Reparto (Cast) - Oculto en Canales en Vivo */}
+            {contentType !== 'live' && focusedMetadata?.cast && (
               <p className="text-xs text-zinc-300 mt-2 line-clamp-1">
                 <span className="text-zinc-500 font-bold mr-1.5">Cast:</span>
                 {focusedMetadata.cast}
               </p>
             )}
 
-            {/* Director */}
-            {focusedMetadata?.director && (
+            {/* Director - Oculto en Canales en Vivo */}
+            {contentType !== 'live' && focusedMetadata?.director && (
               <p className="text-xs text-zinc-300 mt-0.5 line-clamp-1">
                 <span className="text-zinc-500 font-bold mr-1.5">Director:</span>
                 {focusedMetadata.director}
               </p>
             )}
 
-            {/* Sinopsis Oficial */}
+            {/* Sinopsis Oficial / EPG */}
             <p className="text-xs text-zinc-400 mt-2 line-clamp-2 md:line-clamp-3 leading-relaxed max-w-xl">
-              {focusedMetadata?.plot || 'Explora los títulos con las flechas del control remoto para ver su sinopsis completa.'}
+              {focusedMetadata?.plot || (contentType === 'live' ? 'Selecciona este canal para sintonizar en pantalla completa.' : 'Explora los títulos con las flechas del control remoto para ver su sinopsis completa.')}
             </p>
           </div>
         </div>
@@ -2280,7 +2484,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                           <ChannelLogo stream={stream} server={server} title={title} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className={`text-xs font-bold truncate ${isFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>
+                          <h4 className={`text-xs font-bold line-clamp-2 leading-snug ${isFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>
                             {title}
                           </h4>
                           {(live as any).isContinueWatchingItem && (
@@ -2305,7 +2509,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                       className="p-3.5 rounded-2xl flex items-center space-x-3 bg-[#0E1424]/40 border border-white/5 cursor-pointer"
                     >
                       <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center shrink-0">
-                        <Radio className="w-5 h-5 text-zinc-700" />
+                        <Tv className="w-5 h-5 text-zinc-700" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-medium text-zinc-600 truncate">
@@ -2345,12 +2549,14 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             <img
               src={normalizeMediaUrl(selectedMovieDetail.meta.backdropUrl || selectedMovieDetail.meta.posterUrl, server)}
               alt={selectedMovieDetail.meta.title}
+              referrerPolicy="no-referrer"
               onError={(e) => {
                 const target = e.currentTarget as HTMLImageElement;
-                const poster = normalizeMediaUrl(selectedMovieDetail.meta.posterUrl, server);
-                if (poster && target.src !== poster) {
-                  target.src = poster;
-                }
+                PosterResolutionService.resolvePoster(selectedMovieDetail.meta.title).then((resolved) => {
+                  if (resolved && target.src !== resolved) {
+                    target.src = resolved;
+                  }
+                }).catch(() => {});
               }}
               className="w-full h-full object-cover opacity-35 scale-105 transition-opacity duration-500"
             />
@@ -2360,26 +2566,30 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
           {/* Información Superior con Póster Oficial y Metadatos Dinámicos */}
           <div className="relative z-10 flex items-start space-x-8 max-w-5xl">
-            {/* Póster oficial visible de la película */}
-            {selectedMovieDetail.meta.posterUrl && (
-              <div className="w-40 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shrink-0 bg-black/60 hidden md:block">
-                <img
-                  src={normalizeMediaUrl(selectedMovieDetail.meta.posterUrl, server)}
-                  alt={selectedMovieDetail.meta.title}
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = 'none';
-                  }}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
+            {/* Póster oficial visible de la película con auto-resolución */}
+            <div className="w-40 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shrink-0 bg-black/60 hidden md:block">
+              <img
+                src={normalizeMediaUrl(selectedMovieDetail.meta.posterUrl, server)}
+                alt={selectedMovieDetail.meta.title}
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLImageElement;
+                  PosterResolutionService.resolvePoster(selectedMovieDetail.meta.title).then((resolved) => {
+                    if (resolved && target.src !== resolved) {
+                      target.src = resolved;
+                    }
+                  }).catch(() => {});
+                }}
+                className="w-full h-full object-cover"
+              />
+            </div>
 
             <div className="flex-1 space-y-3">
               <h1 className="text-3xl lg:text-4xl font-black text-white tracking-wide drop-shadow-xl">
                 {selectedMovieDetail.meta.title}
               </h1>
 
-              {/* Badges: [★ 7.0] 2025 • 1h 57m • Bélica / Acción / Drama */}
+              {/* Badges: [★ 7.5] 2025 • 1h 57m • Bélica / Acción / Drama */}
               <div className="flex items-center space-x-3 text-sm font-bold text-zinc-300">
                 {selectedMovieDetail.meta.rating && (
                   <span className="px-2.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 text-xs font-black">
@@ -2392,7 +2602,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               </div>
 
               {/* Cast */}
-              {selectedMovieDetail.meta.cast && (
+              {selectedMovieDetail.meta.cast && !selectedMovieDetail.meta.cast.toLowerCase().includes('cargando') && (
                 <p className="text-xs text-zinc-300">
                   <span className="text-zinc-500 font-bold mr-2">Reparto:</span>
                   {selectedMovieDetail.meta.cast}
@@ -2400,7 +2610,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               )}
 
               {/* Director */}
-              {selectedMovieDetail.meta.director && (
+              {selectedMovieDetail.meta.director && !selectedMovieDetail.meta.director.toLowerCase().includes('cargando') && (
                 <p className="text-xs text-zinc-300">
                   <span className="text-zinc-500 font-bold mr-2">Director:</span>
                   {selectedMovieDetail.meta.director}
@@ -2409,7 +2619,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
               {/* Sinopsis Completa */}
               <p className="text-xs lg:text-sm text-zinc-300 leading-relaxed max-w-2xl pt-1 line-clamp-4">
-                {selectedMovieDetail.meta.plot}
+                {selectedMovieDetail.meta.plot && !selectedMovieDetail.meta.plot.toLowerCase().includes('cargando')
+                  ? selectedMovieDetail.meta.plot
+                  : 'Película disponible en tu catálogo. Presiona reproducir para iniciar en alta definición.'}
               </p>
             </div>
           </div>
