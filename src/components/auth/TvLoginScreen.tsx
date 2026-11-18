@@ -7,6 +7,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+
 interface TvLoginScreenProps {
   onOpenAdminPanel: () => void;
   disabled?: boolean;
@@ -18,41 +19,30 @@ type FocusedElement =
   | 'toggle_eye'
   | 'submit';
 
-// Posters reales de películas y series populares (TMDB — formato retrato 2:3)
-const TMDB = 'https://image.tmdb.org/t/p/w342';
+// ─── Backdrops LANDSCAPE de películas y series top (TMDB w1280) ──────────────
+// Usamos los backdrop_path oficiales de TMDB (imágenes 16:9 cinématicas)
+const BD = 'https://image.tmdb.org/t/p/w1280';
 const BG_POSTERS: string[] = [
-  // Películas top
-  `${TMDB}/or06FN3Dka5tukK1e9sl16pB3iy.jpg`,   // Avengers: Endgame
-  `${TMDB}/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg`,   // Inception
-  `${TMDB}/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg`,   // Interstellar
-  `${TMDB}/qJ2tW6WMUDux911r6m7haRef0WH.jpg`,   // The Dark Knight
-  `${TMDB}/7IiTTgloROVKAFbwFKmFJ8Ah78X.jpg`,   // Parasite
-  `${TMDB}/d5NXSklpcvzeBO6gSXdoEWdA5em.jpg`,   // Dune
-  `${TMDB}/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg`,   // Oppenheimer
-  `${TMDB}/iuFNMS8vlE0E3FSMB3TbZV7GNnx.jpg`,   // Barbie
-  `${TMDB}/vZloFAK7NmvMGKE7VkF5UHaz0I.jpg`,    // John Wick 4
-  `${TMDB}/pFlaoHTZeyNkG83vxsAJiGzfSsa.jpg`,   // Guardians Vol 3
-  `${TMDB}/ueO9MYIOHO7M1PkPMosHDGMnTku.jpg`,   // Spider-Man NWH
-  `${TMDB}/sv1xJUazXoQuIDfL5bLs6rIGO8v.jpg`,   // Top Gun Maverick
-  `${TMDB}/t6HIqrRAclMCA60NsSmeqe9RmNV.jpg`,   // Bullet Train
-  `${TMDB}/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg`,   // The Batman
-  `${TMDB}/b0PlSFdDwbyK0cf5RxwDpaOJQvQ.jpg`,   // Avatar 2
-  // Series top
-  `${TMDB}/49WJfeN0moxb9IPfGn8AIqMGskD.jpg`,   // Stranger Things
-  `${TMDB}/uKvVjHNqB5VmOrdxqAt2F7J78ED.jpg`,   // The Last of Us
-  `${TMDB}/t9XkeE7HzOsdQcDDDapDYh8Rrmt.jpg`,   // House of the Dragon
-  `${TMDB}/ggFHVNu6YYI5L9pCfOacjizRGt.jpg`,    // Breaking Bad
-  `${TMDB}/jeGtaMwGxPmQN5xM4ClnwPQcDmV.jpg`,   // Wednesday
-  `${TMDB}/reEMJA1uzscCbkpeRJeTT2bjqUp.jpg`,   // Game of Thrones
-  `${TMDB}/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg`,    // The Boys
-  `${TMDB}/sWgBv7LV2reoncbd1olZS5LSQDL.jpg`,   // Better Call Saul
-  `${TMDB}/vUUqzWa2LnFIROkev3v7hmRBHpV.jpg`,   // Peaky Blinders
-  `${TMDB}/7VzEHxJHDGSKQSFVIl3nhHOIBrC.jpg`,   // Loki
-  `${TMDB}/5VTN0pR8gcqV3EPUHHfMGnJYspR.jpg`,   // Andor
-  `${TMDB}/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg`,   // The Mandalorian
-  `${TMDB}/fS9KcVCSSBzBH8D3rHblJwqS6zy.jpg`,   // Squid Game
-  `${TMDB}/ooBGRQBdbGzBV7ZEnUvdCe8VFZK.jpg`,   // Ozark
-  `${TMDB}/p0a1W5ZxEH5pKcq5BQILB1a0MbX.jpg`,   // Dark
+  `${BD}/s3TBrRGB1iav7gFOCNx3H31MoES.jpg`,  // Inception
+  `${BD}/xu9zaAevzQ5nnrsXN6JcahLnG4i.jpg`,  // Interstellar
+  `${BD}/hkBaDkMWbLaf8B1lsWsKX7Ew3Xq.jpg`,  // The Dark Knight
+  `${BD}/7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg`,  // Avengers: Endgame
+  `${BD}/qdIMHd4sEfJSckfVJfKQvisL02a.jpg`,  // Dune
+  `${BD}/f83f07c3ef6DmPbBODpVSFb3jJE.jpg`,  // Oppenheimer
+  `${BD}/Am6ox7ljH3OBvGl6i4FXMQ5RLKO.jpg`,  // Parasite
+  `${BD}/9zB6naHxvRBpqMGMTIFDnRHblHA.jpg`,  // Barbie
+  `${BD}/1inZm0xxXrpRfN0LxwE2zvIvYig.jpg`,  // John Wick
+  `${BD}/sO9VHHgcVTKHQtEJbU2EKWCAJQD.jpg`,  // Spider-Man NWH
+  `${BD}/suopoADq0k8YZr4dQXcU6pToj6s.jpg`,  // House of Dragon
+  `${BD}/8YFL5QQVPy3AgrEQxNYVSgiPEbe.jpg`,  // The Last of Us
+  `${BD}/eSzmqqoRJmSBpBNHynGrniKKABz.jpg`,  // Stranger Things
+  `${BD}/84XPpjGvxNyExjSuLQe1SzRA8BC.jpg`,  // Breaking Bad
+  `${BD}/pFkSBhSVFjKjYCp7mXa5mLQilDQ.jpg`,  // Wednesday
+  `${BD}/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg`,   // The Boys
+  `${BD}/9PqD3wSIjntyJDBzMNuxuKHpzMp.jpg`,  // Squid Game
+  `${BD}/oV4hMCJ2RxFrXqcg7NrN89FRMRH.jpg`,  // Peaky Blinders
+  `${BD}/mDfJG3LC3Dqb67AZ52x3Z0jU0uB.jpg`,  // Game of Thrones
+  `${BD}/9BBTo108mahw2eKPSWCGpjwUMQ4.jpg`,   // Better Call Saul
 ];
 
 export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, disabled = false }) => {
@@ -90,7 +80,7 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
     }, 200);
   };
 
-  // 🎮 Motor de Navegación D-Pad para TV
+  // 🎮 Motor D-Pad TV
   useEffect(() => {
     if (disabled) {
       userInputRef.current?.blur();
@@ -101,18 +91,15 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (disabled) return;
-
       if (e.key === 'Enter') {
         if (focusedElement === 'username') { userInputRef.current?.focus(); return; }
         if (focusedElement === 'password') { passInputRef.current?.focus(); return; }
         if (focusedElement === 'toggle_eye') { setShowPassword(p => !p); return; }
         if (focusedElement === 'submit') { handleSubmit(); return; }
       }
-
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         e.preventDefault();
-
         switch (e.key) {
           case 'ArrowDown':
             if (focusedElement === 'username') setFocusedElement('password');
@@ -131,32 +118,41 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
         }
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [focusedElement, username, password, disabled]);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden select-none font-sans">
+    <div className="fixed inset-0 z-50 overflow-hidden select-none font-sans bg-black">
 
       {/* ══════════════════════════════════════════════
-          FONDO: Grid de posters de películas/series
+          FONDO: Grid cinématico landscape (3 col × N filas)
+          Igual a la imagen de referencia Netflix-style
           ══════════════════════════════════════════════ */}
-      <div className="absolute inset-0 grid overflow-hidden" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '3px' }}>
-        {/* Duplicamos para llenar filas */}
-        {[...BG_POSTERS, ...BG_POSTERS].map((url, i) => (
-          <div key={i} className="overflow-hidden" style={{ aspectRatio: '2/3' }}>
+      <div
+        className="absolute inset-0 overflow-hidden"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridAutoRows: '33.4vh',
+          gap: '3px',
+        }}
+      >
+        {/* Triplicamos la lista para asegurar que llena la pantalla */}
+        {[...BG_POSTERS, ...BG_POSTERS, ...BG_POSTERS].map((url, i) => (
+          <div
+            key={i}
+            className="overflow-hidden relative"
+            style={{ background: `hsl(${(i * 41) % 360}, 20%, 10%)` }}
+          >
             <img
               src={url}
               alt=""
               className="w-full h-full object-cover"
-              loading="lazy"
+              loading={i < 9 ? 'eager' : 'lazy'}
               draggable={false}
               onError={(e) => {
-                // Si la imagen falla, mostramos un color de relleno
-                (e.currentTarget as HTMLImageElement).style.display = 'none';
-                (e.currentTarget.parentElement as HTMLElement).style.background =
-                  `hsl(${(i * 37) % 360}, 30%, 15%)`;
+                (e.currentTarget as HTMLImageElement).style.opacity = '0';
               }}
             />
           </div>
@@ -164,13 +160,13 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
       </div>
 
       {/* Overlay oscuro sobre el grid */}
-      <div className="absolute inset-0 bg-black/60" />
+      <div className="absolute inset-0 bg-black/55" />
 
-      {/* Gradiente lateral derecho para el panel */}
-      <div className="absolute inset-y-0 right-0 w-[420px] bg-gradient-to-l from-black/95 via-black/80 to-transparent" />
+      {/* Gradiente hacia la derecha para oscurecer donde está el panel */}
+      <div className="absolute inset-y-0 right-0 w-[500px] bg-gradient-to-l from-black via-black/90 to-transparent" />
 
       {/* ══════════════════════════════════════════════
-          PANEL DE LOGIN (derecha)
+          PANEL DE LOGIN — derecha, centrado verticalmente
           ══════════════════════════════════════════════ */}
       <div className="absolute inset-y-0 right-0 w-[400px] flex flex-col items-stretch justify-center px-10 py-12">
 
@@ -240,18 +236,17 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
             </button>
           </div>
 
-          {/* Botón INICIAR SESIÓN — rojo igual que Netflix */}
+          {/* Botón rojo INICIAR SESIÓN */}
           <button
             type="button"
             onClick={handleSubmit}
             disabled={isLoading}
             className={`
               w-full mt-1 py-3.5 rounded-lg font-black text-sm tracking-widest uppercase
-              transition-all duration-150 flex items-center justify-center
+              transition-all duration-150 flex items-center justify-center text-white
               ${focusedElement === 'submit'
                 ? 'bg-red-500 ring-4 ring-red-400/50 scale-[1.02] shadow-lg shadow-red-600/40'
                 : 'bg-red-600 hover:bg-red-500'}
-              text-white
             `}
           >
             {isLoading
@@ -261,7 +256,7 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
           </button>
         </form>
 
-        {/* Links inferiores */}
+        {/* Links */}
         <div className="mt-6 flex flex-col items-center gap-3 text-sm text-white/80">
           <button type="button" className="hover:underline hover:text-white transition">
             Olvidé mi contraseña?
