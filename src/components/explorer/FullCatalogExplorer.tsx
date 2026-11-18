@@ -31,25 +31,96 @@ import { HoldProgressIndicator } from '../common/HoldProgressIndicator';
 
 /**
  * Normaliza URLs de imágenes de servidores IPTV / Xtream Codes y TMDb
+ * Resuelve automáticamente puertos SSL 443, rutas relativas y caracteres especiales
  */
 const normalizeMediaUrl = (url?: string, serverBase?: string): string => {
   if (!url) return '';
-  const trimmed = String(url).trim();
+  let trimmed = String(url).trim();
   if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return '';
   
   if (trimmed.startsWith('//')) {
     return `https:${trimmed}`;
   }
-  
-  if (trimmed.startsWith('/')) {
-    if (serverBase) {
-      return `${serverBase.replace(/\/+$/, '')}${trimmed}`;
+
+  // Si serverBase está disponible, obtener su hostname
+  let sBaseHost = '';
+  try {
+    if (serverBase) sBaseHost = new URL(serverBase).hostname;
+  } catch {}
+
+  // Corregir URLs HTTP hacia puertos SSL (443) o del mismo servidor IPTV HTTPS
+  if (trimmed.startsWith('http://')) {
+    if (trimmed.includes(':443') || (sBaseHost && trimmed.includes(sBaseHost) && serverBase?.startsWith('https://'))) {
+      trimmed = trimmed.replace(/^http:\/\//i, 'https://');
     }
-    return `https://image.tmdb.org/t/p/w500${trimmed}`;
+  }
+
+  // Rutas relativas sin protocolo (/images/... o images/...)
+  if (!/^https?:\/\//i.test(trimmed)) {
+    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    if (serverBase) {
+      return `${serverBase.replace(/\/+$/, '')}${cleanPath}`;
+    }
+    return `https://image.tmdb.org/t/p/w500${cleanPath}`;
   }
   
-  return trimmed;
+  return trimmed.replace(/ /g, '%20');
 };
+
+/**
+ * Componente robusto de Logo para canales de TV en vivo
+ * Prueba stream_icon, icon, logo, tvg_logo, con auto-recuperación y badge de siglas
+ */
+const ChannelLogo = React.memo<{
+  stream: XtreamStream;
+  server: string;
+  title: string;
+}>(({ stream, server, title }) => {
+  const rawUrl = (stream as any).stream_icon || (stream as any).icon || (stream as any).logo || (stream as any).tvg_logo || (stream as any).cover;
+  const initialUrl = normalizeMediaUrl(rawUrl, server);
+
+  const [currentSrc, setCurrentSrc] = useState<string>(initialUrl);
+  const [hasFailed, setHasFailed] = useState<boolean>(!initialUrl);
+
+  useEffect(() => {
+    const nextUrl = normalizeMediaUrl(rawUrl, server);
+    setCurrentSrc(nextUrl);
+    setHasFailed(!nextUrl);
+  }, [rawUrl, server]);
+
+  const handleError = () => {
+    if (currentSrc.startsWith('https://') && !currentSrc.includes(':443')) {
+      setCurrentSrc(currentSrc.replace(/^https:\/\//i, 'http://'));
+    } else if (currentSrc.startsWith('http://') && currentSrc.includes(':443')) {
+      setCurrentSrc(currentSrc.replace(/^http:\/\//i, 'https://'));
+    } else {
+      setHasFailed(true);
+    }
+  };
+
+  if (hasFailed || !currentSrc) {
+    const initials = title
+      .replace(/^(fhd|hd|sd|4k|uhd|hevc|vip|\d+)\s*[-:|]\s*/i, '')
+      .trim()
+      .slice(0, 3)
+      .toUpperCase();
+
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-cyan-950/40 rounded-lg text-[10px] font-black tracking-wider text-cyan-400">
+        {initials || <Radio className="w-5 h-5 text-cyan-400" />}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={currentSrc}
+      alt={title}
+      onError={handleError}
+      className="w-full h-full object-contain"
+    />
+  );
+});
 
 /**
  * Tarjeta individual de poster con soporte anti-bloqueo y fallback elegante
@@ -2147,20 +2218,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                         }`}
                       >
                         <div className="w-12 h-12 rounded-xl bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 p-1">
-                          {stream.stream_icon ? (
-                            <img
-                              src={normalizeMediaUrl(stream.stream_icon, server)}
-                              alt={title}
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                              }}
-                              className="w-full h-full object-contain"
-                            />
-                          ) : (
-                            <Radio className="w-5 h-5 text-cyan-400" />
-                          )}
+                          <ChannelLogo stream={stream} server={server} title={title} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className={`text-xs font-bold truncate ${isFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>

@@ -168,6 +168,20 @@ class XtreamRepository(
         }
     }
 
+    private fun normalizeIconUrl(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+        var trimmed = url.trim()
+        if (trimmed.startsWith("//")) return "https:$trimmed"
+        if (trimmed.startsWith("http://") && (trimmed.contains(":443") || baseUrl.startsWith("https://"))) {
+            trimmed = trimmed.replaceFirst("http://", "https://", ignoreCase = true)
+        }
+        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+            val cleanPath = if (trimmed.startsWith("/")) trimmed else "/$trimmed"
+            return "${baseUrl.trimEnd('/')}$cleanPath"
+        }
+        return trimmed.replace(" ", "%20")
+    }
+
     // ── CANALES DE TV EN VIVO ──
     fun observeChannelsByCategory(categoryId: String): Flow<List<ChannelEntity>> =
         database.channelDao().getChannelsByCategory(categoryId)
@@ -186,7 +200,7 @@ class XtreamRepository(
                         num = dto.num,
                         name = dto.name,
                         streamType = dto.streamType ?: "live",
-                        streamIcon = dto.streamIcon,
+                        streamIcon = normalizeIconUrl(dto.streamIcon),
                         epgChannelId = dto.epgChannelId,
                         added = dto.added,
                         categoryId = dto.categoryId,
