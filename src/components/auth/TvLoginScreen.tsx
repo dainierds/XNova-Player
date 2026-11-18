@@ -132,7 +132,7 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
           LISTÓN IZQUIERDO: Columna sólida de inicio de sesión
           Incrustado directamente en el fondo, sin imágenes detrás
           ══════════════════════════════════════════════ */}
-      <div className="w-[420px] shrink-0 h-full bg-[#0c0e14] z-20 flex flex-col justify-center px-11 relative border-r border-white/10 shadow-[10px_0_40px_rgba(0,0,0,0.85)]">
+      <div className="w-[420px] shrink-0 h-full bg-[#0c0e14] z-20 flex flex-col justify-center px-11 relative">
 
         {/* Logo oficial XNova (X roja con pata blanca) */}
         <div className="flex items-center space-x-3 mb-6">
@@ -273,6 +273,9 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
           LADO DERECHO: Grid cinemático de películas (2 columnas)
           ══════════════════════════════════════════════ */}
       <div className="flex-1 h-full relative overflow-hidden bg-black">
+        {/* Degradado suave de desvanecimiento entre el listón y las películas */}
+        <div className="absolute left-0 top-0 bottom-0 w-40 bg-gradient-to-r from-[#0c0e14] via-[#0c0e14]/75 to-transparent z-10 pointer-events-none" />
+
         <div
           className="w-full h-full overflow-hidden"
           style={{
