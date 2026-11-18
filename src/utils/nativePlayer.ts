@@ -68,3 +68,24 @@ export const openNativeTvCatalog = (server: string, user: string, pass: string):
   return false;
 };
 
+/**
+ * Invoca el reproductor de TV en Vivo 100% nativo con Zapping instantáneo y Guía Overlay estilo TiviMate
+ */
+export const openNativeLiveTv = (server: string, user: string, pass: string): boolean => {
+  try {
+    const bridge = (window as unknown as {
+      NativeTvCatalogBridge?: {
+        openNativeLiveTv: (server: string, user: string, pass: string) => void;
+      };
+    }).NativeTvCatalogBridge;
+
+    if (bridge && typeof bridge.openNativeLiveTv === 'function') {
+      bridge.openNativeLiveTv(server, user, pass);
+      return true;
+    }
+  } catch (err) {
+    console.error('Error al invocar TV en Vivo Nativo:', err);
+  }
+  return false;
+};
+

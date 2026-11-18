@@ -65,6 +65,13 @@
             android:screenOrientation="sensorLandscape"
             android:exported="false" />
 
+        <!-- Experiencia TV en Vivo con Zapping Instantáneo & Overlay Guide (TiviMate style) -->
+        <activity
+            android:name=".TvLivePlayerActivity"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:screenOrientation="sensorLandscape"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

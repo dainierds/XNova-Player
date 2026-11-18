@@ -111,6 +111,19 @@ public class MainActivity extends BridgeActivity {
                     }
 
                     @JavascriptInterface
+                    public void openNativeLiveTv(String server, String user, String pass) {
+                        try {
+                            Intent intent = new Intent(MainActivity.this, TvLivePlayerActivity.class);
+                            intent.putExtra("server", server);
+                            intent.putExtra("user", user);
+                            intent.putExtra("pass", pass);
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    @JavascriptInterface
                     public boolean isAvailable() {
                         return true;
                     }
