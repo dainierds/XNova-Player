@@ -7,8 +7,6 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
-import { SHOWCASE_MOVIES, SHOWCASE_SERIES } from '../../mock/showcaseData';
-
 interface TvLoginScreenProps {
   onOpenAdminPanel: () => void;
   disabled?: boolean;
@@ -20,10 +18,42 @@ type FocusedElement =
   | 'toggle_eye'
   | 'submit';
 
-// Combinamos películas y series para el grid de fondo
-const ALL_POSTERS = [...SHOWCASE_MOVIES, ...SHOWCASE_SERIES].map(i => i.thumbnailUrl);
-// Duplicamos varias veces para llenar el grid completo (apuntamos a ~40 imágenes)
-const BG_POSTERS: string[] = Array.from({ length: 5 }, () => ALL_POSTERS).flat();
+// Posters reales de películas y series populares (TMDB — formato retrato 2:3)
+const TMDB = 'https://image.tmdb.org/t/p/w342';
+const BG_POSTERS: string[] = [
+  // Películas top
+  `${TMDB}/or06FN3Dka5tukK1e9sl16pB3iy.jpg`,   // Avengers: Endgame
+  `${TMDB}/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg`,   // Inception
+  `${TMDB}/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg`,   // Interstellar
+  `${TMDB}/qJ2tW6WMUDux911r6m7haRef0WH.jpg`,   // The Dark Knight
+  `${TMDB}/7IiTTgloROVKAFbwFKmFJ8Ah78X.jpg`,   // Parasite
+  `${TMDB}/d5NXSklpcvzeBO6gSXdoEWdA5em.jpg`,   // Dune
+  `${TMDB}/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg`,   // Oppenheimer
+  `${TMDB}/iuFNMS8vlE0E3FSMB3TbZV7GNnx.jpg`,   // Barbie
+  `${TMDB}/vZloFAK7NmvMGKE7VkF5UHaz0I.jpg`,    // John Wick 4
+  `${TMDB}/pFlaoHTZeyNkG83vxsAJiGzfSsa.jpg`,   // Guardians Vol 3
+  `${TMDB}/ueO9MYIOHO7M1PkPMosHDGMnTku.jpg`,   // Spider-Man NWH
+  `${TMDB}/sv1xJUazXoQuIDfL5bLs6rIGO8v.jpg`,   // Top Gun Maverick
+  `${TMDB}/t6HIqrRAclMCA60NsSmeqe9RmNV.jpg`,   // Bullet Train
+  `${TMDB}/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg`,   // The Batman
+  `${TMDB}/b0PlSFdDwbyK0cf5RxwDpaOJQvQ.jpg`,   // Avatar 2
+  // Series top
+  `${TMDB}/49WJfeN0moxb9IPfGn8AIqMGskD.jpg`,   // Stranger Things
+  `${TMDB}/uKvVjHNqB5VmOrdxqAt2F7J78ED.jpg`,   // The Last of Us
+  `${TMDB}/t9XkeE7HzOsdQcDDDapDYh8Rrmt.jpg`,   // House of the Dragon
+  `${TMDB}/ggFHVNu6YYI5L9pCfOacjizRGt.jpg`,    // Breaking Bad
+  `${TMDB}/jeGtaMwGxPmQN5xM4ClnwPQcDmV.jpg`,   // Wednesday
+  `${TMDB}/reEMJA1uzscCbkpeRJeTT2bjqUp.jpg`,   // Game of Thrones
+  `${TMDB}/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg`,    // The Boys
+  `${TMDB}/sWgBv7LV2reoncbd1olZS5LSQDL.jpg`,   // Better Call Saul
+  `${TMDB}/vUUqzWa2LnFIROkev3v7hmRBHpV.jpg`,   // Peaky Blinders
+  `${TMDB}/7VzEHxJHDGSKQSFVIl3nhHOIBrC.jpg`,   // Loki
+  `${TMDB}/5VTN0pR8gcqV3EPUHHfMGnJYspR.jpg`,   // Andor
+  `${TMDB}/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg`,   // The Mandalorian
+  `${TMDB}/fS9KcVCSSBzBH8D3rHblJwqS6zy.jpg`,   // Squid Game
+  `${TMDB}/ooBGRQBdbGzBV7ZEnUvdCe8VFZK.jpg`,   // Ozark
+  `${TMDB}/p0a1W5ZxEH5pKcq5BQILB1a0MbX.jpg`,   // Dark
+];
 
 export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, disabled = false }) => {
   const { login } = useAuthStore();
@@ -112,19 +142,22 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
       {/* ══════════════════════════════════════════════
           FONDO: Grid de posters de películas/series
           ══════════════════════════════════════════════ */}
-      <div className="absolute inset-0 grid grid-cols-5 gap-0.5 overflow-hidden">
-        {BG_POSTERS.map((url, i) => (
-          <div
-            key={i}
-            className="overflow-hidden"
-            style={{ aspectRatio: '2/3' }}
-          >
+      <div className="absolute inset-0 grid overflow-hidden" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '3px' }}>
+        {/* Duplicamos para llenar filas */}
+        {[...BG_POSTERS, ...BG_POSTERS].map((url, i) => (
+          <div key={i} className="overflow-hidden" style={{ aspectRatio: '2/3' }}>
             <img
               src={url}
               alt=""
               className="w-full h-full object-cover"
               loading="lazy"
               draggable={false}
+              onError={(e) => {
+                // Si la imagen falla, mostramos un color de relleno
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                (e.currentTarget.parentElement as HTMLElement).style.background =
+                  `hsl(${(i * 37) % 360}, 30%, 15%)`;
+              }}
             />
           </div>
         ))}
