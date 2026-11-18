@@ -55,14 +55,16 @@ fun CategorySidebar(
                 Surface(
                     onClick = { onCategoryClick(category) },
                     shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f),
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = if (isSelected) Color(0xFF1E293B) else Color.Transparent,
-                        focusedContainerColor = XNovaCyan,
-                        pressedContainerColor = XNovaCyan
+                        focusedContainerColor = Color.White,
+                        pressedContainerColor = Color.White,
+                        focusedContentColor = Color.Black
                     ),
                     border = ClickableSurfaceDefaults.border(
                         border = if (isSelected) Border(BorderStroke(1.5.dp, XNovaCyan)) else Border.None,
-                        focusedBorder = Border(BorderStroke(2.dp, Color.White))
+                        focusedBorder = Border.None
                     ),
                     modifier = Modifier
                         .fillMaxWidth()

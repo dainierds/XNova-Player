@@ -352,10 +352,10 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   const [focusedCatIndex, setFocusedCatIndex] = useState(0);
   const [focusedGridIndex, setFocusedGridIndex] = useState(0);
 
-  // ⚡ Debounce para cambio de categoría: deslizar a 60 FPS sin saturar la CPU
+  // ⚡ Cambio de categoría instantáneo (0ms) sin retardos ni sombras rezagadas
   const categoryDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const scheduleCategoryChange = useCallback((catId: string, immediate = false) => {
+  const scheduleCategoryChange = useCallback((catId: string, immediate = true) => {
     if (categoryDebounceTimerRef.current) {
       clearTimeout(categoryDebounceTimerRef.current);
       categoryDebounceTimerRef.current = null;
@@ -366,7 +366,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     } else {
       categoryDebounceTimerRef.current = setTimeout(() => {
         setSelectedCategoryId(catId);
-      }, 250);
+      }, 40);
     }
   }, []);
 
@@ -1646,7 +1646,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               const nextIdx = focusedCatIndex - 1;
               setFocusedCatIndex(nextIdx);
               if (allCategories[nextIdx]) {
-                scheduleCategoryChange(allCategories[nextIdx].category_id);
+                scheduleCategoryChange(allCategories[nextIdx].category_id, true);
               }
             } else {
               // Subir a la barra de búsqueda de la sección
@@ -1673,7 +1673,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               const nextIdx = focusedCatIndex + 1;
               setFocusedCatIndex(nextIdx);
               if (allCategories[nextIdx]) {
-                scheduleCategoryChange(allCategories[nextIdx].category_id);
+                scheduleCategoryChange(allCategories[nextIdx].category_id, true);
               }
             }
           } else if (focusZone === 'grid') {
@@ -1857,8 +1857,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         {/* Lista de Carpetas/Categorías */}
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
           {allCategories.map((cat, idx) => {
-            const isSelected = selectedCategoryId === cat.category_id;
             const isFocused = focusZone === 'categories' && focusedCatIndex === idx;
+            // ⚡ Al navegar por las carpetas, el estado activo sigue estrictamente al foco sin retardos ni sombras que se queden rezagadas
+            const isSelected = focusZone === 'categories' ? isFocused : selectedCategoryId === cat.category_id;
             const isContinue = cat.category_id === 'continue_watching';
 
             return (
@@ -1870,18 +1871,18 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                   setFocusedCatIndex(idx);
                   setFocusZone('categories');
                 }}
-                className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-colors duration-75 flex items-center space-x-3 ${
+                className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-none flex items-center space-x-3 ${
                   isFocused
                     ? isContinue
-                      ? 'bg-amber-400 text-black font-black ring-2 ring-amber-300 z-10'
-                      : 'bg-white text-black font-black ring-2 ring-cyan-400 z-10'
+                      ? 'bg-amber-400 text-black font-black'
+                      : 'bg-white text-black font-black'
                     : isSelected
                       ? isContinue
                         ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                         : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
                       : isContinue
-                        ? 'text-amber-300/90 hover:text-amber-200 hover:bg-white/5 bg-amber-500/5'
-                        : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                        ? 'text-amber-300/90 hover:text-amber-200 bg-amber-500/5'
+                        : 'text-zinc-400 hover:text-white'
                 }`}
               >
                 {isContinue ? (

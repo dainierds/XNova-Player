@@ -70,8 +70,8 @@ export const CategoryExplorer: React.FC<CategoryExplorerProps> = ({
             Categorías del Servidor
           </h2>
           {activeCategories.map((cat, idx) => {
-            const isSelected = cat.category_id === selectedCatId;
             const isFocused = focusedZone === 'sidebar' && idx === sidebarIndex;
+            const isSelected = focusedZone === 'sidebar' ? isFocused : cat.category_id === selectedCatId;
 
             return (
               <div
@@ -82,9 +82,9 @@ export const CategoryExplorer: React.FC<CategoryExplorerProps> = ({
                   setFocusedZone('sidebar');
                 }}
                 className={`
-                  px-4 py-3 rounded-xl flex items-center space-x-3 cursor-pointer transition-all duration-200
+                  px-4 py-3 rounded-xl flex items-center space-x-3 cursor-pointer transition-none
                   ${isFocused
-                    ? 'bg-cyan-500 text-white scale-102 shadow-lg shadow-cyan-500/40 ring-2 ring-white font-bold'
+                    ? 'bg-white text-black font-black'
                     : isSelected
                       ? 'bg-zinc-800/80 text-cyan-300 font-semibold border-l-4 border-cyan-400'
                       : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'}
