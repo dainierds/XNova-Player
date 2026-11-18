@@ -30,3 +30,41 @@ export const playWithNativePlayer = (item: {
   }
   return false;
 };
+
+/**
+ * Verifica si el motor nativo de catálogo en Jetpack Compose & SQLite Room está disponible
+ */
+export const isNativeCatalogAvailable = (): boolean => {
+  try {
+    const bridge = (window as unknown as {
+      NativeTvCatalogBridge?: {
+        isAvailable: () => boolean;
+      };
+    }).NativeTvCatalogBridge;
+    return !!(bridge && typeof bridge.isAvailable === 'function' && bridge.isAvailable());
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Invoca la experiencia de TV 100% nativa con consultas de 0ms en SQLite
+ */
+export const openNativeTvCatalog = (server: string, user: string, pass: string): boolean => {
+  try {
+    const bridge = (window as unknown as {
+      NativeTvCatalogBridge?: {
+        openNativeCatalog: (server: string, user: string, pass: string) => void;
+      };
+    }).NativeTvCatalogBridge;
+
+    if (bridge && typeof bridge.openNativeCatalog === 'function') {
+      bridge.openNativeCatalog(server, user, pass);
+      return true;
+    }
+  } catch (err) {
+    console.error('Error al invocar Catálogo Nativo Compose/Room:', err);
+  }
+  return false;
+};
+

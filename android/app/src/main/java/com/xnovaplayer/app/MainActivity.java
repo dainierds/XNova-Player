@@ -95,6 +95,27 @@ public class MainActivity extends BridgeActivity {
                     }
                 }, "ExoPlayerBridge");
 
+                // ⚡ Puente oficial para abrir el Catálogo 100% Nativo en Jetpack Compose & SQLite Room
+                webView.addJavascriptInterface(new Object() {
+                    @JavascriptInterface
+                    public void openNativeCatalog(String server, String user, String pass) {
+                        try {
+                            Intent intent = new Intent(MainActivity.this, TvMainActivity.class);
+                            intent.putExtra("server", server);
+                            intent.putExtra("user", user);
+                            intent.putExtra("pass", pass);
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    @JavascriptInterface
+                    public boolean isAvailable() {
+                        return true;
+                    }
+                }, "NativeTvCatalogBridge");
+
                 // 🛑 Puente nativo para cerrar la aplicación al confirmar en el modal de salida
                 webView.addJavascriptInterface(new Object() {
                     @JavascriptInterface
