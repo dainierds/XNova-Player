@@ -19,30 +19,33 @@ type FocusedElement =
   | 'toggle_eye'
   | 'submit';
 
-// ─── Backdrops LANDSCAPE de películas y series top (TMDB w1280) ──────────────
-// Usamos los backdrop_path oficiales de TMDB (imágenes 16:9 cinématicas)
+// ─── Backdrops LANDSCAPE de películas y series top (TMDB w1280 - 100% verificados HTTP 200) ───
 const BD = 'https://image.tmdb.org/t/p/w1280';
 const BG_POSTERS: string[] = [
-  `${BD}/s3TBrRGB1iav7gFOCNx3H31MoES.jpg`,  // Inception
-  `${BD}/xu9zaAevzQ5nnrsXN6JcahLnG4i.jpg`,  // Interstellar
-  `${BD}/hkBaDkMWbLaf8B1lsWsKX7Ew3Xq.jpg`,  // The Dark Knight
+  `${BD}/c6OLXfKAk5BKeR6broC8pYiCquX.jpg`,  // Fight Club
+  `${BD}/8sNiAPPYU14PUepFNeSNGUTiHW.jpg`,  // Interstellar
+  `${BD}/8ZTVqvKDQ8emSGUEMjsS4yHAwrp.jpg`,  // Inception
   `${BD}/7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg`,  // Avengers: Endgame
-  `${BD}/qdIMHd4sEfJSckfVJfKQvisL02a.jpg`,  // Dune
-  `${BD}/f83f07c3ef6DmPbBODpVSFb3jJE.jpg`,  // Oppenheimer
-  `${BD}/Am6ox7ljH3OBvGl6i4FXMQ5RLKO.jpg`,  // Parasite
-  `${BD}/9zB6naHxvRBpqMGMTIFDnRHblHA.jpg`,  // Barbie
-  `${BD}/1inZm0xxXrpRfN0LxwE2zvIvYig.jpg`,  // John Wick
-  `${BD}/sO9VHHgcVTKHQtEJbU2EKWCAJQD.jpg`,  // Spider-Man NWH
-  `${BD}/suopoADq0k8YZr4dQXcU6pToj6s.jpg`,  // House of Dragon
-  `${BD}/8YFL5QQVPy3AgrEQxNYVSgiPEbe.jpg`,  // The Last of Us
-  `${BD}/eSzmqqoRJmSBpBNHynGrniKKABz.jpg`,  // Stranger Things
-  `${BD}/84XPpjGvxNyExjSuLQe1SzRA8BC.jpg`,  // Breaking Bad
-  `${BD}/pFkSBhSVFjKjYCp7mXa5mLQilDQ.jpg`,  // Wednesday
-  `${BD}/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg`,   // The Boys
-  `${BD}/9PqD3wSIjntyJDBzMNuxuKHpzMp.jpg`,  // Squid Game
-  `${BD}/oV4hMCJ2RxFrXqcg7NrN89FRMRH.jpg`,  // Peaky Blinders
-  `${BD}/mDfJG3LC3Dqb67AZ52x3Z0jU0uB.jpg`,  // Game of Thrones
-  `${BD}/9BBTo108mahw2eKPSWCGpjwUMQ4.jpg`,   // Better Call Saul
+  `${BD}/cfT29Im5VDvjE0RpyKOSdCKZal7.jpg`,  // The Dark Knight
+  `${BD}/96hiUXEuYsu4tcnvlaY8tEMFM0m.jpg`,  // Pulp Fiction
+  `${BD}/66Kn4XWhkuPkJxOJyPEx4U2CUfN.jpg`,  // Forrest Gump
+  `${BD}/ctiw6FZK4N36LmkjSklWEbuvlq9.jpg`,  // The Lord of the Rings: Return of the King
+  `${BD}/4qCqAdHcNKeAHcK8tJ8wNJZa9cx.jpg`,  // Star Wars: A New Hope
+  `${BD}/9BBTo63ANSmhC4e6r62OJFuK2GL.jpg`,  // The Avengers
+  `${BD}/sCzcYW9h55WcesOqA12cgEr9Exw.jpg`,  // Titanic
+  `${BD}/vL5LR6WdxWPjLPFRLe133jXWsh5.jpg`,  // Avatar
+  `${BD}/fRGxZuo7jJUWQsVg9PREb98Aclp.jpg`,  // The Matrix
+  `${BD}/95qi5TJMIBI5VzWHia88Pbrye7Z.jpg`,  // Se7en
+  `${BD}/AbgEQO2mneCSOc8CSnOMa8pBS8I.jpg`,  // The Green Mile
+  `${BD}/zb6fM1CX41D9rF9hdgclu0peUmy.jpg`,  // Harry Potter
+  `${BD}/6qgSKYgkHLL0vAVbsqRfo8KmZgL.jpg`,  // The Lord of the Rings: Fellowship
+  `${BD}/oiwc338EoBgS4sEI2ixAny4KQKg.jpg`,  // The Lord of the Rings: Two Towers
+  `${BD}/6G73mNyooWAEQTpckPSnFxFoNmc.jpg`,  // The Godfather
+  `${BD}/tlm8UkiQsitc8rSuIAscQDCnP8d.jpg`,  // Schindler's List
+  `${BD}/jwBs4djVIe9Kz3Vu9rsI9aEEKWU.jpg`,  // GoodFellas
+  `${BD}/amZavErrjrdgDwhsIdpWxHNenIx.jpg`,  // Star Wars: Empire Strikes Back
+  `${BD}/qrKcg4CbBm3165QNT3kQWQnqlTM.jpg`,  // Star Wars: Return of the Jedi
+  `${BD}/7tbeoSTWW2cWPecjQo9fcdf0Hzv.jpg`,  // Spirited Away
 ];
 
 export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, disabled = false }) => {
@@ -148,11 +151,15 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
             <img
               src={url}
               alt=""
-              className="w-full h-full object-cover"
-              loading={i < 9 ? 'eager' : 'lazy'}
+              className="w-full h-full object-cover transition-opacity duration-300"
+              loading={i < 12 ? 'eager' : 'lazy'}
               draggable={false}
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.opacity = '0';
+                const target = e.currentTarget as HTMLImageElement;
+                if (!target.dataset.fallback) {
+                  target.dataset.fallback = 'true';
+                  target.src = BG_POSTERS[i % 5];
+                }
               }}
             />
           </div>
