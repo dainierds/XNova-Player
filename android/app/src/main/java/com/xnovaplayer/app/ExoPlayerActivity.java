@@ -39,6 +39,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
     private boolean isLive = false;
     private boolean hasTriedAudioFallback = false;
     private boolean hasTriedExtensionFallback = false;
+    private boolean hasTriedVlcFallback = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -215,9 +216,24 @@ public class ExoPlayerActivity extends AppCompatActivity {
                         }
                     }
 
+                    // 3. 🛡️ Salto automático a LibVLC nativo si el chip del televisor no puede decodificar con ExoPlayer
+                    if (!hasTriedVlcFallback && streamUrl != null && !streamUrl.isEmpty()) {
+                        hasTriedVlcFallback = true;
+                        try {
+                            Intent vlcIntent = new Intent(ExoPlayerActivity.this, VlcPlayerActivity.class);
+                            vlcIntent.putExtra("url", streamUrl);
+                            vlcIntent.putExtra("title", title);
+                            startActivity(vlcIntent);
+                            finish();
+                            return;
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+
                     boolean isDts = error.getMessage() != null && error.getMessage().toLowerCase().contains("dts");
                     showError("Error de reproducción (" + error.getErrorCodeName() + "): " + 
-                            (isDts ? "Esta película contiene audio DTS multicanal no soportado por el chip de este televisor. Puedes abrirla directamente con VLC." : error.getMessage()));
+                            (isDts ? "Esta película contiene audio DTS multicanal no soportado por el chip de este televisor." : error.getMessage()));
                     
                     // Si es error de audio/códec, resaltar por defecto el botón "Abrir con VLC"
                     Button btnExternal = findViewById(R.id.btn_error_external);

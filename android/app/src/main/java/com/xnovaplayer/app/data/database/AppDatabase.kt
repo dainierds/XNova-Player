@@ -6,11 +6,13 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.xnovaplayer.app.data.database.dao.CategoryDao
 import com.xnovaplayer.app.data.database.dao.ChannelDao
+import com.xnovaplayer.app.data.database.dao.EpgDao
 import com.xnovaplayer.app.data.database.dao.MovieDao
 import com.xnovaplayer.app.data.database.dao.SeriesDao
 import com.xnovaplayer.app.data.database.dao.WatchHistoryDao
 import com.xnovaplayer.app.data.database.entities.CategoryEntity
 import com.xnovaplayer.app.data.database.entities.ChannelEntity
+import com.xnovaplayer.app.data.database.entities.EpgProgramEntity
 import com.xnovaplayer.app.data.database.entities.EpisodeEntity
 import com.xnovaplayer.app.data.database.entities.MovieEntity
 import com.xnovaplayer.app.data.database.entities.SeriesEntity
@@ -23,9 +25,10 @@ import com.xnovaplayer.app.data.database.entities.WatchHistoryEntity
         SeriesEntity::class,
         EpisodeEntity::class,
         ChannelEntity::class,
-        WatchHistoryEntity::class
+        WatchHistoryEntity::class,
+        EpgProgramEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun seriesDao(): SeriesDao
     abstract fun channelDao(): ChannelDao
     abstract fun watchHistoryDao(): WatchHistoryDao
+    abstract fun epgDao(): EpgDao
 
     companion object {
         @Volatile

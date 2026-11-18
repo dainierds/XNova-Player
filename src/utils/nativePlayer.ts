@@ -89,3 +89,45 @@ export const openNativeLiveTv = (server: string, user: string, pass: string): bo
   return false;
 };
 
+/**
+ * Invoca el mosaico Multiscreen de 4 pantallas en vivo con audio conmutable
+ */
+export const openNativeMultiscreen = (server: string, user: string, pass: string): boolean => {
+  try {
+    const bridge = (window as unknown as {
+      NativeTvCatalogBridge?: {
+        openNativeMultiscreen: (server: string, user: string, pass: string) => void;
+      };
+    }).NativeTvCatalogBridge;
+
+    if (bridge && typeof bridge.openNativeMultiscreen === 'function') {
+      bridge.openNativeMultiscreen(server, user, pass);
+      return true;
+    }
+  } catch (err) {
+    console.error('Error al invocar Multiscreen:', err);
+  }
+  return false;
+};
+
+/**
+ * Invoca la Guía EPG Horizontal Interactiva con Línea de Tiempo y Replay / Catchup (TiviMate style)
+ */
+export const openNativeEpgGuide = (server: string, user: string, pass: string): boolean => {
+  try {
+    const bridge = (window as unknown as {
+      NativeTvCatalogBridge?: {
+        openNativeEpgGuide: (server: string, user: string, pass: string) => void;
+      };
+    }).NativeTvCatalogBridge;
+
+    if (bridge && typeof bridge.openNativeEpgGuide === 'function') {
+      bridge.openNativeEpgGuide(server, user, pass);
+      return true;
+    }
+  } catch (err) {
+    console.error('Error al invocar Guía EPG:', err);
+  }
+  return false;
+};
+

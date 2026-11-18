@@ -5,7 +5,13 @@ import { StorageService } from '../../services/storage';
 import { BRANDING } from '../../config/branding';
 import { PLAN_CONFIGS } from '../../types/auth';
 import { CatalogCacheService } from '../../services/catalogCacheService';
-import { isNativeCatalogAvailable, openNativeTvCatalog } from '../../utils/nativePlayer';
+import { 
+  isNativeCatalogAvailable, 
+  openNativeTvCatalog,
+  openNativeLiveTv,
+  openNativeMultiscreen,
+  openNativeEpgGuide 
+} from '../../utils/nativePlayer';
 import { 
   Plus, 
   Trash2, 
@@ -718,21 +724,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               )}
 
-              {/* Modo Catálogo Nativo 60 FPS (Android TV con SQLite Room) */}
+              {/* Módulos Nativos para Android TV / Fire TV */}
               {isNativeCatalogAvailable() && (
-                <div className="pt-4 border-t border-zinc-800">
-                  <div className="p-4 rounded-xl border border-cyan-500/40 bg-gradient-to-r from-cyan-950/40 to-blue-950/30 flex items-center justify-between">
+                <div className="pt-4 border-t border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm font-extrabold text-white">Catálogo Nativo Android TV (60 FPS)</span>
+                        <span className="text-sm font-extrabold text-white">Módulos Nativos de Alta Velocidad</span>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-400 text-black uppercase tracking-wider">
-                          Room SQLite
+                          Android TV
                         </span>
                       </div>
-                      <p className="text-xs text-zinc-400 mt-1 max-w-md">
-                        Navegación instantánea de 0ms con base de datos nativa SQLite para TVs de gama baja (Fire TV Stick / TV Box).
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Exclusivo para TV Sticks y TV Boxes: rendimiento nativo de 60 FPS sin tirones.
                       </p>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Botón 1: Catálogo Room SQLite */}
                     <button
                       onClick={() => {
                         onClose();
@@ -741,9 +751,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         const pass = activePlaylist?.password || 'uys1dg3e';
                         openNativeTvCatalog(server, user, pass);
                       }}
-                      className="px-4 py-2.5 bg-gradient-to-r from-cyan-400 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-cyan-500/30 transition cursor-pointer"
+                      className="p-3 bg-zinc-900/90 hover:bg-cyan-950/60 border border-cyan-500/30 hover:border-cyan-400 rounded-xl text-left transition cursor-pointer"
                     >
-                      🚀 Abrir Modo Nativo
+                      <div className="text-xs font-bold text-cyan-300">🚀 Catálogo Room SQLite</div>
+                      <div className="text-[10px] text-zinc-400 mt-1">Consultas 0ms y carátulas Coil</div>
+                    </button>
+
+                    {/* Botón 2: TV en Vivo + Zapping + P2P Mesh */}
+                    <button
+                      onClick={() => {
+                        onClose();
+                        const server = activePlaylist?.serverUrl || 'https://tupdvr24.com:443';
+                        const user = activePlaylist?.username || 'dainiersan8play';
+                        const pass = activePlaylist?.password || 'uys1dg3e';
+                        openNativeLiveTv(server, user, pass);
+                      }}
+                      className="p-3 bg-zinc-900/90 hover:bg-cyan-950/60 border border-cyan-500/30 hover:border-cyan-400 rounded-xl text-left transition cursor-pointer"
+                    >
+                      <div className="text-xs font-bold text-cyan-300">⚡ TV en Vivo (Zapping & P2P)</div>
+                      <div className="text-[10px] text-zinc-400 mt-1">Zapping &lt;300ms y malla anticortes</div>
+                    </button>
+
+                    {/* Botón 3: Multiscreen 4 Pantallas */}
+                    <button
+                      onClick={() => {
+                        onClose();
+                        const server = activePlaylist?.serverUrl || 'https://tupdvr24.com:443';
+                        const user = activePlaylist?.username || 'dainiersan8play';
+                        const pass = activePlaylist?.password || 'uys1dg3e';
+                        openNativeMultiscreen(server, user, pass);
+                      }}
+                      className="p-3 bg-zinc-900/90 hover:bg-cyan-950/60 border border-cyan-500/30 hover:border-cyan-400 rounded-xl text-left transition cursor-pointer"
+                    >
+                      <div className="text-xs font-bold text-cyan-300">📺 Multiscreen (4 Pantallas)</div>
+                      <div className="text-[10px] text-zinc-400 mt-1">Mosaico en vivo con audio conmutable</div>
+                    </button>
+
+                    {/* Botón 4: Guía EPG Timeline & Replay */}
+                    <button
+                      onClick={() => {
+                        onClose();
+                        const server = activePlaylist?.serverUrl || 'https://tupdvr24.com:443';
+                        const user = activePlaylist?.username || 'dainiersan8play';
+                        const pass = activePlaylist?.password || 'uys1dg3e';
+                        openNativeEpgGuide(server, user, pass);
+                      }}
+                      className="p-3 bg-zinc-900/90 hover:bg-cyan-950/60 border border-cyan-500/30 hover:border-cyan-400 rounded-xl text-left transition cursor-pointer"
+                    >
+                      <div className="text-xs font-bold text-cyan-300">📅 Guía EPG & Replay ⏪</div>
+                      <div className="text-[10px] text-zinc-400 mt-1">Línea de tiempo estilo cableoperador</div>
                     </button>
                   </div>
                 </div>

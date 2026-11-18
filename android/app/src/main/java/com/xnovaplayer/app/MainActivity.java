@@ -124,6 +124,32 @@ public class MainActivity extends BridgeActivity {
                     }
 
                     @JavascriptInterface
+                    public void openNativeMultiscreen(String server, String user, String pass) {
+                        try {
+                            Intent intent = new Intent(MainActivity.this, TvMultiscreenActivity.class);
+                            intent.putExtra("server", server);
+                            intent.putExtra("user", user);
+                            intent.putExtra("pass", pass);
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    @JavascriptInterface
+                    public void openNativeEpgGuide(String server, String user, String pass) {
+                        try {
+                            Intent intent = new Intent(MainActivity.this, TvEpgGuideActivity.class);
+                            intent.putExtra("server", server);
+                            intent.putExtra("user", user);
+                            intent.putExtra("pass", pass);
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    @JavascriptInterface
                     public boolean isAvailable() {
                         return true;
                     }

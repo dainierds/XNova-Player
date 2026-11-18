@@ -30,6 +30,7 @@ import com.xnovaplayer.app.ui.theme.XNovaTextSecondary
 fun ZappingBanner(
     channel: ChannelEntity?,
     isVisible: Boolean,
+    p2pPeers: Int = 0,
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -116,8 +117,23 @@ fun ZappingBanner(
                     // Derecha: Badges de calidad y atajos del mando
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        // Badge P2P Mesh Anticortes
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF00F0FF).copy(alpha = 0.18f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (p2pPeers > 0) "⚡ P2P MESH ($p2pPeers)" else "🛡️ P2P MESH ACTIVO",
+                                color = XNovaCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))

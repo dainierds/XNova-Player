@@ -24,6 +24,7 @@ import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import androidx.media3.ui.PlayerView
 import com.xnovaplayer.app.data.api.XtreamClient
+import com.xnovaplayer.app.data.p2p.P2pMeshEngine
 import com.xnovaplayer.app.ui.components.LiveChannelOverlay
 import com.xnovaplayer.app.ui.components.ZappingBanner
 import com.xnovaplayer.app.ui.theme.XNovaTvTheme
@@ -39,6 +40,9 @@ fun TvLiveScreen(
     onExit: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val p2pEngine = remember { P2pMeshEngine.getInstance(context) }
+    val p2pPeers by p2pEngine.connectedPeers.collectAsState()
+
     val categories by viewModel.categories.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val channels by viewModel.channels.collectAsState()
@@ -79,6 +83,10 @@ fun TvLiveScreen(
     LaunchedEffect(currentChannel) {
         val ch = currentChannel ?: return@LaunchedEffect
         val streamUrl = XtreamClient.buildLiveStreamUrl(serverUrl, user, pass, ch.streamId, "ts")
+        
+        // Iniciar sesión P2P Mesh con los trackers WebRTC para compartir fragmentos con otros televisores
+        p2pEngine.startMeshSession(streamUrl)
+
         val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
@@ -88,6 +96,7 @@ fun TvLiveScreen(
     DisposableEffect(Unit) {
         viewModel.syncChannels(serverUrl, user, pass)
         onDispose {
+            p2pEngine.stopMeshSession()
             exoPlayer.release()
         }
     }
@@ -158,6 +167,7 @@ fun TvLiveScreen(
             ZappingBanner(
                 channel = currentChannel,
                 isVisible = isZappingBannerVisible && !isOverlayVisible,
+                p2pPeers = p2pPeers,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
 

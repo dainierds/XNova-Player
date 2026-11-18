@@ -58,6 +58,14 @@
             android:theme="@style/PlayerTheme"
             android:exported="false" />
 
+        <!-- Segundo Motor de Reproducción Nativo LibVLC (100% Codec Fallback) -->
+        <activity
+            android:name=".VlcPlayerActivity"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@style/PlayerTheme"
+            android:exported="false" />
+
         <!-- Pantalla de Catálogo TV 100% Nativo en Jetpack Compose -->
         <activity
             android:name=".TvMainActivity"
@@ -68,6 +76,20 @@
         <!-- Experiencia TV en Vivo con Zapping Instantáneo & Overlay Guide (TiviMate style) -->
         <activity
             android:name=".TvLivePlayerActivity"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:screenOrientation="sensorLandscape"
+            android:exported="false" />
+
+        <!-- Mosaico Multiscreen de 4 Pantallas en Vivo Simultáneas con Audio Dinámico -->
+        <activity
+            android:name=".TvMultiscreenActivity"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:screenOrientation="sensorLandscape"
+            android:exported="false" />
+
+        <!-- Guía EPG Horizontal Interactiva con Línea de Tiempo y Replay / Catchup (TiviMate style) -->
+        <activity
+            android:name=".TvEpgGuideActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:screenOrientation="sensorLandscape"
             android:exported="false" />
