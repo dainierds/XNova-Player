@@ -21,7 +21,7 @@ class PosterResolutionEngine {
   private inFlight = new Map<string, Promise<string>>();
   private queue: QueueTask[] = [];
   private activeWorkers = 0;
-  private maxConcurrency = 3; // Máximo 3 descargas simultáneas en segundo plano (igual que Glide/TiviMate)
+  private maxConcurrency = 6; // Descargas simultáneas optimizadas para carga ultrarrápida (Glide/TiviMate)
 
   /**
    * Vacía la cola de peticiones de TMDb pendientes de la carpeta anterior.
@@ -134,27 +134,49 @@ class PosterResolutionEngine {
         task.title
       )}&language=es-ES&page=1&include_adult=false`;
 
-      const res = await fetch(searchUrl);
+      let res = await fetch(searchUrl);
+      let matchPath: string | null = null;
+
       if (res.ok) {
         const data = await res.json();
-        const first = data.results?.[0];
-        if (first?.poster_path) {
-          const finalPoster = `https://image.tmdb.org/t/p/w500${first.poster_path}`;
-          task.resolve(finalPoster);
-          this.activeWorkers--;
-          // Pequeño descanso de 40ms entre peticiones para respetar la red del televisor
-          setTimeout(() => this.processQueue(), 40);
-          return;
+        const found = (data.results || []).find((r: any) => r.poster_path) || (data.results || []).find((r: any) => r.backdrop_path);
+        if (found) {
+          matchPath = found.poster_path || found.backdrop_path;
         }
       }
 
-      // Si no hubo coincidencia en español, intentar fallback a la URL del proveedor o placeholder
+      // Si no hubo coincidencia con search/multi en español, intentar búsqueda directa de películas
+      if (!matchPath) {
+        try {
+          const movieSearch = `https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(
+            task.title
+          )}&page=1&include_adult=false`;
+          const res2 = await fetch(movieSearch);
+          if (res2.ok) {
+            const data2 = await res2.json();
+            const found2 = (data2.results || []).find((r: any) => r.poster_path) || (data2.results || []).find((r: any) => r.backdrop_path);
+            if (found2) {
+              matchPath = found2.poster_path || found2.backdrop_path;
+            }
+          }
+        } catch {}
+      }
+
+      if (matchPath) {
+        const finalPoster = `https://image.tmdb.org/t/p/w500${matchPath}`;
+        task.resolve(finalPoster);
+        this.activeWorkers--;
+        setTimeout(() => this.processQueue(), 20);
+        return;
+      }
+
+      // Si no hubo coincidencia, intentar fallback a la URL del proveedor o placeholder
       task.resolve(task.fallbackUrl || '');
     } catch {
       task.resolve(task.fallbackUrl || '');
     } finally {
       this.activeWorkers--;
-      setTimeout(() => this.processQueue(), 40);
+      setTimeout(() => this.processQueue(), 20);
     }
   }
 }

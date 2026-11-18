@@ -55,6 +55,12 @@ const normalizeMediaUrl = (url?: string, serverBase?: string): string => {
     }
   }
 
+  // Si es un hash o archivo directo de TMDb (/abc123xyz.jpg o abc123xyz.jpg)
+  if (/^\/?[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp)$/i.test(trimmed) && !trimmed.toLowerCase().includes('default') && !trimmed.toLowerCase().includes('logo')) {
+    const cleanFile = trimmed.replace(/^\/+/, '');
+    return `https://image.tmdb.org/t/p/w500/${cleanFile}`;
+  }
+
   // Rutas relativas sin protocolo (/images/... o images/...)
   if (!/^https?:\/\//i.test(trimmed)) {
     const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
@@ -255,7 +261,7 @@ const CatalogPosterCard = React.memo<CatalogPosterCardProps>(
     const isSeries = contentType === 'series';
     const rawCover = isSeries
       ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
-      : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
+      : ((item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).icon || (item as any).stream_icon || (item as any).poster);
     const initialCover = normalizeMediaUrl(rawCover, server);
     const title = item.name || (item as any).title || 'Sin Título';
     const rating = item.rating || '7.0';
@@ -968,7 +974,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
       const urls = cached.slice(0, 15).map((item) => {
         const rawCover = contentType === 'series'
           ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
-          : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
+          : ((item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).icon || (item as any).stream_icon || (item as any).poster);
         return normalizeMediaUrl(rawCover, server);
       });
       ImagePreloadService.preloadBatch(urls);
@@ -1026,7 +1032,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           const urls = validItems.slice(0, 15).map((item) => {
             const rawCover = contentType === 'series'
               ? ((item as any).cover || (item as any).icon || (item as any).stream_icon || (item as any).poster)
-              : ((item as any).icon || (item as any).stream_icon || (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).poster);
+              : ((item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).icon || (item as any).stream_icon || (item as any).poster);
             return normalizeMediaUrl(rawCover, server);
           });
           ImagePreloadService.preloadBatch(urls);
@@ -1076,7 +1082,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   useEffect(() => {
     if (streams && streams.length > 0) {
       const urls = streams.slice(0, 20).map((item) => {
-        const rawCover = (item as any).icon || (item as any).stream_icon || (item as any).cover;
+        const rawCover = (item as any).cover || (item as any).movie_image || (item as any).cover_big || (item as any).icon || (item as any).stream_icon;
         return normalizeMediaUrl(rawCover, server);
       }).filter((u): u is string => Boolean(u));
 

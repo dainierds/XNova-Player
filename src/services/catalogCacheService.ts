@@ -60,7 +60,7 @@ export function compressXtreamItem(
 
   const rawIcon = isSeries
     ? ((raw as XtreamSeries).cover || (raw as any).stream_icon)
-    : (raw as XtreamStream).stream_icon;
+    : ((raw as any).cover || (raw as any).movie_image || (raw as any).cover_big || (raw as any).poster || (raw as XtreamStream).stream_icon);
 
   const rawCat = (raw as any).category_id ?? (raw as any).cat_id;
 
