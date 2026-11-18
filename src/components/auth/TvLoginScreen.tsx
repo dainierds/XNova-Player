@@ -159,16 +159,21 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
         ))}
       </div>
 
-      {/* Overlay oscuro sobre el grid */}
-      <div className="absolute inset-0 bg-black/55" />
-
-      {/* Gradiente hacia la derecha para oscurecer donde está el panel */}
-      <div className="absolute inset-y-0 right-0 w-[500px] bg-gradient-to-l from-black via-black/90 to-transparent" />
+      {/* Overlay oscuro suave sobre todo el grid */}
+      <div className="absolute inset-0 bg-black/40" />
 
       {/* ══════════════════════════════════════════════
-          PANEL DE LOGIN — derecha, centrado verticalmente
+          PANEL DE LOGIN — glassmorphism, centrado a la derecha
           ══════════════════════════════════════════════ */}
-      <div className="absolute inset-y-0 right-0 w-[400px] flex flex-col items-stretch justify-center px-10 py-12">
+      <div className="absolute inset-0 flex items-center justify-end pr-16">
+      <div className="w-[380px] flex flex-col items-stretch justify-center px-9 py-10 rounded-2xl"
+           style={{
+             background: 'rgba(0,0,0,0.72)',
+             backdropFilter: 'blur(18px)',
+             WebkitBackdropFilter: 'blur(18px)',
+             border: '1px solid rgba(255,255,255,0.08)',
+             boxShadow: '0 8px 60px rgba(0,0,0,0.6)',
+           }}>
 
         {/* Título */}
         <h1 className="text-3xl font-black tracking-wide text-white mb-8 uppercase">
@@ -265,7 +270,8 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
             Crear una cuenta
           </button>
         </div>
-      </div>
+      </div>{/* fin panel glassmorphism */}
+      </div>{/* fin flex container */}
 
     </div>
   );
