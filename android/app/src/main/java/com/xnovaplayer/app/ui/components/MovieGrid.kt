@@ -76,8 +76,8 @@ fun MovieCard(
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),
         border = ClickableSurfaceDefaults.border(
-            border = BorderStroke(1.dp, Color(0x2238BDF8)),
-            focusedBorder = BorderStroke(2.5.dp, XNovaCyan)
+            border = Border(BorderStroke(1.dp, Color(0x2238BDF8))),
+            focusedBorder = Border(BorderStroke(2.5.dp, XNovaCyan))
         ),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = XNovaCardBg,
@@ -115,7 +115,7 @@ fun MovieCard(
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = (movie.containerExtension ?: "MKV").uppercase(),
+                        text = movie.containerExtension.uppercase(),
                         color = XNovaCyan,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
@@ -123,7 +123,7 @@ fun MovieCard(
                 }
 
                 // Badge de Rating
-                if (!movie.rating5based.isNullOrBlank() && movie.rating5based != "0") {
+                if (movie.rating5based > 0f) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
@@ -132,7 +132,7 @@ fun MovieCard(
                             .padding(horizontal = 4.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "★ ${movie.rating5based}",
+                            text = "★ ${"%.1f".format(movie.rating5based)}",
                             color = XNovaGold,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold

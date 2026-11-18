@@ -18,7 +18,6 @@ import androidx.tv.material3.*
 import com.xnovaplayer.app.data.database.entities.CategoryEntity
 import com.xnovaplayer.app.ui.theme.XNovaCyan
 import com.xnovaplayer.app.ui.theme.XNovaDarkSurface
-import com.xnovaplayer.app.ui.theme.XNovaTextPrimary
 import com.xnovaplayer.app.ui.theme.XNovaTextSecondary
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -62,11 +61,8 @@ fun CategorySidebar(
                         pressedContainerColor = XNovaCyan
                     ),
                     border = ClickableSurfaceDefaults.border(
-                        border = BorderStroke(
-                            width = if (isSelected) 1.5.dp else 0.dp,
-                            color = if (isSelected) XNovaCyan else Color.Transparent
-                        ),
-                        focusedBorder = BorderStroke(2.dp, Color.White)
+                        border = if (isSelected) Border(BorderStroke(1.5.dp, XNovaCyan)) else Border.None,
+                        focusedBorder = Border(BorderStroke(2.dp, Color.White))
                     ),
                     modifier = Modifier
                         .fillMaxWidth()

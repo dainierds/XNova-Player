@@ -47,7 +47,7 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
 
     private fun observeCategories() {
         viewModelScope.launch {
-            repository.getCategories("movie").collectLatest { list ->
+            repository.observeCategories("movies").collectLatest { list ->
                 _categories.value = list
                 if (_selectedCategory.value == null && list.isNotEmpty()) {
                     selectCategory(list.first())
@@ -59,11 +59,7 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
     fun selectCategory(category: CategoryEntity) {
         _selectedCategory.value = category
         viewModelScope.launch(Dispatchers.IO) {
-            val list = if (category.categoryId == "all") {
-                database.movieDao().getAllMovies()
-            } else {
-                database.movieDao().getMoviesByCategory(category.categoryId)
-            }
+            val list = database.movieDao().getMoviesByCategoryList(category.categoryId)
             _movies.value = list
             if (list.isNotEmpty()) {
                 _focusedMovie.value = list.first()
@@ -80,10 +76,11 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
             if (query.isBlank()) {
                 _selectedCategory.value?.let { selectCategory(it) }
             } else {
-                val results = database.movieDao().searchMovies("%$query%")
-                _movies.value = results
-                if (results.isNotEmpty()) {
-                    _focusedMovie.value = results.first()
+                database.movieDao().searchMovies(query).collectLatest { results ->
+                    _movies.value = results
+                    if (results.isNotEmpty()) {
+                        _focusedMovie.value = results.first()
+                    }
                 }
             }
         }
@@ -92,22 +89,22 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
     fun syncCatalog(baseUrl: String, user: String, pass: String) {
         viewModelScope.launch(Dispatchers.IO) {
             _syncState.value = CatalogUiState.Loading
-            val authSuccess = repository.login(baseUrl, user, pass)
-            if (!authSuccess) {
-                _syncState.value = CatalogUiState.Error("Credenciales o servidor inválido")
+            repository.updateCredentials(baseUrl, user, pass)
+
+            val loginResult = repository.login()
+            if (loginResult.isFailure) {
+                _syncState.value = CatalogUiState.Error("Error de autenticación con el servidor")
                 return@launch
             }
 
-            val catSuccess = repository.syncCategories()
-            val movSuccess = repository.syncMovies()
-            val serSuccess = repository.syncSeries()
-            val chSuccess = repository.syncChannels()
+            val catResult = repository.syncCategories("movies")
+            val movResult = repository.syncMovies()
 
-            if (catSuccess && movSuccess) {
-                val totalMovies = database.movieDao().getMovieCount()
+            if (catResult.isSuccess && movResult.isSuccess) {
+                val totalMovies = database.movieDao().getCount()
                 _syncState.value = CatalogUiState.Success(totalMovies)
             } else {
-                _syncState.value = CatalogUiState.Error("Error al sincronizar catálogo")
+                _syncState.value = CatalogUiState.Error("Error al sincronizar el catálogo")
             }
         }
     }

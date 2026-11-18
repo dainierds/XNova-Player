@@ -37,15 +37,9 @@ fun HeroPreviewBanner(
             .background(XNovaDarkSurface)
     ) {
         if (movie != null) {
-            // Fondo con Backdrop / Carátula estirada y oscurecida
-            val backdropUrl = if (!movie.backdropPath.isNullOrBlank()) {
-                movie.backdropPath
-            } else {
-                movie.streamIcon
-            }
-
+            // Fondo con Carátula cinematográfica oscurecida
             AsyncImage(
-                model = backdropUrl,
+                model = movie.streamIcon,
                 contentDescription = movie.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -59,7 +53,7 @@ fun HeroPreviewBanner(
                         Brush.horizontalGradient(
                             colors = listOf(
                                 Color(0xFF070B14),
-                                Color(0xE6070B14),
+                                Color(0xF2070B14),
                                 Color(0x99070B14),
                                 Color.Transparent
                             ),
@@ -90,27 +84,27 @@ fun HeroPreviewBanner(
                                 .padding(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = (movie.containerExtension ?: "MKV").uppercase(),
+                                text = movie.containerExtension.uppercase(),
                                 color = XNovaCyan,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
-                        if (!movie.rating5based.isNullOrBlank() && movie.rating5based != "0") {
+                        if (movie.rating5based > 0f) {
                             Text(
-                                text = "★ ${movie.rating5based} / 5",
+                                text = "★ ${"%.1f".format(movie.rating5based)} / 5",
                                 color = XNovaGold,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
 
-                        if (!movie.releaseDate.isNullOrBlank()) {
+                        if (!movie.added.isNullOrBlank()) {
                             Text(
-                                text = movie.releaseDate.take(4),
+                                text = "Agregada recientemente",
                                 color = XNovaTextSecondary,
-                                fontSize = 13.sp
+                                fontSize = 12.sp
                             )
                         }
                     }
@@ -129,12 +123,12 @@ fun HeroPreviewBanner(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Sinopsis o descripción
+                    // Descripción
                     Text(
-                        text = if (!movie.plot.isNullOrBlank()) movie.plot else "Disfruta de este título en alta definición sin cortes ni búfering con XNova Player.",
+                        text = "Transmisión nativa de alta definición con decodificación de hardware acelerada en XNova Player.",
                         color = XNovaTextSecondary,
                         fontSize = 13.sp,
-                        maxLines = 3,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         lineHeight = 18.sp
                     )
