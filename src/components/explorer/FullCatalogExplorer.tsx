@@ -461,6 +461,65 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
   } | null>(null);
   const [detailBtnIndex, setDetailBtnIndex] = useState<number>(0); // 0: Play, 1: Favorite, 2: Trailer
 
+  // ⚡ Carga dinámica inmediata de sinopsis real, actores, director y fondo al abrir Detalles de Película
+  useEffect(() => {
+    if (!selectedMovieDetail) return;
+    let isCancelled = false;
+
+    const loadFullDetails = async () => {
+      const streamId = selectedMovieDetail.item.stream_id || (selectedMovieDetail.item as any).id;
+      const title = selectedMovieDetail.meta.title;
+
+      try {
+        let fullInfo: any = null;
+        if (/^\d+$/.test(String(streamId))) {
+          const res = await XtreamService.getVodInfo(server, user, pass, streamId);
+          if (res?.info) fullInfo = res.info;
+        }
+
+        // Si Xtream no tiene sinopsis completa o backdrop, consultar TMDb de inmediato
+        let tmdbInfo: any = null;
+        if (!fullInfo?.plot || !fullInfo?.backdrop_path?.length) {
+          tmdbInfo = await TmdbService.enrichMovie(title).catch(() => null);
+        }
+
+        if (isCancelled) return;
+
+        const rawBackdrop = (fullInfo?.backdrop_path && fullInfo.backdrop_path.length > 0)
+          ? fullInfo.backdrop_path[0]
+          : (tmdbInfo?.backdropUrl || fullInfo?.movie_image || fullInfo?.cover_big || selectedMovieDetail.meta.backdropUrl);
+
+        const rawPoster = fullInfo?.cover_big || fullInfo?.movie_image || tmdbInfo?.posterUrl || selectedMovieDetail.meta.posterUrl;
+
+        setSelectedMovieDetail((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            meta: {
+              ...prev.meta,
+              title: fullInfo?.name || tmdbInfo?.title || prev.meta.title,
+              rating: fullInfo?.rating || tmdbInfo?.rating || prev.meta.rating,
+              year: fullInfo?.releasedate ? fullInfo.releasedate.substring(0, 4) : (tmdbInfo?.year || prev.meta.year),
+              duration: fullInfo?.duration || (fullInfo?.episode_run_time ? `${fullInfo.episode_run_time} min` : prev.meta.duration),
+              genres: fullInfo?.genre || (tmdbInfo?.genres ? tmdbInfo.genres.join(', ') : prev.meta.genres),
+              cast: fullInfo?.actors || fullInfo?.cast || 'Reparto oficial en catálogo',
+              director: fullInfo?.director || 'Director en catálogo',
+              plot: fullInfo?.plot || fullInfo?.description || tmdbInfo?.synopsis || prev.meta.plot || 'Disfruta de esta película en máxima calidad.',
+              backdropUrl: normalizeMediaUrl(rawBackdrop, server) || prev.meta.backdropUrl,
+              posterUrl: normalizeMediaUrl(rawPoster, server) || prev.meta.posterUrl,
+              youtubeTrailer: fullInfo?.youtube_trailer || tmdbInfo?.youtubeKey || prev.meta.youtubeTrailer,
+            },
+          };
+        });
+      } catch (err) {
+        console.warn('Error cargando detalles completos de película:', err);
+      }
+    };
+
+    loadFullDetails();
+    return () => { isCancelled = true; };
+  }, [selectedMovieDetail?.item?.stream_id, server, user, pass]);
+
   // ⭐ Favoritos y pulsación de 3 segundos
   const { isFavorite, toggleFavorite } = useFavoritesStore();
   const [quickFavItem, setQuickFavItem] = useState<QuickFavoriteItem | null>(null);
@@ -2281,58 +2340,78 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             <X className="w-6 h-6" />
           </button>
 
-          {/* Gran Imagen de Fondo Cinemática */}
-          {selectedMovieDetail.meta.backdropUrl && (
-            <div className="absolute inset-0 pointer-events-none">
-              <img
-                src={selectedMovieDetail.meta.backdropUrl}
-                alt={selectedMovieDetail.meta.title}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover opacity-35 scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#070A12] via-[#070A12]/85 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#070A12] via-[#070A12]/60 to-transparent" />
-            </div>
-          )}
+          {/* Gran Imagen de Fondo Cinemática con Auto-recuperación */}
+          <div className="absolute inset-0 pointer-events-none">
+            <img
+              src={normalizeMediaUrl(selectedMovieDetail.meta.backdropUrl || selectedMovieDetail.meta.posterUrl, server)}
+              alt={selectedMovieDetail.meta.title}
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                const poster = normalizeMediaUrl(selectedMovieDetail.meta.posterUrl, server);
+                if (poster && target.src !== poster) {
+                  target.src = poster;
+                }
+              }}
+              className="w-full h-full object-cover opacity-35 scale-105 transition-opacity duration-500"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#070A12] via-[#070A12]/85 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#070A12] via-[#070A12]/60 to-transparent" />
+          </div>
 
-          {/* Información Superior: Título, Metadatos, Cast, Director y Sinopsis */}
-          <div className="relative z-10 max-w-3xl space-y-4">
-            <h1 className="text-4xl font-black text-white tracking-wide drop-shadow-xl">
-              {selectedMovieDetail.meta.title}
-            </h1>
+          {/* Información Superior con Póster Oficial y Metadatos Dinámicos */}
+          <div className="relative z-10 flex items-start space-x-8 max-w-5xl">
+            {/* Póster oficial visible de la película */}
+            {selectedMovieDetail.meta.posterUrl && (
+              <div className="w-40 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shrink-0 bg-black/60 hidden md:block">
+                <img
+                  src={normalizeMediaUrl(selectedMovieDetail.meta.posterUrl, server)}
+                  alt={selectedMovieDetail.meta.title}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  }}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
 
-            {/* Badges: [7.0] 2025 • 1h 57m • Bélica / Acción / Drama */}
-            <div className="flex items-center space-x-3 text-sm font-bold text-zinc-300">
-              {selectedMovieDetail.meta.rating && (
-                <span className="px-2.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 text-xs font-black">
-                  {selectedMovieDetail.meta.rating}
-                </span>
+            <div className="flex-1 space-y-3">
+              <h1 className="text-3xl lg:text-4xl font-black text-white tracking-wide drop-shadow-xl">
+                {selectedMovieDetail.meta.title}
+              </h1>
+
+              {/* Badges: [★ 7.0] 2025 • 1h 57m • Bélica / Acción / Drama */}
+              <div className="flex items-center space-x-3 text-sm font-bold text-zinc-300">
+                {selectedMovieDetail.meta.rating && (
+                  <span className="px-2.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 text-xs font-black">
+                    ★ {selectedMovieDetail.meta.rating}
+                  </span>
+                )}
+                {selectedMovieDetail.meta.year && <span>{selectedMovieDetail.meta.year}</span>}
+                {selectedMovieDetail.meta.duration && <span>• {selectedMovieDetail.meta.duration}</span>}
+                {selectedMovieDetail.meta.genres && <span className="text-zinc-300">• {selectedMovieDetail.meta.genres}</span>}
+              </div>
+
+              {/* Cast */}
+              {selectedMovieDetail.meta.cast && (
+                <p className="text-xs text-zinc-300">
+                  <span className="text-zinc-500 font-bold mr-2">Reparto:</span>
+                  {selectedMovieDetail.meta.cast}
+                </p>
               )}
-              {selectedMovieDetail.meta.year && <span>{selectedMovieDetail.meta.year}</span>}
-              {selectedMovieDetail.meta.duration && <span>• {selectedMovieDetail.meta.duration}</span>}
-              {selectedMovieDetail.meta.genres && <span className="text-zinc-300">• {selectedMovieDetail.meta.genres}</span>}
+
+              {/* Director */}
+              {selectedMovieDetail.meta.director && (
+                <p className="text-xs text-zinc-300">
+                  <span className="text-zinc-500 font-bold mr-2">Director:</span>
+                  {selectedMovieDetail.meta.director}
+                </p>
+              )}
+
+              {/* Sinopsis Completa */}
+              <p className="text-xs lg:text-sm text-zinc-300 leading-relaxed max-w-2xl pt-1 line-clamp-4">
+                {selectedMovieDetail.meta.plot}
+              </p>
             </div>
-
-            {/* Cast */}
-            {selectedMovieDetail.meta.cast && (
-              <p className="text-sm text-zinc-300">
-                <span className="text-zinc-500 font-bold mr-2">Cast:</span>
-                {selectedMovieDetail.meta.cast}
-              </p>
-            )}
-
-            {/* Director */}
-            {selectedMovieDetail.meta.director && (
-              <p className="text-sm text-zinc-300">
-                <span className="text-zinc-500 font-bold mr-2">Director:</span>
-                {selectedMovieDetail.meta.director}
-              </p>
-            )}
-
-            {/* Sinopsis Completa */}
-            <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl pt-2">
-              {selectedMovieDetail.meta.plot}
-            </p>
           </div>
 
           {/* Botones de Acción Inferiores (Imagen 2) */}
