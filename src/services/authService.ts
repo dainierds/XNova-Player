@@ -3,7 +3,6 @@ import type { PlaylistAccount } from '../types';
 import { PLAN_CONFIGS } from '../types/auth';
 import { StorageService } from './storage';
 import { CloudService } from './cloudService';
-import { XtreamService } from './xtream';
 
 const STORAGE_USERS_KEY = 'xnova_managed_users_v2';
 const STORAGE_SESSION_KEY = 'xnova_active_session_v2';
@@ -307,46 +306,6 @@ export const AuthService = {
     return true;
   },
 
-  // Validar credenciales directamente con el servidor IPTV Xtream Codes / América Play
-  async authenticateWithXtream(username: string, password: string): Promise<UserAccount | null> {
-    const servers = ['https://tupdvr24.com:443', 'http://tupdvr24.com:80'];
-    for (const server of servers) {
-      try {
-        const res = await XtreamService.authenticate(server, username, password);
-        if (res && res.userInfo && res.userInfo.username) {
-          const expFormatted = res.userInfo.expDateFormatted || 'ILIMITADO';
-          const newUser: UserAccount = {
-            id: `usr_xtream_${username.toLowerCase()}`,
-            username: username.trim(),
-            password: password.trim(),
-            displayName: username.trim(),
-            plan: 'premium',
-            status: (res.userInfo.status === 'Active' || !res.userInfo.status) ? 'active' : 'expired',
-            expDate: expFormatted,
-            playlists: [
-              {
-                id: `pl_xtream_${username.toLowerCase()}`,
-                name: 'XNova TV Principal',
-                type: 'xtream',
-                serverUrl: server,
-                username: username.trim(),
-                password: password.trim(),
-                isActive: true,
-                expDate: expFormatted,
-              },
-            ],
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-          };
-          return newUser;
-        }
-      } catch (err) {
-        console.warn(`Intento de autenticación en ${server} falló:`, err);
-      }
-    }
-    return null;
-  },
-
   // Autenticar credenciales en la app (Intentando Nube primero, luego Fallback Local)
   async login(
     username: string,
@@ -404,28 +363,14 @@ export const AuthService = {
       };
     }
 
-    let users = this.getAllUsers();
-    let found = users.find(
+    const users = this.getAllUsers();
+    const found = users.find(
       (u) =>
         u.username.toLowerCase() === cleanUser && u.password === cleanPass
     );
 
-    // 3. 🚀 Validación Directa con Servidor IPTV Xtream (América Play / Xtream Codes)
-    // Si el usuario no fue creado manualmente en el panel admin local, se autentica directamente con el servidor
     if (!found) {
-      const xtreamUser = await this.authenticateWithXtream(cleanUser, cleanPass);
-      if (xtreamUser) {
-        // Limpiar cuentas demo si solo estaban las iniciales
-        const onlyHasSeeds = users.length > 0 && users.every((u) => isSeedUser(u));
-        if (onlyHasSeeds) {
-          users = [];
-        }
-        users.push(xtreamUser);
-        this.saveAllUsers(users);
-        this.saveActiveSession(xtreamUser);
-        return { success: true, user: xtreamUser, isAdmin: false };
-      }
-      return { success: false, error: 'Usuario o contraseña incorrectos en el servidor IPTV.' };
+      return { success: false, error: 'Usuario o contraseña incorrectos.' };
     }
 
     if (found.status === 'suspended') {
