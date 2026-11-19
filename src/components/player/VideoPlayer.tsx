@@ -420,11 +420,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
             if (focusedControl === 'rewind') {
               if (video && !isLive) {
-                video.currentTime = Math.max(0, video.currentTime - 10);
+                video.play().catch(() => {});
+                setIsPlaying(true);
+                setFocusedControl('play_pause');
               }
             } else if (focusedControl === 'forward') {
               if (video && !isLive) {
-                video.currentTime = Math.min(duration, video.currentTime + 10);
+                video.play().catch(() => {});
+                setIsPlaying(true);
+                setFocusedControl('play_pause');
               }
             } else if (focusedControl === 'audio') {
               if (hlsRef.current && audioTracks.length > 1) {

@@ -151,6 +151,13 @@ public class ExoPlayerActivity extends AppCompatActivity {
             playerView.setPlayer(player);
             playerView.setControllerShowTimeoutMs(3500);
 
+            // Garantizar que al mostrar controles el foco siempre quede en el botón central de Play/Pausa
+            playerView.setControllerVisibilityListener((int visibility) -> {
+                if (visibility == View.VISIBLE) {
+                    focusCenterControl();
+                }
+            });
+
             // Re-vincular vistas del controlador tras asignar el reproductor
             setupCustomControllerViews();
 
@@ -272,6 +279,22 @@ public class ExoPlayerActivity extends AppCompatActivity {
         }
     }
 
+    private void focusCenterControl() {
+        if (playerView == null) return;
+        playerView.post(() -> {
+            View play = playerView.findViewById(androidx.media3.ui.R.id.exo_play);
+            View pause = playerView.findViewById(androidx.media3.ui.R.id.exo_pause);
+            View ffwd = playerView.findViewById(androidx.media3.ui.R.id.exo_ffwd);
+            if (play != null && play.getVisibility() == View.VISIBLE) {
+                play.requestFocus();
+            } else if (pause != null && pause.getVisibility() == View.VISIBLE) {
+                pause.requestFocus();
+            } else if (ffwd != null && ffwd.getVisibility() == View.VISIBLE) {
+                ffwd.requestFocus();
+            }
+        });
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         // 🛑 SI EL DIÁLOGO DE ERROR ESTÁ VISIBLE, PERMITIR NAVEGACIÓN D-PAD NATIVA ENTRE LOS BOTONES
@@ -302,11 +325,6 @@ public class ExoPlayerActivity extends AppCompatActivity {
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
             case KeyEvent.KEYCODE_SPACE:
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    View currentFocus = getCurrentFocus();
-                    if (currentFocus != null && currentFocus.getId() == R.id.btn_back) {
-                        finish();
-                        return true;
-                    }
                     if (player.isPlaying()) {
                         player.pause();
                     } else {
@@ -314,6 +332,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
                     }
                     if (playerView != null) {
                         playerView.showController();
+                        focusCenterControl();
                     }
                 }
                 return true;
@@ -321,33 +340,49 @@ public class ExoPlayerActivity extends AppCompatActivity {
             case KeyEvent.KEYCODE_MEDIA_PLAY:
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
                     player.play();
-                    if (playerView != null) playerView.showController();
+                    if (playerView != null) {
+                        playerView.showController();
+                        focusCenterControl();
+                    }
                 }
                 return true;
 
             case KeyEvent.KEYCODE_MEDIA_PAUSE:
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
                     player.pause();
-                    if (playerView != null) playerView.showController();
+                    if (playerView != null) {
+                        playerView.showController();
+                        focusCenterControl();
+                    }
                 }
                 return true;
 
+            case KeyEvent.KEYCODE_MEDIA_REWIND:
+            case KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD:
             case KeyEvent.KEYCODE_DPAD_LEFT:
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
                     if (!isLive && player.isCurrentMediaItemSeekable()) {
                         long current = player.getCurrentPosition();
                         player.seekTo(Math.max(0, current - 10000));
-                        if (playerView != null) playerView.showController();
+                        if (playerView != null) {
+                            playerView.showController();
+                            focusCenterControl();
+                        }
                     }
                 }
                 return true;
 
+            case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
+            case KeyEvent.KEYCODE_MEDIA_STEP_FORWARD:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
                     if (!isLive && player.isCurrentMediaItemSeekable()) {
                         long current = player.getCurrentPosition();
                         player.seekTo(current + 10000);
-                        if (playerView != null) playerView.showController();
+                        if (playerView != null) {
+                            playerView.showController();
+                            focusCenterControl();
+                        }
                     }
                 }
                 return true;
@@ -357,6 +392,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 if (playerView != null && !playerView.isControllerFullyVisible()) {
                     if (event.getAction() == KeyEvent.ACTION_DOWN) {
                         playerView.showController();
+                        focusCenterControl();
                     }
                     return true;
                 }
