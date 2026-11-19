@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ShowcaseItem, SidebarTabId } from '../../types/showcase';
-import { Play, Heart, Film } from 'lucide-react';
 import { PosterResolutionService } from '../../services/posterResolutionService';
 
 const FALLBACK_POSTER = 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400';
@@ -10,28 +9,20 @@ interface MainHeroStageProps {
   item: ShowcaseItem;
   items: ShowcaseItem[];
   selectedIndex: number;
-  focusedZone: 'hero_buttons' | 'thumbnails';
-  heroButtonIndex: number; // 0: Watch now, 1: Favorite, 2: Trailer
-  isFavorite?: boolean;
+  isSidebarFocused?: boolean;
   activeTab?: SidebarTabId;
   onSelectThumbnail: (index: number) => void;
   onPlay: () => void;
-  onToggleFavorite?: () => void;
-  onOpenTrailer: () => void;
 }
 
 export const MainHeroStage: React.FC<MainHeroStageProps> = ({
   item,
   items,
   selectedIndex,
-  focusedZone,
-  heroButtonIndex,
-  isFavorite = false,
+  isSidebarFocused = false,
   activeTab = 'movies',
   onSelectThumbnail,
   onPlay,
-  onToggleFavorite,
-  onOpenTrailer,
 }) => {
   const [backdropSrc, setBackdropSrc] = useState(item.backdropUrl || item.thumbnailUrl || FALLBACK_BACKDROP);
 
@@ -100,8 +91,8 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
         <div className="absolute -top-20 -left-20 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* 🎬 1. ZONA SUPERIOR: DETALLES DINÁMICOS DE LA PELÍCULA O SERIE SELECCIONADA */}
-      <div className="relative z-10 max-w-2xl lg:max-w-4xl flex-1 flex flex-col justify-end space-y-2 min-h-0 pt-1 pb-2">
+      {/* 🎬 1. ZONA SUPERIOR: HERO AMPLIO CON DETALLES DINÁMICOS DEL ÍTEM SELECCIONADO */}
+      <div className="relative z-10 max-w-3xl lg:max-w-5xl flex-1 flex flex-col justify-end space-y-2.5 min-h-0 pt-2 pb-3">
         {/* Metadatos: Badge + Rating + Año + Duración + Géneros */}
         <div className="flex items-center space-x-3 text-xs md:text-sm font-medium text-zinc-300">
           <span className="font-bold text-white tracking-wide">{item.releaseDateText || 'En Catálogo'}</span>
@@ -148,78 +139,35 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
           {item.title}
         </h1>
 
-        {/* Sinopsis descriptiva (2 líneas compactas) */}
-        <p className="text-xs md:text-sm text-zinc-300 font-normal tracking-wide drop-shadow line-clamp-2 max-w-2xl">
-          {item.synopsis || item.subtitle || 'Disfruta de este título en calidad ultra alta.'}
+        {/* Sinopsis descriptiva generosa (3 a 4 líneas) */}
+        <p className="text-xs sm:text-sm md:text-base text-zinc-300/90 font-normal tracking-wide drop-shadow line-clamp-3 md:line-clamp-4 max-w-3xl leading-relaxed">
+          {item.synopsis || item.subtitle || 'Disfruta de este contenido en alta definición desde tu catálogo IPTV.'}
         </p>
 
-        {/* Fila de Botones: Ver ahora + Favorito + Trailer */}
-        <div className="flex items-center space-x-3 pt-0.5">
-          {/* Botón 0: Ver ahora */}
-          <button
-            onClick={onPlay}
-            className={`
-              px-6 py-2 rounded-full font-bold text-xs md:text-sm flex items-center space-x-2 transition-all duration-150 cursor-pointer
-              ${focusedZone === 'hero_buttons' && heroButtonIndex === 0
-                ? 'bg-white text-black scale-105 shadow-xl shadow-white/40 ring-4 ring-cyan-400'
-                : 'bg-white text-black hover:bg-zinc-200'}
-            `}
-          >
-            <Play className="w-4 h-4 fill-black text-black ml-0.5" />
-            <span>Ver ahora</span>
-          </button>
-
-          {/* Botón 1: Añadir a Favoritos / En Favoritos */}
-          <button
-            onClick={onToggleFavorite}
-            className={`
-              px-5 py-2 rounded-full font-bold text-xs md:text-sm flex items-center space-x-2 transition-all duration-150 cursor-pointer
-              ${focusedZone === 'hero_buttons' && heroButtonIndex === 1
-                ? isFavorite
-                  ? 'bg-rose-500 text-white scale-105 ring-4 ring-rose-400 shadow-xl shadow-rose-500/40'
-                  : 'bg-cyan-400 text-black scale-105 ring-4 ring-cyan-300 shadow-xl shadow-cyan-400/50'
-                : isFavorite
-                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                : 'glass-panel text-white border border-white/20 hover:bg-white/10'}
-            `}
-          >
-            <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-            <span>{isFavorite ? 'En Favoritos' : 'Añadir a Favoritos'}</span>
-          </button>
-
-          {/* Botón 2: Trailer */}
-          <button
-            onClick={onOpenTrailer}
-            className={`
-              px-5 py-2 rounded-full font-semibold text-xs md:text-sm text-white glass-panel border border-white/20 transition-all duration-150 cursor-pointer
-              ${focusedZone === 'hero_buttons' && heroButtonIndex === 2
-                ? 'bg-white/25 border-cyan-400 scale-105 ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/30'
-                : 'hover:bg-white/10'}
-            `}
-          >
-            <Film className="w-3.5 h-3.5" />
-            <span>Tráiler</span>
-          </button>
+        {/* Indicador de acción al pulsar OK */}
+        <div className="flex items-center space-x-2 text-[11px] text-cyan-300/80 font-semibold pt-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+          <span>Presiona OK para ver opciones (Reproducir, Favoritos, Tráiler)</span>
         </div>
       </div>
 
       {/* 📺 2. ZONA INFERIOR: DOS FILAS COMPACTAS (TOP 10 + AGREGADAS RECIENTEMENTE) */}
-      <div className="relative z-10 w-full flex flex-col space-y-2 pt-1 pb-1 shrink-0">
+      <div className="relative z-10 w-full flex flex-col space-y-1.5 pt-1 pb-1 shrink-0">
         
         {/* ── FILA 1: TOP 10 ── */}
         <div className="w-full">
           <div className="flex items-center space-x-2 mb-1 px-0.5">
-            <span className="w-1.5 h-3.5 bg-rose-600 rounded-full" />
-            <h3 className="text-xs md:text-sm font-black text-white tracking-wide uppercase">
+            <span className="w-1.5 h-3 bg-rose-600 rounded-full" />
+            <h3 className="text-[11px] md:text-xs font-black text-white tracking-wide uppercase">
               {activeTab === 'series' ? 'Top 10 Series Más Vistas Hoy' : 'Top 10 Películas Más Vistas Hoy'}
             </h3>
           </div>
 
-          <div className="flex items-center space-x-2.5 overflow-x-auto no-scrollbar py-1">
+          <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-0.5">
             {row1Items.map((thumbItem, idx) => {
               const index = idx;
               const isSelected = index === selectedIndex;
-              const isFocused = focusedZone === 'thumbnails' && isSelected;
+              const isFocused = !isSidebarFocused && isSelected;
 
               return (
                 <div
@@ -227,12 +175,12 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                   ref={(el) => { row1Refs.current[idx] = el; }}
                   onClick={() => {
                     onSelectThumbnail(index);
-                    if (isSelected) onPlay();
+                    onPlay();
                   }}
                   className={`
-                    relative w-20 md:w-24 lg:w-28 aspect-[2/3] rounded-xl overflow-hidden cursor-pointer transition-all duration-200 shrink-0 bg-zinc-900 border border-white/10 shadow-lg
+                    relative w-16 sm:w-18 md:w-20 lg:w-22 aspect-[2/3] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 shrink-0 bg-zinc-900 border border-white/10 shadow-md
                     ${isFocused
-                      ? 'scale-105 ring-4 ring-cyan-400 shadow-2xl shadow-cyan-500/60 z-20 -translate-y-1'
+                      ? 'scale-110 ring-4 ring-cyan-400 shadow-xl shadow-cyan-500/60 z-20 -translate-y-1'
                       : isSelected
                         ? 'ring-2 ring-white/80 opacity-100'
                         : 'opacity-75 hover:opacity-100 scale-95'}
@@ -263,19 +211,19 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                   />
 
                   {/* Rating Badge Superior */}
-                  <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-sm border border-white/10 text-[9px] font-black text-amber-300 flex items-center space-x-0.5 shadow">
+                  <div className="absolute top-1 left-1 z-10 px-1 py-0.2 rounded bg-black/70 backdrop-blur-sm border border-white/10 text-[8px] font-black text-amber-300 flex items-center space-x-0.5 shadow">
                     <span>★</span>
                     <span>{thumbItem.rating || '8.5'}</span>
                   </div>
 
                   {/* Gran Número de Ranking estilo Top 10 */}
-                  <span className="absolute bottom-0.5 left-1.5 text-3xl md:text-4xl lg:text-5xl font-black italic font-sans text-white/95 drop-shadow-[0_2px_8px_rgba(0,0,0,1)] select-none leading-none z-10 pointer-events-none">
+                  <span className="absolute bottom-0.5 left-1 text-2xl md:text-3xl font-black italic font-sans text-white/95 drop-shadow-[0_2px_6px_rgba(0,0,0,1)] select-none leading-none z-10 pointer-events-none">
                     {idx + 1}
                   </span>
 
                   {/* Título en degradado inferior */}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-1.5 pt-6 flex flex-col justify-end">
-                    <span className={`text-[10px] md:text-[11px] font-bold text-white truncate drop-shadow leading-tight ${idx < 9 ? 'pl-6' : 'pl-8'}`}>
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-1 pt-4 flex flex-col justify-end">
+                    <span className={`text-[9px] md:text-[10px] font-bold text-white truncate drop-shadow leading-tight ${idx < 9 ? 'pl-4' : 'pl-6'}`}>
                       {thumbItem.title}
                     </span>
                   </div>
@@ -289,17 +237,17 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
         {row2Items.length > 0 && (
           <div className="w-full">
             <div className="flex items-center space-x-2 mb-1 px-0.5">
-              <span className="w-1.5 h-3.5 bg-cyan-400 rounded-full" />
-              <h3 className="text-xs md:text-sm font-black text-white tracking-wide uppercase">
+              <span className="w-1.5 h-3 bg-cyan-400 rounded-full" />
+              <h3 className="text-[11px] md:text-xs font-black text-white tracking-wide uppercase">
                 {activeTab === 'series' ? 'Series Populares Agregadas Recientemente' : 'Películas Populares Agregadas Recientemente'}
               </h3>
             </div>
 
-            <div className="flex items-center space-x-2.5 overflow-x-auto no-scrollbar py-1">
+            <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-0.5">
               {row2Items.map((thumbItem, idx) => {
                 const index = 10 + idx;
                 const isSelected = index === selectedIndex;
-                const isFocused = focusedZone === 'thumbnails' && isSelected;
+                const isFocused = !isSidebarFocused && isSelected;
 
                 return (
                   <div
@@ -307,12 +255,12 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                     ref={(el) => { row2Refs.current[idx] = el; }}
                     onClick={() => {
                       onSelectThumbnail(index);
-                      if (isSelected) onPlay();
+                      onPlay();
                     }}
                     className={`
-                      relative w-20 md:w-24 lg:w-28 aspect-[2/3] rounded-xl overflow-hidden cursor-pointer transition-all duration-200 shrink-0 bg-zinc-900 border border-white/10 shadow-lg
+                      relative w-16 sm:w-18 md:w-20 lg:w-22 aspect-[2/3] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 shrink-0 bg-zinc-900 border border-white/10 shadow-md
                       ${isFocused
-                        ? 'scale-105 ring-4 ring-cyan-400 shadow-2xl shadow-cyan-500/60 z-20 -translate-y-1'
+                        ? 'scale-110 ring-4 ring-cyan-400 shadow-xl shadow-cyan-500/60 z-20 -translate-y-1'
                         : isSelected
                           ? 'ring-2 ring-white/80 opacity-100'
                           : 'opacity-75 hover:opacity-100 scale-95'}
@@ -343,7 +291,7 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                     />
 
                     {/* Badge Superior Izquierdo: Estado */}
-                    <span className={`absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shadow-sm ${
+                    <span className={`absolute top-1 left-1 z-10 px-1 py-0.2 rounded text-[7px] md:text-[8px] font-black uppercase tracking-wider border shadow-sm ${
                       thumbItem.statusBadge === 'PRÓXIMAMENTE'
                         ? 'bg-purple-600/90 text-white border-purple-400/40'
                         : thumbItem.statusBadge === 'RECIÉN AÑADIDA' || thumbItem.statusBadge === 'NUEVO'
@@ -354,16 +302,16 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                     </span>
 
                     {/* Badge Superior Derecho: Calificación */}
-                    <span className="absolute top-1.5 right-1.5 z-10 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-sm border border-white/10 text-[9px] font-black text-amber-300">
+                    <span className="absolute top-1 right-1 z-10 px-1 py-0.2 rounded bg-black/70 backdrop-blur-sm border border-white/10 text-[8px] font-black text-amber-300">
                       ★ {thumbItem.rating || '8.2'}
                     </span>
 
                     {/* Título y Año en degradado inferior */}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-1.5 pt-6 flex flex-col justify-end">
-                      <span className="text-[10px] md:text-[11px] font-bold text-white truncate drop-shadow leading-tight">
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-1 pt-4 flex flex-col justify-end">
+                      <span className="text-[9px] md:text-[10px] font-bold text-white truncate drop-shadow leading-tight">
                         {thumbItem.title}
                       </span>
-                      <span className="text-[8px] md:text-[9px] text-zinc-400 font-semibold truncate mt-0.5">
+                      <span className="text-[7px] md:text-[8px] text-zinc-400 font-semibold truncate mt-0.5">
                         {thumbItem.releaseDateText || thumbItem.year || '2026'}
                       </span>
                     </div>

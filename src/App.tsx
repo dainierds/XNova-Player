@@ -35,7 +35,7 @@ import { HoldProgressIndicator } from './components/common/HoldProgressIndicator
 import { InitialSyncOverlay } from './components/common/InitialSyncOverlay';
 import { CatalogCacheService } from './services/catalogCacheService';
 
-type FocusSection = 'sidebar' | 'hero_buttons' | 'thumbnails';
+type FocusSection = 'sidebar' | 'thumbnails';
 
 export function App() {
   const { currentUser, isAuthenticated, isAdmin, initializeAuth, login } = useAuthStore();
@@ -67,7 +67,6 @@ export function App() {
   const [activeTab, setActiveTab] = useState<SidebarTabId>('movies');
   const [focusedTab, setFocusedTab] = useState<SidebarTabId>('movies');
   const [focusedZone, setFocusedZone] = useState<FocusSection>('sidebar');
-  const [heroBtnIndex, setHeroBtnIndex] = useState(0); // 0: Watch now, 1: Favorite, 2: Trailer
   const [explorerSelectedItem, setExplorerSelectedItem] = useState<any | null>(null);
   
   // Hook de favoritos persistidos en IndexedDB
@@ -441,6 +440,7 @@ export function App() {
     });
     setIsTrailerOpen(true);
   };
+  void handleOpenTrailer;
 
   // Temporizador de rotación automática estilo carrusel (6 segundos)
   const autoPlayTimerRef = useRef<number | null>(null);
@@ -623,12 +623,6 @@ export function App() {
             } else {
               setCarouselIndex(carouselIndex - 1);
             }
-          } else if (focusedZone === 'hero_buttons') {
-            if (heroBtnIndex > 0) {
-              setHeroBtnIndex(heroBtnIndex - 1);
-            } else {
-              setFocusedZone('sidebar');
-            }
           }
           break;
 
@@ -643,10 +637,6 @@ export function App() {
             } else if (carouselIndex >= 10 && carouselIndex < currentCatalog.length - 1) {
               // En Fila 2 (10..19): avanzar hasta el final
               setCarouselIndex(carouselIndex + 1);
-            }
-          } else if (focusedZone === 'hero_buttons') {
-            if (heroBtnIndex < 2) {
-              setHeroBtnIndex(heroBtnIndex + 1);
             }
           }
           break;
@@ -665,9 +655,6 @@ export function App() {
             if (carouselIndex >= 10) {
               // Subir de la Fila 2 a la Fila 1 en la misma columna
               setCarouselIndex(carouselIndex - 10);
-            } else {
-              // Subir de la Fila 1 a los botones del Hero
-              setFocusedZone('hero_buttons');
             }
           }
           break;
@@ -682,12 +669,6 @@ export function App() {
               setFocusedTab(nextTab);
               setActiveTab(nextTab);
             }
-          } else if (focusedZone === 'hero_buttons') {
-            // Bajar de los botones a la Fila 1
-            setFocusedZone('thumbnails');
-            if (carouselIndex >= 10) {
-              setCarouselIndex(carouselIndex % 10);
-            }
           } else if (focusedZone === 'thumbnails') {
             // Si está en la Fila 1 (0..9) y existe la Fila 2 (más de 10 elementos):
             if (carouselIndex < 10 && currentCatalog.length > 10) {
@@ -700,13 +681,7 @@ export function App() {
         // --- ENTER / OK ---
         case 'Enter':
         case ' ':
-          if (focusedZone === 'hero_buttons') {
-            if (heroBtnIndex === 0) {
-              handlePlayShowcaseItem(activeItem);
-            } else {
-              handleOpenTrailer(activeItem);
-            }
-          } else if (focusedZone === 'thumbnails') {
+          if (focusedZone === 'thumbnails') {
             handlePlayShowcaseItem(activeItem);
           } else if (focusedZone === 'sidebar') {
             if (focusedTab === 'settings') {
@@ -771,25 +746,7 @@ export function App() {
         }
 
         // Si fue pulsación corta:
-        if (focusedZone === 'hero_buttons') {
-          if (heroBtnIndex === 0) {
-            handlePlayShowcaseItem(activeItem);
-          } else if (heroBtnIndex === 1) {
-            toggleFavorite({
-              id: activeItem.id,
-              title: activeItem.title,
-              type: activeItem.type || 'movie',
-              posterUrl: activeItem.thumbnailUrl,
-              backdropUrl: activeItem.backdropUrl,
-              streamUrl: activeItem.streamUrl,
-              year: activeItem.year,
-              rating: activeItem.rating,
-              genresText: activeItem.genresText,
-            });
-          } else if (heroBtnIndex === 2) {
-            handleOpenTrailer(activeItem);
-          }
-        } else if (focusedZone === 'thumbnails') {
+        if (focusedZone === 'thumbnails') {
           handlePlayShowcaseItem(activeItem);
         }
       }
@@ -807,7 +764,6 @@ export function App() {
     activeTheme,
     focusedZone,
     carouselIndex,
-    heroBtnIndex,
     focusedTab,
     currentCatalog.length,
     activeItem,
@@ -975,33 +931,13 @@ export function App() {
                 item={activeItem}
                 items={currentCatalog}
                 selectedIndex={carouselIndex}
-                focusedZone={
-                  focusedZone === 'hero_buttons'
-                    ? 'hero_buttons'
-                    : 'thumbnails'
-                }
-                heroButtonIndex={heroBtnIndex}
-                isFavorite={isFavorite(activeItem.id)}
+                isSidebarFocused={focusedZone === 'sidebar'}
                 activeTab={activeTab}
-                onToggleFavorite={() => {
-                  toggleFavorite({
-                    id: activeItem.id,
-                    title: activeItem.title,
-                    type: activeItem.type || 'movie',
-                    posterUrl: activeItem.thumbnailUrl,
-                    backdropUrl: activeItem.backdropUrl,
-                    streamUrl: activeItem.streamUrl,
-                    year: activeItem.year,
-                    rating: activeItem.rating,
-                    genresText: activeItem.genresText,
-                  });
-                }}
                 onSelectThumbnail={(idx) => {
                   setCarouselIndex(idx);
                   setFocusedZone('thumbnails');
                 }}
                 onPlay={() => handlePlayShowcaseItem(activeItem)}
-                onOpenTrailer={() => handleOpenTrailer(activeItem)}
               />
             </div>
           </>
