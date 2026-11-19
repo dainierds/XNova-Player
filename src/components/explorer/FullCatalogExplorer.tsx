@@ -548,9 +548,11 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     }
 
     if (immediate) {
+      PosterResolutionService.clearQueue();
       setSelectedCategoryId(catId);
     } else {
       categoryDebounceTimerRef.current = setTimeout(() => {
+        PosterResolutionService.clearQueue();
         setSelectedCategoryId(catId);
       }, 40);
     }
@@ -1202,11 +1204,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     return () => window.removeEventListener('contextmenu', handleContextMenu, true);
   }, [isActive, openQuickMenu]);
 
-  // Al cambiar la búsqueda o categoría, cancelar descargas obsoletas y restablecer el foco y scroll al inicio
+  // Al cambiar la búsqueda o categoría, restablecer el foco y scroll al inicio
   useEffect(() => {
-    // 🚀 Opción 2: Cancelación inmediata de imágenes y peticiones TMDb de la carpeta previa
     ImagePreloadService.cancelAllPending();
-    PosterResolutionService.clearQueue();
 
     setScrollRow(0);
     setFocusedGridIndex(0);

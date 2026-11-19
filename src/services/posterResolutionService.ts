@@ -42,7 +42,8 @@ class PosterResolutionEngine {
   public cleanTitle(raw: string): string {
     if (!raw) return '';
     return raw
-      .replace(/^[★☆✦✧✪✫■◆▶►●•|»›\-_\s]*PLEX[\s»›|:\-★☆✦✧✪✫■◆▶►●•]*/gi, '')
+      .replace(/^[★☆✦✧✪✫■◆▶►●•|»›\-_\s]*PLEX(?:\s*\d{4})?[\s»›|:\-★☆✦✧✪✫■◆▶►●•]*/gi, '')
+      .replace(/^\[PLEX(?:\s*\d{4})?\]\s*/gi, '')
       .replace(/^[★☆✦✧✪✫■◆▶►●•\s|»›\-]+/g, '')
       .replace(/«.*?»|\[.*?\]|\(.*?\)|<.*?>/g, '')
       .replace(/\b(4k|2160p|1080p|720p|480p|fhd|hd|latino|castellano|sub|subtitulado|esp|eng|dual|p2p|plex|vod|promo|60fps)\b/gi, ' ')
@@ -59,7 +60,8 @@ class PosterResolutionEngine {
     const clean = this.cleanTitle(rawTitle);
     if (!clean) return null;
     const cacheKey = `poster_tmdb_${clean.toLowerCase()}`;
-    return this.memoryCache.get(cacheKey) || null;
+    const cached = this.memoryCache.get(cacheKey);
+    return (cached && cached.startsWith('http')) ? cached : null;
   }
 
   /**
@@ -73,9 +75,10 @@ class PosterResolutionEngine {
 
     const cacheKey = `poster_tmdb_${clean.toLowerCase()}`;
 
-    // 1. Comprobar memoria RAM (0ms)
-    if (this.memoryCache.has(cacheKey)) {
-      return this.memoryCache.get(cacheKey)!;
+    // 1. Comprobar memoria RAM (0ms) - solo si contiene una URL válida http
+    const cachedMem = this.memoryCache.get(cacheKey);
+    if (cachedMem && cachedMem.startsWith('http')) {
+      return cachedMem;
     }
 
     // 2. Si ya hay una resolución en curso para este título, devolver la misma promesa
@@ -87,7 +90,7 @@ class PosterResolutionEngine {
       // 3. Comprobar almacenamiento persistente IndexedDB (1-3ms)
       try {
         const persisted = await get<string>(cacheKey);
-        if (persisted) {
+        if (persisted && typeof persisted === 'string' && persisted.startsWith('http')) {
           this.memoryCache.set(cacheKey, persisted);
           return persisted;
         }
@@ -101,8 +104,11 @@ class PosterResolutionEngine {
           title: clean,
           fallbackUrl,
           resolve: (url) => {
-            this.memoryCache.set(cacheKey, url);
-            set(cacheKey, url).catch(() => {});
+            // Solo persistir si es una URL válida de imagen, nunca cadenas vacías
+            if (url && typeof url === 'string' && url.startsWith('http')) {
+              this.memoryCache.set(cacheKey, url);
+              set(cacheKey, url).catch(() => {});
+            }
             resolve(url);
           },
         });
