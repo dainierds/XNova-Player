@@ -37,13 +37,16 @@ class PosterResolutionEngine {
   }
 
   /**
-   * Limpia marcas de agua, grupos P2P y tags técnicos de IPTV
+   * Limpia marcas de agua, grupos P2P, etiquetas PLEX y tags técnicos de IPTV
    */
   public cleanTitle(raw: string): string {
     if (!raw) return '';
     return raw
+      .replace(/^[★☆✦✧✪✫■◆▶►●•|»›\-_\s]*PLEX[\s»›|:\-★☆✦✧✪✫■◆▶►●•]*/gi, '')
+      .replace(/^[★☆✦✧✪✫■◆▶►●•\s|»›\-]+/g, '')
       .replace(/«.*?»|\[.*?\]|\(.*?\)|<.*?>/g, '')
-      .replace(/\b(4k|2160p|1080p|720p|480p|fhd|hd|latino|castellano|sub|esp|eng|dual|p2p|plex|vod|promo)\b/gi, ' ')
+      .replace(/\b(4k|2160p|1080p|720p|480p|fhd|hd|latino|castellano|sub|subtitulado|esp|eng|dual|p2p|plex|vod|promo|60fps)\b/gi, ' ')
+      .replace(/[★☆✦✧✪✫■◆▶►●•«»›‹|]/g, ' ')
       .replace(/[-_.:]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ShowcaseItem, SidebarTabId } from '../../types/showcase';
 import { Play, Heart, Film } from 'lucide-react';
+import { PosterResolutionService } from '../../services/posterResolutionService';
 
 const FALLBACK_POSTER = 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?q=80&w=400';
 const FALLBACK_BACKDROP = 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=1920';
@@ -80,7 +81,12 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
           key={backdropSrc}
           src={backdropSrc}
           alt={item.title}
-          onError={() => setBackdropSrc(FALLBACK_BACKDROP)}
+          onError={() => {
+            PosterResolutionService.resolvePoster(item.title).then((url) => {
+              if (url && url !== FALLBACK_POSTER) setBackdropSrc(url);
+              else setBackdropSrc(FALLBACK_BACKDROP);
+            }).catch(() => setBackdropSrc(FALLBACK_BACKDROP));
+          }}
           className="w-full h-full object-cover object-right-top transition-opacity duration-500 ease-out opacity-90 animate-fadeIn"
         />
 
@@ -233,12 +239,23 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                   `}
                 >
                   <img
-                    src={thumbItem.thumbnailUrl || FALLBACK_POSTER}
+                    src={thumbItem.thumbnailUrl || PosterResolutionService.getCachedPoster(thumbItem.title) || FALLBACK_POSTER}
                     alt={thumbItem.title}
                     loading="lazy"
                     onError={(e) => {
                       const target = e.currentTarget;
-                      if (target.src !== FALLBACK_POSTER) {
+                      if (!target.dataset.resolved) {
+                        target.dataset.resolved = 'true';
+                        PosterResolutionService.resolvePoster(thumbItem.title).then((resolvedUrl) => {
+                          if (resolvedUrl && resolvedUrl !== FALLBACK_POSTER) {
+                            target.src = resolvedUrl;
+                          } else {
+                            target.src = FALLBACK_POSTER;
+                          }
+                        }).catch(() => {
+                          target.src = FALLBACK_POSTER;
+                        });
+                      } else if (target.src !== FALLBACK_POSTER) {
                         target.src = FALLBACK_POSTER;
                       }
                     }}
@@ -302,12 +319,23 @@ export const MainHeroStage: React.FC<MainHeroStageProps> = ({
                     `}
                   >
                     <img
-                      src={thumbItem.thumbnailUrl || FALLBACK_POSTER}
+                      src={thumbItem.thumbnailUrl || PosterResolutionService.getCachedPoster(thumbItem.title) || FALLBACK_POSTER}
                       alt={thumbItem.title}
                       loading="lazy"
                       onError={(e) => {
                         const target = e.currentTarget;
-                        if (target.src !== FALLBACK_POSTER) {
+                        if (!target.dataset.resolved) {
+                          target.dataset.resolved = 'true';
+                          PosterResolutionService.resolvePoster(thumbItem.title).then((resolvedUrl) => {
+                            if (resolvedUrl && resolvedUrl !== FALLBACK_POSTER) {
+                              target.src = resolvedUrl;
+                            } else {
+                              target.src = FALLBACK_POSTER;
+                            }
+                          }).catch(() => {
+                            target.src = FALLBACK_POSTER;
+                          });
+                        } else if (target.src !== FALLBACK_POSTER) {
                           target.src = FALLBACK_POSTER;
                         }
                       }}

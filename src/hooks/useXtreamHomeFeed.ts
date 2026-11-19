@@ -196,9 +196,9 @@ export function useXtreamHomeFeed(activePlaylist: PlaylistAccount | null): HomeF
         });
 
         // ─── PASO 5: ENRIQUECIMIENTO VISUAL CINEMÁTICO CON TMDB EN SEGUNDO PLANO ───
-        // Solo para mejorar imágenes y sinopsis sin alterar los streamUrls reales
-        Promise.allSettled(
-          realMovies.slice(0, 6).map(async (m) => {
+        // Mejora carátulas, sinopsis y fondos en los 20 ítems del Home Showcase
+        const movieEnrichment = Promise.allSettled(
+          realMovies.slice(0, 20).map(async (m) => {
             try {
               const tmdb = await TmdbService.enrichMovie(m.title);
               if (tmdb && !abortRef.current) {
@@ -211,12 +211,31 @@ export function useXtreamHomeFeed(activePlaylist: PlaylistAccount | null): HomeF
               // Mantener imágenes del proveedor
             }
           })
-        ).then(() => {
+        );
+
+        const seriesEnrichment = Promise.allSettled(
+          realSeries.slice(0, 20).map(async (s) => {
+            try {
+              const tmdb = await TmdbService.enrichSeries(s.title);
+              if (tmdb && !abortRef.current) {
+                if (tmdb.backdropUrl) s.backdropUrl = tmdb.backdropUrl;
+                if (tmdb.posterUrl) s.posterUrl = tmdb.posterUrl;
+                if (tmdb.synopsis && tmdb.synopsis.length > 20) s.synopsis = tmdb.synopsis;
+                if (tmdb.genres && tmdb.genres.length > 0) s.genres = tmdb.genres;
+              }
+            } catch {
+              // Mantener imágenes del proveedor
+            }
+          })
+        );
+
+        Promise.all([movieEnrichment, seriesEnrichment]).then(() => {
           if (!abortRef.current) {
             setState((prev) => ({
               ...prev,
               featured: realMovies,
               featuredMovies: realMovies,
+              featuredSeries: realSeries,
               recientes: realMovies.filter((i) => i.tag === 'ESTRENO'),
               tendencias: realMovies.filter((i) => i.tag === 'NUEVO'),
             }));
@@ -225,8 +244,8 @@ export function useXtreamHomeFeed(activePlaylist: PlaylistAccount | null): HomeF
 
         // Precarga de imágenes en memoria RAM
         const urlsToPreload = [
-          ...realMovies.slice(0, 6).flatMap((f) => [f.backdropUrl, f.posterUrl]),
-          ...realSeries.slice(0, 6).flatMap((f) => [f.backdropUrl, f.posterUrl]),
+          ...realMovies.slice(0, 20).flatMap((f) => [f.backdropUrl, f.posterUrl]),
+          ...realSeries.slice(0, 20).flatMap((f) => [f.backdropUrl, f.posterUrl]),
         ].filter((u): u is string => Boolean(u && u.startsWith('http')));
         ImagePreloadService.preloadBatch(urlsToPreload);
 

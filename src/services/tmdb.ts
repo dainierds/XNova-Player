@@ -42,9 +42,13 @@ export class TmdbService {
 
   public static cleanTitle(rawTitle: string): string {
     return rawTitle
+      .replace(/^[★☆✦✧✪✫■◆▶►●•|»›\-_\s]*PLEX[\s»›|:\-★☆✦✧✪✫■◆▶►●•]*/gi, '')
+      .replace(/^[★☆✦✧✪✫■◆▶►●•\s|»›\-]+/g, '')
       .replace(/\[.*?\]|\(.*?\)|«.*?»|<.*?>/g, '')
-      .replace(/\b(4K|2160p|1080p|720p|480p|HD|FHD|LATINO|CASTELLANO|SUB|ESP|P2P|PLEX|PROMO)\b/gi, '')
-      .replace(/\s{2,}/g, ' ')
+      .replace(/\b(4K|2160p|1080p|720p|480p|HD|FHD|LATINO|CASTELLANO|SUB|SUBTITULADO|ESP|ENG|DUAL|P2P|PLEX|VOD|PROMO|60FPS)\b/gi, ' ')
+      .replace(/[★☆✦✧✪✫■◆▶►●•«»›‹|]/g, ' ')
+      .replace(/[-_.:]/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
