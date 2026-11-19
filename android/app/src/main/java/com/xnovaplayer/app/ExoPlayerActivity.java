@@ -152,9 +152,12 @@ public class ExoPlayerActivity extends AppCompatActivity {
             playerView.setControllerShowTimeoutMs(3500);
 
             // Garantizar que al mostrar controles el foco siempre quede en el botón central de Play/Pausa
-            playerView.setControllerVisibilityListener((int visibility) -> {
-                if (visibility == View.VISIBLE) {
-                    focusCenterControl();
+            playerView.setControllerVisibilityListener(new PlayerView.ControllerVisibilityListener() {
+                @Override
+                public void onVisibilityChanged(int visibility) {
+                    if (visibility == View.VISIBLE) {
+                        focusCenterControl();
+                    }
                 }
             });
 
