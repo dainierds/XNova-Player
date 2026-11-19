@@ -126,29 +126,29 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
   }, [focusedElement, username, password, disabled]);
 
   return (
-    <div className="fixed inset-0 z-50 flex overflow-hidden select-none font-sans bg-[#0c0e14]">
+    <div className="fixed inset-0 z-50 flex overflow-hidden select-none font-sans bg-[#0A0E1A]">
 
       {/* ══════════════════════════════════════════════
           LISTÓN IZQUIERDO: Columna sólida de inicio de sesión
           Incrustado directamente en el fondo, sin imágenes detrás
           ══════════════════════════════════════════════ */}
-      <div className="w-[420px] shrink-0 h-full bg-[#0c0e14] z-20 flex flex-col justify-center px-11 relative">
+      <div className="w-[420px] shrink-0 h-full bg-[#0A0E1A] border-r border-white/10 z-20 flex flex-col justify-center px-11 relative">
 
-        {/* Logo oficial XNova (X roja con pata blanca) */}
+        {/* Logo oficial XNova (X en gradiente cyan/azul con pata blanca neón) */}
         <div className="flex items-center space-x-3 mb-6">
-          <svg className="w-10 h-10 drop-shadow-[0_0_12px_rgba(255,26,38,0.75)]" viewBox="0 0 100 100" fill="none">
-            {/* Trazo superior izquierdo al centro y a pata inferior izquierda (ROJO) */}
+          <svg className="w-10 h-10 drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]" viewBox="0 0 100 100" fill="none">
+            {/* Trazo superior izquierdo al centro y a pata inferior izquierda (CYAN ELÉCTRICO) */}
             <path
               d="M20 18 L50 50 L20 82"
-              stroke="#FF1A26"
+              stroke="#22D3EE"
               strokeWidth="14"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            {/* Trazo superior derecho al centro (ROJO) */}
+            {/* Trazo superior derecho al centro (AZUL ZAFIRO) */}
             <path
               d="M80 18 L50 50"
-              stroke="#FF1A26"
+              stroke="#2563EB"
               strokeWidth="14"
               strokeLinecap="round"
             />
@@ -164,9 +164,9 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
           <div className="flex flex-col">
             <span className="text-xl font-black tracking-wider text-white flex items-center gap-1.5">
               <span>XNOVA</span>
-              <span className="text-red-500 font-extrabold">PLAYER</span>
+              <span className="text-cyan-400 font-extrabold">PLAYER</span>
             </span>
-            <span className="text-[10px] tracking-widest uppercase text-zinc-400 font-semibold">
+            <span className="text-[10px] tracking-widest uppercase text-cyan-300/70 font-semibold">
               PREMIUM STREAMING
             </span>
           </div>
@@ -179,8 +179,8 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
 
         {/* Error */}
         {errorMessage && (
-          <div className="mb-4 flex items-center space-x-2 bg-red-700/30 border border-red-500/40 text-red-300 text-xs px-3 py-2.5 rounded-lg">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+          <div className="mb-4 flex items-center space-x-2 bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs px-3 py-2.5 rounded-lg">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
             <span className="flex-1">{errorMessage}</span>
           </div>
         )}
@@ -190,13 +190,13 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
           {/* Campo Usuario */}
           <div
             onClick={() => { setFocusedElement('username'); userInputRef.current?.focus(); }}
-            className={`flex items-center gap-3 px-4 py-3.5 rounded-lg cursor-pointer transition-all duration-150 ${
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-lg cursor-pointer transition-all duration-150 border ${
               focusedElement === 'username'
-                ? 'bg-zinc-700 ring-2 ring-white/60'
-                : 'bg-zinc-800/80 hover:bg-zinc-800'
+                ? 'bg-[#131F38] border-cyan-400 ring-2 ring-cyan-400/70 shadow-lg shadow-cyan-500/20'
+                : 'bg-[#0E172A]/80 border-white/10 hover:bg-[#131F38]/60 hover:border-white/20'
             }`}
           >
-            <User className="w-5 h-5 text-zinc-400 shrink-0" />
+            <User className={`w-5 h-5 shrink-0 ${focusedElement === 'username' ? 'text-cyan-400' : 'text-zinc-400'}`} />
             <input
               ref={userInputRef}
               type="text"
@@ -211,13 +211,13 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
           {/* Campo Contraseña */}
           <div
             onClick={() => { setFocusedElement('password'); passInputRef.current?.focus(); }}
-            className={`flex items-center gap-3 px-4 py-3.5 rounded-lg cursor-pointer transition-all duration-150 ${
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-lg cursor-pointer transition-all duration-150 border ${
               focusedElement === 'password' || focusedElement === 'toggle_eye'
-                ? 'bg-zinc-700 ring-2 ring-white/60'
-                : 'bg-zinc-800/80 hover:bg-zinc-800'
+                ? 'bg-[#131F38] border-cyan-400 ring-2 ring-cyan-400/70 shadow-lg shadow-cyan-500/20'
+                : 'bg-[#0E172A]/80 border-white/10 hover:bg-[#131F38]/60 hover:border-white/20'
             }`}
           >
-            <Lock className="w-5 h-5 text-zinc-400 shrink-0" />
+            <Lock className={`w-5 h-5 shrink-0 ${focusedElement === 'password' ? 'text-cyan-400' : 'text-zinc-400'}`} />
             <input
               ref={passInputRef}
               type={showPassword ? 'text' : 'password'}
@@ -231,14 +231,14 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
               type="button"
               onClick={(e) => { e.stopPropagation(); setShowPassword(p => !p); }}
               className={`p-1 rounded text-zinc-400 hover:text-white transition ${
-                focusedElement === 'toggle_eye' ? 'ring-2 ring-white/60 text-white' : ''
+                focusedElement === 'toggle_eye' ? 'ring-2 ring-cyan-400 text-cyan-300' : ''
               }`}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
 
-          {/* Botón rojo INICIAR SESIÓN */}
+          {/* Botón cyan/azul INICIAR SESIÓN */}
           <button
             type="button"
             onClick={handleSubmit}
@@ -247,8 +247,8 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
               w-full mt-2 py-3.5 rounded-lg font-black text-sm tracking-widest uppercase
               transition-all duration-150 flex items-center justify-center text-white
               ${focusedElement === 'submit'
-                ? 'bg-red-500 ring-4 ring-red-400/50 scale-[1.02] shadow-lg shadow-red-600/40'
-                : 'bg-red-600 hover:bg-red-500'}
+                ? 'bg-gradient-to-r from-cyan-400 to-blue-500 ring-4 ring-cyan-400/60 scale-[1.02] shadow-2xl shadow-cyan-500/50'
+                : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-950/50'}
             `}
           >
             {isLoading
@@ -259,11 +259,11 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
         </form>
 
         {/* Links */}
-        <div className="mt-6 flex flex-col items-center gap-2.5 text-xs text-white/80">
-          <button type="button" className="hover:underline hover:text-white transition">
+        <div className="mt-6 flex flex-col items-center gap-2.5 text-xs text-zinc-400">
+          <button type="button" className="hover:underline hover:text-cyan-300 transition">
             ¿Olvidé mi contraseña?
           </button>
-          <button type="button" className="hover:underline hover:text-white transition">
+          <button type="button" className="hover:underline hover:text-cyan-300 transition">
             Crear una cuenta
           </button>
         </div>
@@ -274,7 +274,7 @@ export const TvLoginScreen: React.FC<TvLoginScreenProps> = ({ onOpenAdminPanel, 
           ══════════════════════════════════════════════ */}
       <div className="flex-1 h-full relative overflow-hidden bg-black">
         {/* Degradado suave de desvanecimiento entre el listón y las películas */}
-        <div className="absolute left-0 top-0 bottom-0 w-40 bg-gradient-to-r from-[#0c0e14] via-[#0c0e14]/75 to-transparent z-10 pointer-events-none" />
+        <div className="absolute left-0 top-0 bottom-0 w-40 bg-gradient-to-r from-[#0A0E1A] via-[#0A0E1A]/80 to-transparent z-10 pointer-events-none" />
 
         <div
           className="w-full h-full overflow-hidden"
