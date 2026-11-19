@@ -60,6 +60,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
       if (percent !== undefined) setDownloadPercent(percent);
       if (installing) {
         setDownloadStatus('¡Descarga completa! Abriendo instalador de Android...');
+        // Si el sistema operativo no abrió el instalador o el usuario canceló, desbloquear para permitir reintento
+        setTimeout(() => {
+          setDownloading(false);
+          setDownloadStatus('Si el instalador no se abrió automáticamente, presiona Actualizar para reintentar.');
+        }, 6000);
       } else {
         setDownloadStatus(`Descargando actualización: ${percent}%`);
       }

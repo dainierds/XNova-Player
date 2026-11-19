@@ -199,7 +199,7 @@ public class MainActivity extends BridgeActivity {
                                 }
 
                                 int fileLength = conn.getContentLength();
-                                java.io.File cacheDir = getCacheDir();
+                                java.io.File cacheDir = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
                                 java.io.File apkFile = new java.io.File(cacheDir, "XNovaUpdate.apk");
                                 if (apkFile.exists()) {
                                     apkFile.delete();
@@ -233,6 +233,14 @@ public class MainActivity extends BridgeActivity {
                                 output.close();
                                 input.close();
 
+                                // Validar que el archivo descargado no esté vacío o incompleto (mínimo 1MB)
+                                if (!apkFile.exists() || apkFile.length() < 1000000) {
+                                    throw new java.io.IOException("El paquete descargado está incompleto o dañado. Por favor, reintenta.");
+                                }
+
+                                // Otorgar permisos de lectura al archivo para el instalador del sistema
+                                apkFile.setReadable(true, false);
+
                                 // Notificar que la descarga terminó y se abre el instalador
                                 runOnUiThread(() -> {
                                     webView.evaluateJavascript(
@@ -241,17 +249,30 @@ public class MainActivity extends BridgeActivity {
                                     );
                                 });
 
-                                // Si es Android 8+ y no tiene permiso para instalar apps desconocidas, solicitarlo
+                                // Si es Android 8+ y no tiene permiso para instalar apps desconocidas, solicitarlo y detener para no causar bloqueo
                                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                                     if (!getPackageManager().canRequestPackageInstalls()) {
-                                        Intent settingsIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
-                                        settingsIntent.setData(Uri.parse("package:" + getPackageName()));
-                                        settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                        startActivity(settingsIntent);
+                                        runOnUiThread(() -> {
+                                            webView.evaluateJavascript(
+                                                "window.dispatchEvent(new CustomEvent('native_update_error', { detail: { error: 'Debes conceder permiso para instalar apps desconocidas a XNova Player en Ajustes y luego volver a presionar Actualizar.' } }));",
+                                                null
+                                            );
+                                        });
+                                        try {
+                                            Intent settingsIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                                            settingsIntent.setData(Uri.parse("package:" + getPackageName()));
+                                            settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                            startActivity(settingsIntent);
+                                        } catch (Exception se) {
+                                            Intent fallbackSettings = new Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS);
+                                            fallbackSettings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                            startActivity(fallbackSettings);
+                                        }
+                                        return;
                                     }
                                 }
 
-                                // Invocar el instalador oficial del sistema operativo
+                                // Invocar el instalador oficial del sistema operativo con permisos completos
                                 Uri apkUri = androidx.core.content.FileProvider.getUriForFile(
                                     MainActivity.this,
                                     getPackageName() + ".fileprovider",
@@ -262,6 +283,22 @@ public class MainActivity extends BridgeActivity {
                                 installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
                                 installIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                 installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                installIntent.addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+
+                                // Otorgar permisos de lectura explícitos a todas las apps que puedan manejar la instalación
+                                java.util.List<android.content.pm.ResolveInfo> resolveInfoList = getPackageManager().queryIntentActivities(installIntent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+                                for (android.content.pm.ResolveInfo resolveInfo : resolveInfoList) {
+                                    try {
+                                        grantUriPermission(resolveInfo.activityInfo.packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                    } catch (Exception ignored) {}
+                                }
+                                try {
+                                    grantUriPermission("com.google.android.packageinstaller", apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                } catch (Exception ignored) {}
+                                try {
+                                    grantUriPermission("com.android.packageinstaller", apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                } catch (Exception ignored) {}
+
                                 startActivity(installIntent);
 
                             } catch (Exception e) {
