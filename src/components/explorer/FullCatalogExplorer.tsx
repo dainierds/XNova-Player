@@ -1524,8 +1524,40 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
         if (seasonKeys.length > 0) {
           const firstSeasonNum = Number(seasonKeys[0]) || 1;
+          const cleanTitle = (details.info?.name || series.name || (series as any).title || '').replace(/ - T\d+:?E\d+.*$/, '');
+          
+          // Enriquecimiento cinemático con metadatos reales de TMDb (sinopsis en español, backdrop y póster HD)
+          let tmdbMeta: any = null;
+          try {
+            tmdbMeta = await TmdbService.enrichSeries(cleanTitle, details.info?.cover || series.cover || (series as any).stream_icon || '');
+          } catch {
+            // Continuar con metadatos de Xtream si falla la red
+          }
+
+          const enrichedSeries: XtreamSeries = {
+            ...series,
+            num: 1,
+            name: details.info?.name || tmdbMeta?.title || series.name,
+            series_id: Number(seriesId) || series.series_id || 0,
+            cover: tmdbMeta?.posterUrl || details.info?.cover || series.cover || (series as any).stream_icon || '',
+            plot: (details.info?.plot && details.info.plot.trim().length > 10)
+              ? details.info.plot
+              : (tmdbMeta?.synopsis && !tmdbMeta.synopsis.toLowerCase().includes('disfruta de esta serie')
+                ? tmdbMeta.synopsis
+                : (details.info?.plot || series.plot || 'Disfruta de todos los capítulos y temporadas disponibles en tu catálogo.')),
+            cast: tmdbMeta?.cast || (details.info as any)?.cast || series.cast || '',
+            director: tmdbMeta?.director || (details.info as any)?.director || '',
+            genre: (details.info?.genre && details.info.genre.trim().length > 0)
+              ? details.info.genre
+              : (tmdbMeta?.genres?.join(', ') || series.genre || 'Serie TV'),
+            releaseDate: details.info?.releaseDate || tmdbMeta?.year || series.releaseDate || '2026',
+            rating: details.info?.rating || tmdbMeta?.rating || series.rating || '8.8',
+            backdrop_path: tmdbMeta?.backdropUrl ? [tmdbMeta.backdropUrl] : (details.info?.backdrop_path || []),
+            category_id: (details.info as any)?.category_id || series.category_id || '0',
+          } as any;
+
           setSelectedSeriesDetails({
-            series,
+            series: enrichedSeries,
             seasons: seasons.length > 0 ? seasons : seasonKeys.map((k) => ({
               season_number: Number(k),
               name: `Temporada ${k}`,
@@ -1733,7 +1765,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         e.preventDefault();
         e.stopPropagation();
         const seasonsList = selectedSeriesDetails.seasons || [];
-        const numEpisodeCols = 3;
+        const numEpisodeCols = 4;
 
         if (isOk) {
           if (seriesFocusZone === 'episodes' && currentSeasonEpisodes[focusedEpisodeIndex]) {
@@ -2753,7 +2785,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         const totalSeasons = selectedSeriesDetails.seasons.length;
 
         return (
-          <div className="fixed inset-0 z-60 bg-[#070A12] flex flex-col p-6 md:p-8 animate-fadeIn select-none overflow-hidden relative">
+          <div className="fixed inset-0 z-50 bg-[#070A12] flex flex-col p-6 md:p-8 animate-fadeIn select-none overflow-hidden">
             {/* 🌌 Gran Fondo Cinemático */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
               {finalBackdrop && (
@@ -2761,19 +2793,19 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                   src={normalizeMediaUrl(finalBackdrop, server)}
                   alt={title}
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover opacity-20 scale-105"
+                  className="w-full h-full object-cover opacity-40 scale-105 transition-all duration-700"
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-r from-[#070A12] via-[#070A12]/95 to-[#070A12]/80" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#070A12] via-[#070A12]/60 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#070A12] via-[#070A12]/85 to-[#070A12]/60" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#070A12] via-[#070A12]/75 to-transparent" />
             </div>
 
-            {/* 🎬 PARTE SUPERIOR: DETALLES, PÓSTER, PUNTUACIÓN Y SINOPSIS (IGUAL QUE EN PELÍCULAS) */}
-            <div className="relative z-10 flex items-start justify-between pb-3 border-b border-white/10 shrink-0">
-              <div className="flex items-start space-x-6 max-w-4xl">
-                {/* Póster oficial de la serie */}
+            {/* 🎬 PARTE SUPERIOR: PÓSTER, TÍTULO, BADGES, REPARTO Y SINOPSIS COMPLETA */}
+            <div className="relative z-10 flex items-start justify-between pb-4 border-b border-white/10 shrink-0">
+              <div className="flex items-start space-x-6 max-w-5xl">
+                {/* Póster oficial de la serie (visible siempre) */}
                 {cover && (
-                  <div className="w-24 sm:w-28 md:w-32 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shrink-0 bg-black/60 hidden sm:block">
+                  <div className="w-28 md:w-36 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shrink-0 bg-black/60 flex">
                     <img
                       src={normalizeMediaUrl(cover, server)}
                       alt={title}
@@ -2784,7 +2816,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                 )}
 
                 {/* Textos y Metadatos de la serie */}
-                <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="space-y-2 flex-1 min-w-0">
                   <h2 className="text-2xl md:text-3xl font-black text-white tracking-wide line-clamp-1 drop-shadow-md">
                     {title}
                   </h2>
@@ -2809,8 +2841,8 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                     </p>
                   )}
 
-                  {/* Sinopsis oficial de la serie */}
-                  <p className="text-xs text-zinc-300 leading-relaxed max-w-3xl line-clamp-2 md:line-clamp-3">
+                  {/* Sinopsis oficial de la serie (visible, amplia y cinematográfica) */}
+                  <p className="text-xs md:text-sm text-zinc-300 leading-relaxed max-w-4xl line-clamp-3 md:line-clamp-4">
                     {finalPlot}
                   </p>
                 </div>
@@ -2861,7 +2893,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             </div>
 
             {/* 🎞️ SELECTOR DE TEMPORADAS (PILLS COMPACTOS) */}
-            <div className="relative z-10 flex items-center space-x-2 py-2.5 shrink-0 border-b border-white/5 overflow-x-auto no-scrollbar">
+            <div className="relative z-10 flex items-center space-x-2 py-2 shrink-0 border-b border-white/5 overflow-x-auto no-scrollbar">
               {selectedSeriesDetails.seasons.map((season, sIdx) => {
                 const sNum = season.season_number || sIdx + 1;
                 const isSelected = selectedSeasonNumber === sNum;
@@ -2876,10 +2908,10 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                       setFocusedEpisodeIndex(0);
                       setSeriesFocusZone('episodes');
                     }}
-                    className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all ${
                       isSelected
-                        ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/40 font-black'
-                        : 'bg-[#131826] text-zinc-400 hover:text-white border border-white/10 font-bold'
+                        ? 'bg-cyan-500 text-black shadow-md shadow-cyan-500/40'
+                        : 'bg-[#131826] text-zinc-400 hover:text-white border border-white/10'
                     } ${isFocused ? 'ring-4 ring-cyan-300 scale-105 z-10' : ''}`}
                   >
                     {season.name || `Temporada ${sNum}`}
@@ -2888,9 +2920,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
               })}
             </div>
 
-            {/* 📺 GRILLA DE CAPÍTULOS MÁS PEQUEÑOS Y COMPACTOS */}
-            <div className="relative z-10 flex-1 overflow-y-auto pt-3 pb-6">
-              <div className="grid grid-cols-3 xl:grid-cols-4 gap-2.5">
+            {/* 📺 GRILLA DE CAPÍTULOS COMPACTOS (4 COLUMNAS, MÁS PEQUEÑOS Y DISCRETOS) */}
+            <div className="relative z-10 flex-1 overflow-y-auto pt-3 pb-4">
+              <div className="grid grid-cols-4 gap-2">
                 {currentSeasonEpisodes.map((ep, eIdx) => {
                   const isEpFocused = focusZone === 'series_modal' && seriesFocusZone === 'episodes' && focusedEpisodeIndex === eIdx;
 
@@ -2899,32 +2931,32 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
                       key={ep.id || eIdx}
                       ref={(el) => { episodeItemRefs.current[eIdx] = el; }}
                       onClick={() => playEpisode(ep)}
-                      className={`p-2.5 rounded-xl flex items-center space-x-3 cursor-pointer transition-all duration-150 border ${
+                      className={`px-2.5 py-2 rounded-xl flex items-center space-x-2.5 cursor-pointer transition-all duration-150 border ${
                         isEpFocused
-                          ? 'bg-gradient-to-r from-cyan-900/80 to-blue-900/80 border-cyan-400 ring-4 ring-cyan-400/50 scale-102 z-10 shadow-lg'
-                          : 'bg-[#0E1424] hover:bg-cyan-950/40 border-white/5'
+                          ? 'bg-gradient-to-r from-cyan-900/90 to-blue-900/90 border-cyan-400 ring-4 ring-cyan-400/50 scale-102 z-10 shadow-lg'
+                          : 'bg-[#0E1424]/90 hover:bg-cyan-950/40 border-white/5'
                       }`}
                     >
-                      {/* Número de episodio */}
-                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 font-black text-xs flex items-center justify-center shrink-0 border border-cyan-500/30">
+                      {/* Número de episodio mini */}
+                      <div className="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 font-black text-[11px] flex items-center justify-center shrink-0 border border-cyan-500/30">
                         {ep.episode_num || eIdx + 1}
                       </div>
 
-                      {/* Título de episodio */}
+                      {/* Título de episodio compacto */}
                       <div className="flex-1 min-w-0">
                         <h4 className={`text-xs font-bold truncate ${isEpFocused ? 'text-cyan-300 font-extrabold' : 'text-white'}`}>
-                          {ep.title || `Episodio ${ep.episode_num || eIdx + 1}`}
+                          {ep.title || `Capítulo ${ep.episode_num || eIdx + 1}`}
                         </h4>
                         {ep.info?.duration_secs ? (
-                          <span className="text-[10px] text-zinc-400">
+                          <span className="text-[10px] text-zinc-400 block -mt-0.5">
                             {Math.round(ep.info.duration_secs / 60)} min
                           </span>
                         ) : null}
                       </div>
 
-                      {/* Botón play compacto */}
-                      <div className={`p-1.5 rounded-full transition shrink-0 ${isEpFocused ? 'bg-cyan-400 text-black' : 'bg-white/10 text-white'}`}>
-                        <Play className="w-3 h-3 fill-current ml-0.5" />
+                      {/* Botón play mini */}
+                      <div className={`p-1 rounded-full transition shrink-0 ${isEpFocused ? 'bg-cyan-400 text-black' : 'bg-white/10 text-white'}`}>
+                        <Play className="w-2.5 h-2.5 fill-current ml-0.5" />
                       </div>
                     </div>
                   );
