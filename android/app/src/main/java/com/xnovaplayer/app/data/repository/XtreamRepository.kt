@@ -172,12 +172,12 @@ class XtreamRepository(
         if (url.isNullOrBlank()) return null
         var trimmed = url.trim()
         if (trimmed.startsWith("//")) return "https:$trimmed"
-        if (trimmed.startsWith("http://") && (trimmed.contains(":443") || baseUrl.startsWith("https://"))) {
+        if (trimmed.startsWith("http://") && (trimmed.contains(":443") || serverUrl.startsWith("https://"))) {
             trimmed = trimmed.replaceFirst("http://", "https://", ignoreCase = true)
         }
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
             val cleanPath = if (trimmed.startsWith("/")) trimmed else "/$trimmed"
-            return "${baseUrl.trimEnd('/')}$cleanPath"
+            return "${serverUrl.trimEnd('/')}$cleanPath"
         }
         return trimmed.replace(" ", "%20")
     }
