@@ -963,7 +963,7 @@ export function App() {
             />
 
             {/* 3. Escenario Principal: Barra Superior Limpia + Hero Stage Central */}
-            <div className="flex-1 h-full flex flex-col justify-between overflow-hidden">
+            <div className="relative flex-1 h-full flex flex-col justify-between overflow-hidden">
               {/* Barra Superior con Logo e Indicador de Suscripción */}
               <TopSearchBar
                 expDate={currentUser?.expDate || activePlaylist?.expDate || '2026-12-31'}

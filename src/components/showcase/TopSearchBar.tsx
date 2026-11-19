@@ -10,8 +10,8 @@ export const TopSearchBar: React.FC<TopSearchBarProps> = ({
   planBadge,
 }) => {
   return (
-    <header className="relative z-20 w-full px-8 py-2.5 flex items-center justify-end select-none bg-gradient-to-b from-black/80 via-black/30 to-transparent pointer-events-none">
-      {/* Indicadores Elegantes a la derecha: Estado de Suscripción y Vencimiento */}
+    <header className="absolute top-3.5 right-8 z-30 flex items-center justify-end select-none bg-transparent pointer-events-none">
+      {/* Indicadores Elegantes a la derecha: Estado de Suscripción y Vencimiento (Flotantes sin cintillo) */}
       <div className="flex items-center space-x-2.5 pointer-events-auto">
         <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-[11px] text-zinc-300 font-semibold tracking-wider shadow-sm">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400 animate-pulse" />
