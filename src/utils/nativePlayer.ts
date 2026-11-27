@@ -7,22 +7,37 @@ export const playWithNativePlayer = (item: {
   title: string;
   posterUrl?: string;
   isLive?: boolean;
+  seriesContext?: any;
+  liveContext?: any;
 }): boolean => {
   try {
     const bridge = (window as unknown as {
       ExoPlayerBridge?: {
-        playExoPlayer: (url: string, title: string, posterUrl: string, isLive: boolean) => void;
+        playExoPlayer: (url: string, title: string, posterUrl: string, isLive: boolean, seriesInfoJson?: string) => void;
         isAvailable: () => boolean;
       };
     }).ExoPlayerBridge;
 
     if (bridge && typeof bridge.playExoPlayer === 'function') {
-      bridge.playExoPlayer(
-        item.streamUrl,
-        item.title,
-        item.posterUrl || '',
-        !!item.isLive
-      );
+      const quickList = item.seriesContext || item.liveContext;
+      const quickListJson = quickList ? JSON.stringify(quickList) : '';
+      try {
+        bridge.playExoPlayer(
+          item.streamUrl,
+          item.title,
+          item.posterUrl || '',
+          !!item.isLive,
+          quickListJson
+        );
+      } catch {
+        // Fallback si la versión nativa anterior solo aceptaba 4 argumentos
+        (bridge.playExoPlayer as any)(
+          item.streamUrl,
+          item.title,
+          item.posterUrl || '',
+          !!item.isLive
+        );
+      }
       return true;
     }
   } catch (err) {

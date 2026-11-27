@@ -7,6 +7,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -24,6 +25,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.extractor.DefaultExtractorsFactory;
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory;
 import androidx.media3.ui.PlayerView;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 @OptIn(markerClass = UnstableApi.class)
 public class ExoPlayerActivity extends AppCompatActivity {
@@ -41,6 +44,12 @@ public class ExoPlayerActivity extends AppCompatActivity {
     private boolean hasTriedExtensionFallback = false;
     private boolean hasTriedVlcFallback = false;
 
+    private String seriesInfoJson = "";
+    private String currentEpisodeId = "";
+    private LinearLayout llEpisodesList;
+    private HorizontalScrollView hsvEpisodes;
+    private LinearLayout episodesContainer;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,6 +62,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
             streamUrl = intent.getStringExtra("url");
             title = intent.getStringExtra("title");
             isLive = intent.getBooleanExtra("isLive", false);
+            seriesInfoJson = intent.getStringExtra("seriesInfoJson");
         }
 
         // Vincular vistas de la pantalla
@@ -106,10 +116,271 @@ public class ExoPlayerActivity extends AppCompatActivity {
             tvTitle.setText(title);
         }
 
-        // Ocultar barra de tiempo si es emisión en directo
+        // Ocultar barra de tiempo solo si es emisión en directo Y no hay lista rápida de canales
         View bottomBar = playerView.findViewById(R.id.bottom_bar);
-        if (bottomBar != null && isLive) {
+        if (bottomBar != null && isLive && (seriesInfoJson == null || seriesInfoJson.isEmpty())) {
             bottomBar.setVisibility(View.GONE);
+        }
+
+        // Configurar carrusel de capítulos o canales de TV
+        if (seriesInfoJson != null && !seriesInfoJson.isEmpty()) {
+            setupSeriesEpisodes(seriesInfoJson);
+        }
+    }
+
+    private void setupSeriesEpisodes(String json) {
+        if (playerView == null || json == null || json.isEmpty()) return;
+
+        try {
+            JSONObject obj = new JSONObject(json);
+
+            // 📺 CASO A: Canales de la Carpeta de TV en Vivo
+            if (obj.has("channels")) {
+                final String catName = obj.optString("categoryName", "Canales en Vivo");
+                currentEpisodeId = obj.optString("currentChannelId", "");
+                JSONArray chArray = obj.optJSONArray("channels");
+                if (chArray == null || chArray.length() == 0) return;
+
+                episodesContainer = playerView.findViewById(R.id.episodes_container);
+                hsvEpisodes = playerView.findViewById(R.id.hsv_episodes);
+                llEpisodesList = playerView.findViewById(R.id.ll_episodes_list);
+                TextView tvEpisodesHeader = playerView.findViewById(R.id.tv_episodes_header);
+
+                if (episodesContainer != null) {
+                    episodesContainer.setVisibility(View.VISIBLE);
+                }
+                if (tvEpisodesHeader != null) {
+                    tvEpisodesHeader.setText("CARPETA: " + catName.toUpperCase() + " — " + chArray.length() + " CANALES");
+                }
+                if (llEpisodesList == null) return;
+                llEpisodesList.removeAllViews();
+
+                for (int i = 0; i < chArray.length(); i++) {
+                    JSONObject ch = chArray.getJSONObject(i);
+                    final String chId = ch.optString("id", String.valueOf(i + 1));
+                    final int chNum = ch.optInt("channelNumber", i + 1);
+                    final String chName = ch.optString("name", "Canal " + chNum);
+                    final String chUrl = ch.optString("streamUrl", "");
+
+                    LinearLayout itemLayout = new LinearLayout(this);
+                    itemLayout.setOrientation(LinearLayout.HORIZONTAL);
+                    itemLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                    itemLayout.setFocusable(true);
+                    itemLayout.setClickable(true);
+                    itemLayout.setBackgroundResource(R.drawable.bg_player_episode_item);
+                    itemLayout.setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8));
+
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                    );
+                    lp.setMarginEnd(dpToPx(8));
+                    itemLayout.setLayoutParams(lp);
+
+                    TextView tvNum = new TextView(this);
+                    tvNum.setTextSize(11);
+                    tvNum.setTypeface(null, android.graphics.Typeface.BOLD);
+                    tvNum.setPadding(0, 0, dpToPx(6), 0);
+
+                    TextView tvText = new TextView(this);
+                    tvText.setTextSize(12);
+                    tvText.setTypeface(null, android.graphics.Typeface.BOLD);
+                    tvText.setTextColor(getResources().getColorStateList(R.color.text_player_episode_selector, getTheme()));
+                    tvText.setText(chName);
+                    tvText.setMaxLines(1);
+                    tvText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+                    boolean isCurrent = chId.equals(currentEpisodeId);
+                    if (isCurrent) {
+                        tvNum.setText("▶");
+                        tvNum.setTextColor(android.graphics.Color.parseColor("#22D3EE"));
+                        itemLayout.setTag("current_ep");
+                    } else {
+                        tvNum.setText(String.valueOf(chNum));
+                        tvNum.setTextColor(android.graphics.Color.parseColor("#A1A1AA"));
+                        itemLayout.setTag(chId);
+                    }
+
+                    itemLayout.addView(tvNum);
+                    itemLayout.addView(tvText);
+
+                    itemLayout.setOnFocusChangeListener((v, hasFocus) -> {
+                        if (hasFocus) {
+                            v.setScaleX(1.04f);
+                            v.setScaleY(1.04f);
+                            if (hsvEpisodes != null) {
+                                int scrollTo = v.getLeft() - (hsvEpisodes.getWidth() / 2) + (v.getWidth() / 2);
+                                hsvEpisodes.smoothScrollTo(Math.max(0, scrollTo), 0);
+                            }
+                        } else {
+                            v.setScaleX(1.0f);
+                            v.setScaleY(1.0f);
+                        }
+                    });
+
+                    itemLayout.setOnClickListener(v -> {
+                        playNewEpisode(chUrl, chName, chId);
+                    });
+
+                    itemLayout.setNextFocusUpId(androidx.media3.ui.R.id.exo_progress);
+                    llEpisodesList.addView(itemLayout);
+                }
+                return;
+            }
+            final String seriesName = obj.optString("seriesName", "Serie");
+            final int seasonNum = obj.optInt("seasonNumber", 1);
+            currentEpisodeId = obj.optString("currentEpisodeId", "");
+            JSONArray epArray = obj.optJSONArray("episodes");
+            if (epArray == null || epArray.length() == 0) return;
+
+            episodesContainer = playerView.findViewById(R.id.episodes_container);
+            hsvEpisodes = playerView.findViewById(R.id.hsv_episodes);
+            llEpisodesList = playerView.findViewById(R.id.ll_episodes_list);
+            TextView tvEpisodesHeader = playerView.findViewById(R.id.tv_episodes_header);
+
+            if (episodesContainer != null) {
+                episodesContainer.setVisibility(View.VISIBLE);
+            }
+            if (tvEpisodesHeader != null) {
+                tvEpisodesHeader.setText("TEMPORADA " + seasonNum + " — " + epArray.length() + " CAPÍTULOS");
+            }
+            if (llEpisodesList == null) return;
+            llEpisodesList.removeAllViews();
+
+            for (int i = 0; i < epArray.length(); i++) {
+                JSONObject ep = epArray.getJSONObject(i);
+                final String epId = ep.optString("id", String.valueOf(i + 1));
+                final int epNum = ep.optInt("episodeNum", i + 1);
+                final String epTitle = ep.optString("title", "Capítulo " + epNum);
+                final String epUrl = ep.optString("streamUrl", "");
+                final String fullTitle = seriesName + " - T" + seasonNum + "E" + epNum + ": " + epTitle;
+
+                // Tarjeta de botón de cada capítulo
+                LinearLayout itemLayout = new LinearLayout(this);
+                itemLayout.setOrientation(LinearLayout.HORIZONTAL);
+                itemLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                itemLayout.setFocusable(true);
+                itemLayout.setClickable(true);
+                itemLayout.setBackgroundResource(R.drawable.bg_player_episode_item);
+                itemLayout.setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8));
+
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                lp.setMarginEnd(dpToPx(8));
+                itemLayout.setLayoutParams(lp);
+
+                TextView tvNum = new TextView(this);
+                tvNum.setTextSize(11);
+                tvNum.setTypeface(null, android.graphics.Typeface.BOLD);
+                tvNum.setPadding(0, 0, dpToPx(6), 0);
+
+                TextView tvText = new TextView(this);
+                tvText.setTextSize(12);
+                tvText.setTypeface(null, android.graphics.Typeface.BOLD);
+                tvText.setTextColor(getResources().getColorStateList(R.color.text_player_episode_selector, getTheme()));
+                tvText.setText("Cap. " + epNum + ": " + epTitle);
+                tvText.setMaxLines(1);
+                tvText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+                boolean isCurrent = epId.equals(currentEpisodeId);
+                if (isCurrent) {
+                    tvNum.setText("▶");
+                    tvNum.setTextColor(android.graphics.Color.parseColor("#22D3EE"));
+                    itemLayout.setTag("current_ep");
+                } else {
+                    tvNum.setText(String.valueOf(epNum));
+                    tvNum.setTextColor(android.graphics.Color.parseColor("#A1A1AA"));
+                    itemLayout.setTag(epId);
+                }
+
+                itemLayout.addView(tvNum);
+                itemLayout.addView(tvText);
+
+                // Auto-desplazamiento y escalado al recibir foco del mando
+                itemLayout.setOnFocusChangeListener((v, hasFocus) -> {
+                    if (hasFocus) {
+                        v.setScaleX(1.04f);
+                        v.setScaleY(1.04f);
+                        if (hsvEpisodes != null) {
+                            int scrollTo = v.getLeft() - (hsvEpisodes.getWidth() / 2) + (v.getWidth() / 2);
+                            hsvEpisodes.smoothScrollTo(Math.max(0, scrollTo), 0);
+                        }
+                    } else {
+                        v.setScaleX(1.0f);
+                        v.setScaleY(1.0f);
+                    }
+                });
+
+                // Reproducir el nuevo capítulo de inmediato sin salir del reproductor
+                itemLayout.setOnClickListener(v -> {
+                    playNewEpisode(epUrl, fullTitle, epId);
+                });
+
+                // Flecha arriba regresa a la barra de tiempo
+                itemLayout.setNextFocusUpId(androidx.media3.ui.R.id.exo_progress);
+
+                llEpisodesList.addView(itemLayout);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private int dpToPx(int dp) {
+        float density = getResources().getDisplayMetrics().density;
+        return Math.round(dp * density);
+    }
+
+    private void playNewEpisode(String newUrl, String newTitle, String newEpId) {
+        if (newUrl == null || newUrl.isEmpty()) return;
+        this.streamUrl = newUrl;
+        this.title = newTitle;
+        this.currentEpisodeId = newEpId;
+
+        // Actualizar título en la barra superior
+        if (playerView != null) {
+            TextView tvTitle = playerView.findViewById(R.id.tv_title);
+            if (tvTitle != null) {
+                tvTitle.setText(newTitle);
+            }
+        }
+
+        // Actualizar indicadores visuales en los capítulos
+        if (llEpisodesList != null) {
+            for (int i = 0; i < llEpisodesList.getChildCount(); i++) {
+                View child = llEpisodesList.getChildAt(i);
+                if (child instanceof LinearLayout) {
+                    LinearLayout epItem = (LinearLayout) child;
+                    TextView numView = (TextView) epItem.getChildAt(0);
+                    Object tag = epItem.getTag();
+                    if (newEpId.equals(tag) || (tag != null && tag.toString().equals("current_ep"))) {
+                        if (newEpId.equals(tag) || newEpId.equals(child.getContentDescription())) {
+                            numView.setText("▶");
+                            numView.setTextColor(android.graphics.Color.parseColor("#22D3EE"));
+                            epItem.setTag("current_ep");
+                        } else {
+                            numView.setText(String.valueOf(i + 1));
+                            numView.setTextColor(android.graphics.Color.parseColor("#A1A1AA"));
+                            epItem.setTag(newEpId);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Cargar y reproducir el nuevo stream en ExoPlayer sin salir
+        if (player != null) {
+            player.stop();
+            loadingSpinner.setVisibility(View.VISIBLE);
+            errorLayout.setVisibility(View.GONE);
+            MediaItem mediaItem = MediaItem.fromUri(newUrl);
+            player.setMediaItem(mediaItem);
+            player.prepare();
+            player.play();
+        } else {
+            initPlayer();
         }
     }
 
@@ -391,13 +662,42 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 return true;
 
             case KeyEvent.KEYCODE_DPAD_UP:
-            case KeyEvent.KEYCODE_DPAD_DOWN:
                 if (playerView != null && !playerView.isControllerFullyVisible()) {
                     if (event.getAction() == KeyEvent.ACTION_DOWN) {
                         playerView.showController();
                         focusCenterControl();
                     }
                     return true;
+                }
+                break;
+
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                if (playerView != null) {
+                    if (!playerView.isControllerFullyVisible()) {
+                        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                            playerView.showController();
+                            focusCenterControl();
+                        }
+                        return true;
+                    } else if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        // 📺 Si el foco está en la barra de tiempo o controles y toca Flecha Abajo:
+                        // Llevar el foco inmediatamente al carrusel de capítulos de la serie
+                        View focused = getCurrentFocus();
+                        if (focused != null && (focused.getId() == androidx.media3.ui.R.id.exo_progress || 
+                                                focused.getId() == R.id.bottom_bar ||
+                                                focused.getId() == androidx.media3.ui.R.id.exo_play ||
+                                                focused.getId() == androidx.media3.ui.R.id.exo_pause)) {
+                            if (llEpisodesList != null && llEpisodesList.getChildCount() > 0) {
+                                View currentEpView = llEpisodesList.findViewWithTag("current_ep");
+                                if (currentEpView != null) {
+                                    currentEpView.requestFocus();
+                                } else {
+                                    llEpisodesList.getChildAt(0).requestFocus();
+                                }
+                                return true;
+                            }
+                        }
+                    }
                 }
                 break;
         }

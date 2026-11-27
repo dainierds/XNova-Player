@@ -28,6 +28,7 @@ import { useAdminFeaturedStore, type FeaturedBadge } from '../../store/useAdminF
 import { useContinueWatchingStore } from '../../store/useContinueWatchingStore';
 import { QuickFavoriteModal, type QuickFavoriteItem } from '../common/QuickFavoriteModal';
 import { HoldProgressIndicator } from '../common/HoldProgressIndicator';
+import type { SeriesContextData, SeriesEpisodeData, LiveCategoryContextData, LiveChannelData } from '../../types/showcase';
 
 /**
  * Normaliza URLs de imágenes de servidores IPTV / Xtream Codes y TMDb
@@ -411,6 +412,8 @@ interface FullCatalogExplorerProps {
     streamUrl: string;
     posterUrl?: string;
     isLive?: boolean;
+    seriesContext?: SeriesContextData;
+    liveContext?: LiveCategoryContextData;
   }) => void;
   initialSelectedItem?: any | null;
 }
@@ -1478,12 +1481,39 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         ? (live as any).direct_source
         : XtreamService.buildLiveStreamUrl(server, user, pass, streamId, cleanExt));
 
+      // Obtener nombre de la carpeta / categoría actual
+      const currentCat = categories.find((c) => c.category_id === selectedCategoryId);
+      const catName = currentCat ? currentCat.category_name : 'Canales en Vivo';
+
+      // Construir lista de canales de la carpeta actual para navegación fluida dentro del reproductor
+      const channelList: LiveChannelData[] = (streams as XtreamStream[]).map((ch, idx) => {
+        const cId = (ch as any).stream_id ?? (ch as any).id ?? `ch_${idx}`;
+        const cRawExt = (ch as any).container_extension || (ch as any).extension || (ch as any).ext || 'ts';
+        const cCleanExt = String(cRawExt).replace(/^\.+/, '').trim() || 'ts';
+        const cUrl = (ch as any).streamUrl || ((ch as any).direct_source && String((ch as any).direct_source).startsWith('http')
+          ? (ch as any).direct_source
+          : XtreamService.buildLiveStreamUrl(server, user, pass, cId, cCleanExt));
+        return {
+          id: String(cId),
+          name: ch.name || (ch as any).title || `Canal ${idx + 1}`,
+          streamUrl: cUrl,
+          logoUrl: (ch as any).stream_icon || (ch as any).icon || (ch as any).logo,
+          channelNumber: (ch as any).num || idx + 1,
+        };
+      });
+
       onPlayStream({
         id: `live_${streamId}`,
         title: live.name || (live as any).title || 'Canal de TV',
         streamUrl,
         posterUrl: live.stream_icon || (live as any).icon,
         isLive: true,
+        liveContext: {
+          categoryId: selectedCategoryId,
+          categoryName: catName,
+          currentChannelId: String(streamId),
+          channels: channelList,
+        },
       });
     } else {
       // Para Series, abrir modal de episodios
@@ -1628,12 +1658,45 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
     console.log(`[Series Play] Serie: ${series.name}, Temporada: ${selectedSeasonNumber}, Ep: ${epNum}, ID: ${epId}, Ext: ${cleanExt}, URL: ${streamUrl}`);
 
+    // Construir lista estructurada de episodios para navegación dentro del reproductor de video
+    const seasonEps = (selectedSeriesDetails.episodes[String(selectedSeasonNumber)] || selectedSeriesDetails.episodes[selectedSeasonNumber] || []) as EpisodeItem[];
+    const epList: SeriesEpisodeData[] = seasonEps.map((ep, idx) => {
+      const eId = (ep as any).id ?? (ep as any).episode_id ?? (ep as any).stream_id ?? `ep_${idx}`;
+      const rExt = (ep as any).container_extension || 
+                   (ep as any).extension || 
+                   (ep as any).ext || 
+                   ep.info?.container_extension || 
+                   (ep.info as any)?.extension || 
+                   'mp4';
+      const cExt = String(rExt).replace(/^\.+/, '').trim() || 'mp4';
+      const url = (ep as any).direct_source && String((ep as any).direct_source).startsWith('http')
+        ? (ep as any).direct_source
+        : XtreamService.buildSeriesStreamUrl(server, user, pass, eId, cExt);
+      const num = ep.episode_num ?? (ep as any).num ?? (idx + 1);
+      return {
+        id: String(eId),
+        episodeNum: Number(num),
+        seasonNum: Number(selectedSeasonNumber),
+        title: ep.title || `Capítulo ${num}`,
+        streamUrl: url,
+        posterUrl: ep.info?.movie_image || series.cover,
+        duration: (ep.info as any)?.duration || (ep.info?.duration_secs ? `${Math.round(ep.info.duration_secs / 60)} min` : undefined)
+      };
+    });
+
     onPlayStream({
       id: `series_${epId}`,
       title: `${series.name} - T${selectedSeasonNumber}E${epNum}: ${epTitle}`,
       streamUrl,
       posterUrl: episode.info?.movie_image || series.cover,
       isLive: false,
+      seriesContext: {
+        seriesName: series.name,
+        seriesCover: series.cover,
+        seasonNumber: Number(selectedSeasonNumber),
+        currentEpisodeId: String(epId),
+        episodes: epList,
+      }
     });
   };
 

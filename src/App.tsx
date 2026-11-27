@@ -1048,6 +1048,8 @@ export function App() {
           posterUrl={playingItem.thumbnailUrl}
           contentId={playingItem.id}
           isLive={playingItem.duration === 'DIRECTO'}
+          seriesContext={playingItem.seriesContext}
+          liveContext={playingItem.liveContext}
           onClose={() => {
             // Al salir del reproductor, cerrar video y regresar con el foco seguro en la barra lateral
             setPlayingItem(null);
@@ -1126,6 +1128,8 @@ export function App() {
                 title: stream.title,
                 posterUrl: stream.posterUrl,
                 isLive: stream.isLive,
+                seriesContext: stream.seriesContext,
+                liveContext: stream.liveContext,
               })) {
                 return;
               }
@@ -1137,7 +1141,7 @@ export function App() {
                 subtitle: stream.title,
                 backdropUrl: stream.posterUrl || '',
                 thumbnailUrl: stream.posterUrl || '',
-                releaseDateText: stream.isLive ? 'En Directo' : 'Película',
+                releaseDateText: stream.isLive ? 'En Directo' : stream.seriesContext ? 'Serie' : 'Película',
                 statusBadge: 'NUEVO',
                 genresText: stream.isLive ? 'TV en Vivo' : 'Streaming',
                 year: '2026',
@@ -1146,6 +1150,8 @@ export function App() {
                 synopsis: 'Disfruta de tu contenido.',
                 type: stream.id.startsWith('series_') ? 'series' : 'movie',
                 streamUrl: stream.streamUrl,
+                seriesContext: stream.seriesContext,
+                liveContext: stream.liveContext,
               });
             }}
           />

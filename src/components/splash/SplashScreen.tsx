@@ -11,7 +11,6 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const [stage, setStage] = useState<SplashState>('video');
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasFinishedRef = useRef(false);
 
   // Finalizar splash de forma segura una sola vez
@@ -19,10 +18,6 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     if (hasFinishedRef.current) return;
     hasFinishedRef.current = true;
 
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
     if (videoRef.current) {
       videoRef.current.pause();
     }
@@ -30,21 +25,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     onFinish();
   }, [onFinish]);
 
-  // Manejar fallback a GIF y sonido independiente
+  // Manejar fallback a GIF (completamente silencioso, sin música)
   const handleFallbackToGif = useCallback(() => {
     setStage('fallback_gif');
-
-    // Intentar reproducir sonido de respaldo
-    try {
-      const audio = new Audio(BRANDING.assets.splashSound);
-      audio.volume = 1.0;
-      audio.play().catch((err) => {
-        console.warn('No se pudo reproducir audio de respaldo:', err);
-      });
-      audioRef.current = audio;
-    } catch (e) {
-      console.warn('Error al instanciar audio de respaldo:', e);
-    }
 
     // Salir después de 4.6 segundos (duración de la animación)
     window.setTimeout(() => {
@@ -60,19 +43,19 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     }, 2000);
   }, [completeSplash]);
 
-  // Intentar reproducir video con audio automáticamente al montar
+  // Reproducir video completamente silenciado al montar
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    video.muted = false;
-    video.volume = 1.0;
+    video.muted = true;
+    video.defaultMuted = true;
+    video.volume = 0;
 
     const playPromise = video.play();
     if (playPromise !== undefined) {
       playPromise.catch((err) => {
-        console.warn('Autoplay de video con audio bloqueado o no soportado:', err);
-        // Si falla por autoplay policy o formato, activar respaldo GIF + Audio
+        console.warn('Autoplay de video silenciado bloqueado o no soportado:', err);
         handleFallbackToGif();
       });
     }
@@ -111,6 +94,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           src={BRANDING.assets.splashVideo}
           playsInline
           autoPlay
+          muted
           preload="auto"
           poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%230A0E1A'/%3E%3C/svg%3E"
           onPlaying={() => setIsVideoPlaying(true)}

@@ -13,6 +13,7 @@ import {
 import { StorageService } from '../../services/storage';
 import { recordWatchItem } from '../../store/useContinueWatchingStore';
 import { openExternalPlayer } from '../../utils/externalPlayer';
+import type { SeriesContextData, SeriesEpisodeData, LiveCategoryContextData, LiveChannelData } from '../../types/showcase';
 
 interface VideoPlayerProps {
   streamUrl: string;
@@ -21,6 +22,8 @@ interface VideoPlayerProps {
   contentId: string;
   isLive?: boolean;
   channelNumber?: number;
+  seriesContext?: SeriesContextData;
+  liveContext?: LiveCategoryContextData;
   onClose: () => void;
   onNextChannel?: () => void;
   onPrevChannel?: () => void;
@@ -33,6 +36,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   contentId,
   isLive = false,
   channelNumber,
+  seriesContext,
+  liveContext,
   onClose,
   onNextChannel,
   onPrevChannel,
@@ -45,7 +50,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [errorFocus, setErrorFocus] = useState<'retry' | 'external' | 'back'>('external');
-  const currentStreamUrl = streamUrl;
+
+  // Estado dinámico para cambiar de capítulo o canal sin salir del reproductor
+  const [activeStreamUrl, setActiveStreamUrl] = useState(streamUrl);
+  const [activeTitle, setActiveTitle] = useState(title);
+  const [activeContentId, setActiveContentId] = useState(contentId);
+  const [activeEpisodeId, setActiveEpisodeId] = useState(seriesContext?.currentEpisodeId || '');
+  const [activeChannelId, setActiveChannelId] = useState(liveContext?.currentChannelId || '');
+  const [showEpisodesDrawer, setShowEpisodesDrawer] = useState(false);
+  const [focusedZone, setFocusedZone] = useState<'controls' | 'episodes' | 'channels'>('controls');
+  const [focusedEpisodeIdx, setFocusedEpisodeIdx] = useState(0);
+  const [focusedChannelIdx, setFocusedChannelIdx] = useState(0);
+  const episodeCardRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const channelCardRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
@@ -60,6 +78,61 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [subtitleTracks, setSubtitleTracks] = useState<{ id: number; name: string }[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<number>(-1); // -1 = desactivados
   const hideTimerRef = useRef<number | null>(null);
+
+  // Sincronizar cambios de props
+  useEffect(() => {
+    setActiveStreamUrl(streamUrl);
+    setActiveTitle(title);
+    setActiveContentId(contentId);
+    if (seriesContext?.currentEpisodeId) {
+      setActiveEpisodeId(seriesContext.currentEpisodeId);
+    }
+    if (liveContext?.currentChannelId) {
+      setActiveChannelId(liveContext.currentChannelId);
+    }
+  }, [streamUrl, title, contentId, seriesContext, liveContext]);
+
+  // Sincronizar índice inicial del episodio actual
+  useEffect(() => {
+    if (seriesContext?.episodes && activeEpisodeId) {
+      const idx = seriesContext.episodes.findIndex((e) => e.id === activeEpisodeId);
+      if (idx !== -1) {
+        setFocusedEpisodeIdx(idx);
+      }
+    }
+  }, [seriesContext, activeEpisodeId]);
+
+  // Sincronizar índice inicial del canal actual
+  useEffect(() => {
+    if (liveContext?.channels && activeChannelId) {
+      const idx = liveContext.channels.findIndex((c) => c.id === activeChannelId);
+      if (idx !== -1) {
+        setFocusedChannelIdx(idx);
+      }
+    }
+  }, [liveContext, activeChannelId]);
+
+  // Centrar automáticamente en pantalla el capítulo enfocado
+  useEffect(() => {
+    if (focusedZone === 'episodes' && showEpisodesDrawer) {
+      episodeCardRefs.current[focusedEpisodeIdx]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    }
+  }, [focusedEpisodeIdx, focusedZone, showEpisodesDrawer]);
+
+  // Centrar automáticamente en pantalla el canal enfocado
+  useEffect(() => {
+    if (focusedZone === 'channels' && showEpisodesDrawer) {
+      channelCardRefs.current[focusedChannelIdx]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    }
+  }, [focusedChannelIdx, focusedZone, showEpisodesDrawer]);
 
   useEffect(() => {
     containerRef.current?.focus();
@@ -102,6 +175,58 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  // Guardar progreso al salir o pausar
+  const saveProgress = useCallback(() => {
+    if (!videoRef.current) return;
+    const curTime = videoRef.current.currentTime;
+    const dur = duration > 0 ? duration : videoRef.current.duration || 0;
+
+    recordWatchItem({
+      id: activeContentId,
+      title: activeTitle,
+      posterUrl,
+      currentTime: curTime,
+      duration: dur,
+      streamUrl: activeStreamUrl,
+      type: isLive ? 'live' : 'movie',
+    });
+  }, [activeContentId, activeTitle, posterUrl, duration, activeStreamUrl, isLive]);
+
+  // Cambiar y reproducir un nuevo episodio directamente sin salir del reproductor
+  const playNewEpisode = useCallback(
+    (ep: SeriesEpisodeData) => {
+      saveProgress();
+      const newTitle = seriesContext?.seriesName
+        ? `${seriesContext.seriesName} - T${ep.seasonNum}E${ep.episodeNum}: ${ep.title}`
+        : ep.title;
+      setActiveStreamUrl(ep.streamUrl);
+      setActiveTitle(newTitle);
+      setActiveContentId(`series_${ep.id}`);
+      setActiveEpisodeId(ep.id);
+      setIsVideoReady(false);
+      setStreamError(null);
+      setCurrentTime(0);
+      resetHideTimer();
+    },
+    [saveProgress, seriesContext, resetHideTimer]
+  );
+
+  // Cambiar y sintonizar un nuevo canal directamente sin salir del reproductor
+  const playNewChannel = useCallback(
+    (ch: LiveChannelData) => {
+      saveProgress();
+      setActiveStreamUrl(ch.streamUrl);
+      setActiveTitle(ch.name);
+      setActiveContentId(`live_${ch.id}`);
+      setActiveChannelId(ch.id);
+      setIsVideoReady(false);
+      setStreamError(null);
+      setCurrentTime(0);
+      resetHideTimer();
+    },
+    [saveProgress, resetHideTimer]
+  );
+
   // Inicializar reproducción con HLS.js o video nativo
   useEffect(() => {
     const video = videoRef.current;
@@ -112,7 +237,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       hlsRef.current = null;
     }
 
-    const isHls = streamUrl.includes('.m3u8') || isLive;
+    const isHls = activeStreamUrl.includes('.m3u8') || isLive;
 
     if (isHls && Hls.isSupported()) {
       const hls = new Hls({
@@ -121,7 +246,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         backBufferLength: 60,
       });
 
-      hls.loadSource(streamUrl);
+      hls.loadSource(activeStreamUrl);
       hls.attachMedia(video);
       hlsRef.current = hls;
 
@@ -160,14 +285,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl') || !isHls) {
       // Reproducción nativa (Safari o MP4 directo)
-      video.src = streamUrl;
+      video.src = activeStreamUrl;
       video.play().catch(() => setIsPlaying(false));
     }
 
     // Cargar progreso previo si no es en vivo
     if (!isLive) {
       StorageService.getWatchProgress().then((list) => {
-        const item = list.find((p) => p.id === contentId);
+        const item = list.find((p) => p.id === activeContentId);
         if (item && item.currentTime > 10 && item.currentTime < item.duration - 30) {
           video.currentTime = item.currentTime;
         }
@@ -184,24 +309,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         clearTimeout(hideTimerRef.current);
       }
     };
-  }, [streamUrl, isLive, contentId, resetHideTimer]);
-
-  // Guardar progreso al salir o pausar
-  const saveProgress = useCallback(() => {
-    if (!videoRef.current) return;
-    const curTime = videoRef.current.currentTime;
-    const dur = duration > 0 ? duration : videoRef.current.duration || 0;
-
-    recordWatchItem({
-      id: contentId,
-      title,
-      posterUrl,
-      currentTime: curTime,
-      duration: dur,
-      streamUrl,
-      type: isLive ? 'live' : 'movie',
-    });
-  }, [contentId, title, posterUrl, duration, streamUrl, isLive]);
+  }, [activeStreamUrl, isLive, activeContentId, resetHideTimer]);
 
   // Alternar Reproducción / Pausa de manera infalible
   const handleTogglePlayPause = useCallback(() => {
@@ -282,7 +390,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   video.play().catch(() => {});
                 }
               } else if (errorFocus === 'external') {
-                openExternalPlayer(currentStreamUrl, title);
+                openExternalPlayer(activeStreamUrl, activeTitle);
               } else {
                 saveProgress();
                 onClose();
@@ -307,7 +415,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           e.preventDefault();
           e.stopPropagation();
           setShowControls(true);
-          setFocusedControl('play_pause');
+          if (e.key === 'ArrowDown') {
+            if (isLive && liveContext && liveContext.channels && liveContext.channels.length > 0) {
+              setShowEpisodesDrawer(true);
+              setFocusedZone('channels');
+            } else if (seriesContext && seriesContext.episodes && seriesContext.episodes.length > 0) {
+              setShowEpisodesDrawer(true);
+              setFocusedZone('episodes');
+            } else {
+              setFocusedZone('controls');
+              setFocusedControl('play_pause');
+            }
+          } else {
+            setFocusedZone('controls');
+            setFocusedControl('play_pause');
+          }
           resetHideTimer();
           return;
         } else if (e.key === 'ArrowLeft') {
@@ -342,6 +464,116 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       // Si los controles están visibles, mantenemos despierto el temporizador con cada pulsación
       resetHideTimer();
 
+      // 📺 NAVEGACIÓN D-PAD DENTRO DEL CARRUSEL DE CAPÍTULOS DE LA SERIE
+      if (focusedZone === 'episodes' && seriesContext && seriesContext.episodes && seriesContext.episodes.length > 0) {
+        if (isBack) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowEpisodesDrawer(false);
+          setFocusedZone('controls');
+          setFocusedControl('play_pause');
+          resetHideTimer();
+          return;
+        }
+
+        switch (e.key) {
+          case 'ArrowLeft':
+            e.preventDefault();
+            e.stopPropagation();
+            setFocusedEpisodeIdx((prev) => Math.max(0, prev - 1));
+            resetHideTimer();
+            return;
+
+          case 'ArrowRight':
+            e.preventDefault();
+            e.stopPropagation();
+            setFocusedEpisodeIdx((prev) => Math.min(seriesContext.episodes.length - 1, prev + 1));
+            resetHideTimer();
+            return;
+
+          case 'ArrowUp':
+            e.preventDefault();
+            e.stopPropagation();
+            setFocusedZone('controls');
+            setFocusedControl('play_pause');
+            resetHideTimer();
+            return;
+
+          case 'ArrowDown':
+            e.preventDefault();
+            e.stopPropagation();
+            resetHideTimer();
+            return;
+
+          default:
+            if (isOk) {
+              e.preventDefault();
+              e.stopPropagation();
+              const selectedEp = seriesContext.episodes[focusedEpisodeIdx];
+              if (selectedEp) {
+                playNewEpisode(selectedEp);
+              }
+              return;
+            }
+            break;
+        }
+      }
+
+      // 📺 NAVEGACIÓN D-PAD DENTRO DEL CARRUSEL DE CANALES DE TV EN VIVO
+      if (focusedZone === 'channels' && liveContext && liveContext.channels && liveContext.channels.length > 0) {
+        if (isBack) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowEpisodesDrawer(false);
+          setFocusedZone('controls');
+          setFocusedControl('play_pause');
+          resetHideTimer();
+          return;
+        }
+
+        switch (e.key) {
+          case 'ArrowLeft':
+            e.preventDefault();
+            e.stopPropagation();
+            setFocusedChannelIdx((prev) => Math.max(0, prev - 1));
+            resetHideTimer();
+            return;
+
+          case 'ArrowRight':
+            e.preventDefault();
+            e.stopPropagation();
+            setFocusedChannelIdx((prev) => Math.min(liveContext.channels.length - 1, prev + 1));
+            resetHideTimer();
+            return;
+
+          case 'ArrowUp':
+            e.preventDefault();
+            e.stopPropagation();
+            setFocusedZone('controls');
+            setFocusedControl('play_pause');
+            resetHideTimer();
+            return;
+
+          case 'ArrowDown':
+            e.preventDefault();
+            e.stopPropagation();
+            resetHideTimer();
+            return;
+
+          default:
+            if (isOk) {
+              e.preventDefault();
+              e.stopPropagation();
+              const selectedCh = liveContext.channels[focusedChannelIdx];
+              if (selectedCh) {
+                playNewChannel(selectedCh);
+              }
+              return;
+            }
+            break;
+        }
+      }
+
       if (isBack) {
         e.preventDefault();
         e.stopPropagation();
@@ -369,7 +601,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         case 'ArrowDown':
           e.preventDefault();
           e.stopPropagation();
-          if (isLive && onNextChannel) {
+          if (isLive && liveContext && liveContext.channels && liveContext.channels.length > 0) {
+            // 📺 Si es TV en vivo: mostrar carrusel de canales de la carpeta actual
+            setShowEpisodesDrawer(true);
+            setFocusedZone('channels');
+            setShowControls(true);
+            resetHideTimer();
+          } else if (seriesContext && seriesContext.episodes && seriesContext.episodes.length > 0) {
+            // 📺 Si es una serie: mostrar carrusel de capítulos y enfocar el episodio actual
+            setShowEpisodesDrawer(true);
+            setFocusedZone('episodes');
+            setShowControls(true);
+            resetHideTimer();
+          } else if (isLive && onNextChannel) {
             onNextChannel();
           } else {
             // Ocultar controles OSD inmediatamente para disfrutar a pantalla completa
@@ -596,7 +840,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </button>
 
             <button
-              onClick={() => openExternalPlayer(currentStreamUrl, title)}
+              onClick={() => openExternalPlayer(activeStreamUrl, activeTitle)}
               className={`px-8 py-3.5 rounded-2xl font-black text-sm transition-all duration-200 flex items-center space-x-2.5 ${
                 errorFocus === 'external'
                   ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-105 shadow-2xl shadow-cyan-400/60 z-10'
@@ -655,7 +899,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     CH {channelNumber}
                   </span>
                 )}
-                <h1 className="text-2xl font-black text-white drop-shadow-lg tracking-wide">{title}</h1>
+                <h1 className="text-2xl font-black text-white drop-shadow-lg tracking-wide">{activeTitle}</h1>
               </div>
             </div>
           </div>
@@ -669,8 +913,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         {/* Zona Inferior: Barra de Progreso y Controles (A todo lo ancho, fundida hacia arriba) */}
         <div className="w-full bg-gradient-to-t from-black/95 via-black/75 to-transparent px-10 pb-8 pt-16 flex flex-col space-y-4 pointer-events-auto">
-          {/* Barra de Progreso (Solo en VOD) */}
-          {!isLive && (
+          {/* Barra de Progreso (Solo en VOD) o Indicador En Directo */}
+          {!isLive ? (
             <div className="w-full flex items-center space-x-4">
               <span className="text-xs font-mono text-zinc-300">{formatTime(currentTime)}</span>
               <div className="flex-1 h-2 bg-zinc-700/60 rounded-full overflow-hidden relative">
@@ -680,6 +924,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 />
               </div>
               <span className="text-xs font-mono text-zinc-400">{formatTime(duration)}</span>
+            </div>
+          ) : (
+            <div className="w-full flex items-center justify-between py-1">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs font-black tracking-wider text-red-500 uppercase">
+                  EMISIÓN EN DIRECTO
+                </span>
+              </div>
+              {liveContext?.categoryName && (
+                <span className="text-xs font-bold text-zinc-400">
+                  Carpeta: {liveContext.categoryName}
+                </span>
+              )}
             </div>
           )}
 
@@ -810,6 +1068,120 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </button>
             </div>
           </div>
+
+          {/* 📺 Sugerencia y Carrusel Desplegable de Capítulos de Series (Flecha Abajo) */}
+          {seriesContext && seriesContext.episodes && seriesContext.episodes.length > 0 && (
+            <div className="w-full pt-3 pb-1 border-t border-white/10 mt-1 flex flex-col space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="text-xs font-black tracking-wide text-cyan-400">
+                    TEMPORADA {seriesContext.seasonNumber} — {seriesContext.episodes.length} CAPÍTULOS
+                  </span>
+                </div>
+                <span className="text-[11px] text-zinc-400 font-medium">
+                  {showEpisodesDrawer
+                    ? 'OK para reproducir • Flecha Arriba para volver'
+                    : '↓ Pulsa Flecha Abajo para ver los demás capítulos'}
+                </span>
+              </div>
+
+              {/* Contenedor de Capítulos en Fila Horizontal */}
+              {showEpisodesDrawer && (
+                <div className="flex items-center space-x-3 overflow-x-auto py-2 px-1 scrollbar-none">
+                  {seriesContext.episodes.map((ep, idx) => {
+                    const isCurrent = ep.id === activeEpisodeId;
+                    const isFocused = focusedZone === 'episodes' && focusedEpisodeIdx === idx;
+
+                    return (
+                      <button
+                        key={ep.id}
+                        ref={(el) => { episodeCardRefs.current[idx] = el; }}
+                        type="button"
+                        tabIndex={-1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playNewEpisode(ep);
+                        }}
+                        className={`flex-shrink-0 flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer border ${
+                          isFocused
+                            ? 'bg-cyan-400 text-black border-cyan-300 ring-4 ring-cyan-300 scale-105 shadow-xl shadow-cyan-400/50 z-20 font-black'
+                            : isCurrent
+                              ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/60 font-bold'
+                              : 'bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 border-white/10 font-medium'
+                        }`}
+                        style={{ minWidth: '180px', maxWidth: '260px' }}
+                      >
+                        <span className={`text-xs font-black ${isFocused ? 'text-black' : isCurrent ? 'text-cyan-400' : 'text-zinc-400'}`}>
+                          {isCurrent ? '▶ Ahora' : `Cap. ${ep.episodeNum}`}
+                        </span>
+                        <span className="text-xs truncate flex-1 text-left">
+                          {ep.title}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 📺 Sugerencia y Carrusel Desplegable de Canales de TV en Vivo (Flecha Abajo) */}
+          {isLive && liveContext && liveContext.channels && liveContext.channels.length > 0 && (
+            <div className="w-full pt-3 pb-1 border-t border-white/10 mt-1 flex flex-col space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-xs font-black tracking-wide text-cyan-400 uppercase">
+                    CARPETA: {liveContext.categoryName} — {liveContext.channels.length} CANALES
+                  </span>
+                </div>
+                <span className="text-[11px] text-zinc-400 font-medium">
+                  {showEpisodesDrawer
+                    ? 'OK para sintonizar • Flecha Arriba para volver'
+                    : '↓ Pulsa Flecha Abajo para ver los demás canales'}
+                </span>
+              </div>
+
+              {/* Contenedor de Canales en Fila Horizontal */}
+              {showEpisodesDrawer && (
+                <div className="flex items-center space-x-3 overflow-x-auto py-2 px-1 scrollbar-none">
+                  {liveContext.channels.map((ch, idx) => {
+                    const isCurrent = ch.id === activeChannelId;
+                    const isFocused = focusedZone === 'channels' && focusedChannelIdx === idx;
+
+                    return (
+                      <button
+                        key={ch.id}
+                        ref={(el) => { channelCardRefs.current[idx] = el; }}
+                        type="button"
+                        tabIndex={-1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playNewChannel(ch);
+                        }}
+                        className={`flex-shrink-0 flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer border ${
+                          isFocused
+                            ? 'bg-cyan-400 text-black border-cyan-300 ring-4 ring-cyan-300 scale-105 shadow-xl shadow-cyan-400/50 z-20 font-black'
+                            : isCurrent
+                              ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/60 font-bold'
+                              : 'bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 border-white/10 font-medium'
+                        }`}
+                        style={{ minWidth: '180px', maxWidth: '260px' }}
+                      >
+                        <span className={`text-xs font-black ${isFocused ? 'text-black' : isCurrent ? 'text-cyan-400' : 'text-zinc-400'}`}>
+                          {isCurrent ? '▶ Ahora' : `${ch.channelNumber || idx + 1}`}
+                        </span>
+                        <span className="text-xs truncate flex-1 text-left">
+                          {ch.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

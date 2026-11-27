@@ -1,3 +1,36 @@
+export interface SeriesEpisodeData {
+  id: string;
+  episodeNum: number;
+  seasonNum: number;
+  title: string;
+  streamUrl: string;
+  posterUrl?: string;
+  duration?: string;
+}
+
+export interface SeriesContextData {
+  seriesName: string;
+  seriesCover?: string;
+  seasonNumber: number;
+  currentEpisodeId: string;
+  episodes: SeriesEpisodeData[];
+}
+
+export interface LiveChannelData {
+  id: string;
+  name: string;
+  streamUrl: string;
+  logoUrl?: string;
+  channelNumber?: number;
+}
+
+export interface LiveCategoryContextData {
+  categoryId: string;
+  categoryName: string;
+  currentChannelId: string;
+  channels: LiveChannelData[];
+}
+
 export interface ShowcaseItem {
   id: string;
   title: string;
@@ -15,6 +48,8 @@ export interface ShowcaseItem {
   type: 'movie' | 'series' | 'live';
   trailerYoutubeKey?: string;
   tmdbId?: number | string;
+  seriesContext?: SeriesContextData;
+  liveContext?: LiveCategoryContextData;
 }
 
 export type SidebarTabId = 

@@ -77,12 +77,20 @@ public class MainActivity extends BridgeActivity {
                 webView.addJavascriptInterface(new Object() {
                     @JavascriptInterface
                     public void playExoPlayer(String url, String title, String posterUrl, boolean isLive) {
+                        playExoPlayer(url, title, posterUrl, isLive, null);
+                    }
+
+                    @JavascriptInterface
+                    public void playExoPlayer(String url, String title, String posterUrl, boolean isLive, String seriesInfoJson) {
                         try {
                             Intent intent = new Intent(MainActivity.this, ExoPlayerActivity.class);
                             intent.putExtra("url", url);
                             intent.putExtra("title", title);
                             intent.putExtra("posterUrl", posterUrl);
                             intent.putExtra("isLive", isLive);
+                            if (seriesInfoJson != null && !seriesInfoJson.isEmpty()) {
+                                intent.putExtra("seriesInfoJson", seriesInfoJson);
+                            }
                             startActivity(intent);
                         } catch (Exception e) {
                             e.printStackTrace();
