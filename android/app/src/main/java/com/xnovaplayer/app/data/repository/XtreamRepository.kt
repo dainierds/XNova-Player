@@ -3,6 +3,7 @@ package com.xnovaplayer.app.data.repository
 import com.xnovaplayer.app.data.api.XtreamApiService
 import com.xnovaplayer.app.data.api.XtreamClient
 import com.xnovaplayer.app.data.api.models.XtreamAuthResponse
+import com.xnovaplayer.app.data.api.models.XtreamCategoryDto
 import com.xnovaplayer.app.data.database.AppDatabase
 import com.xnovaplayer.app.data.database.entities.CategoryEntity
 import com.xnovaplayer.app.data.database.entities.ChannelEntity
@@ -53,7 +54,7 @@ class XtreamRepository(
 
     suspend fun syncCategories(type: String): Result<Int> = withContext(Dispatchers.IO) {
         try {
-            val dtoList = mutableListOf<com.xnovaplayer.app.data.api.models.CategoryDto>()
+            val dtoList = mutableListOf<com.xnovaplayer.app.data.api.models.XtreamCategoryDto>()
             val response = when (type) {
                 "movies" -> api.getVodCategories(username, password)
                 "series" -> api.getSeriesCategories(username, password)
@@ -81,7 +82,7 @@ class XtreamRepository(
                             }
                         }
                     }
-                } catch (_: Exception) {}
+                } catch (ignored: Exception) {}
             }
 
             if (dtoList.isNotEmpty() || response.isSuccessful) {
