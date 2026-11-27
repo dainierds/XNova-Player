@@ -190,12 +190,14 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Contenedor Desplegable de Capítulos de Series (Flecha Abajo) -->
+        <!-- Contenedor Desplegable de Capítulos de Series / Canales de TV (Flecha Abajo) -->
         <LinearLayout
             android:id="@+id/episodes_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:orientation="vertical"
             android:visibility="gone">
 
@@ -228,6 +230,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
+                android:clipChildren="false"
                 android:clipToPadding="false"
                 android:overScrollMode="never"
                 android:scrollbars="none">
@@ -236,8 +239,12 @@
                     android:id="@+id/ll_episodes_list"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal" />
+                    android:orientation="horizontal"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp" />
             </HorizontalScrollView>
         </LinearLayout>
 

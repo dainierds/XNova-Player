@@ -1,14 +1,20 @@
 package com.xnovaplayer.app;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewParent;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -128,6 +134,68 @@ public class ExoPlayerActivity extends AppCompatActivity {
         }
     }
 
+    private static final android.util.LruCache<String, Bitmap> logoCache = new android.util.LruCache<>(100);
+    private static final java.util.concurrent.ExecutorService logoExecutor = java.util.concurrent.Executors.newFixedThreadPool(4);
+
+    private void loadChannelLogo(String url, ImageView imageView, View fallbackView) {
+        if (url == null || url.trim().isEmpty()) {
+            imageView.setVisibility(View.GONE);
+            if (fallbackView != null) fallbackView.setVisibility(View.VISIBLE);
+            return;
+        }
+        Bitmap cached = logoCache.get(url);
+        if (cached != null) {
+            imageView.setImageBitmap(cached);
+            imageView.setVisibility(View.VISIBLE);
+            if (fallbackView != null) fallbackView.setVisibility(View.GONE);
+            return;
+        }
+        imageView.setTag(url);
+        logoExecutor.execute(() -> {
+            try {
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                conn.setInstanceFollowRedirects(true);
+                conn.setRequestProperty("User-Agent", "TiviMate/4.7.0 (Linux; Android 11)");
+                int responseCode = conn.getResponseCode();
+                if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                    java.io.InputStream is = conn.getInputStream();
+                    Bitmap bitmap = BitmapFactory.decodeStream(is);
+                    is.close();
+                    if (bitmap != null) {
+                        logoCache.put(url, bitmap);
+                        runOnUiThread(() -> {
+                            if (url.equals(imageView.getTag())) {
+                                imageView.setImageBitmap(bitmap);
+                                imageView.setVisibility(View.VISIBLE);
+                                if (fallbackView != null) fallbackView.setVisibility(View.GONE);
+                            }
+                        });
+                        return;
+                    }
+                }
+            } catch (Exception ignored) {}
+            runOnUiThread(() -> {
+                if (url.equals(imageView.getTag())) {
+                    imageView.setVisibility(View.GONE);
+                    if (fallbackView != null) fallbackView.setVisibility(View.VISIBLE);
+                }
+            });
+        });
+    }
+
+    private boolean isViewInCarousel(View view) {
+        if (view == null || llEpisodesList == null) return false;
+        ViewParent p = view.getParent();
+        while (p != null) {
+            if (p == llEpisodesList || p == hsvEpisodes) return true;
+            if (!(p instanceof View)) break;
+            p = ((View) p).getParent();
+        }
+        return false;
+    }
+
     private void setupSeriesEpisodes(String json) {
         if (playerView == null || json == null || json.isEmpty()) return;
 
@@ -150,64 +218,137 @@ public class ExoPlayerActivity extends AppCompatActivity {
                     episodesContainer.setVisibility(View.VISIBLE);
                 }
                 if (tvEpisodesHeader != null) {
-                    tvEpisodesHeader.setText("CARPETA: " + catName.toUpperCase() + " — " + chArray.length() + " CANALES");
+                    tvEpisodesHeader.setText("CARPETA: " + catName.toUpperCase() + " • " + chArray.length() + " CANALES");
                 }
                 if (llEpisodesList == null) return;
                 llEpisodesList.removeAllViews();
 
+                int prevId = -1;
                 for (int i = 0; i < chArray.length(); i++) {
                     JSONObject ch = chArray.getJSONObject(i);
                     final String chId = ch.optString("id", String.valueOf(i + 1));
                     final int chNum = ch.optInt("channelNumber", i + 1);
                     final String chName = ch.optString("name", "Canal " + chNum);
                     final String chUrl = ch.optString("streamUrl", "");
+                    final String chLogo = ch.optString("logoUrl", "");
 
+                    // Tarjeta de canal con dimensiones amplias y fondo semi-transparente
                     LinearLayout itemLayout = new LinearLayout(this);
                     itemLayout.setOrientation(LinearLayout.HORIZONTAL);
-                    itemLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                    itemLayout.setGravity(Gravity.CENTER_VERTICAL);
                     itemLayout.setFocusable(true);
                     itemLayout.setClickable(true);
                     itemLayout.setBackgroundResource(R.drawable.bg_player_episode_item);
-                    itemLayout.setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8));
+                    itemLayout.setPadding(dpToPx(10), dpToPx(8), dpToPx(12), dpToPx(8));
 
                     LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.WRAP_CONTENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT
+                            dpToPx(200),
+                            dpToPx(76)
                     );
-                    lp.setMarginEnd(dpToPx(8));
+                    lp.setMarginEnd(dpToPx(12));
                     itemLayout.setLayoutParams(lp);
 
-                    TextView tvNum = new TextView(this);
-                    tvNum.setTextSize(11);
-                    tvNum.setTypeface(null, android.graphics.Typeface.BOLD);
-                    tvNum.setPadding(0, 0, dpToPx(6), 0);
+                    // Conexión precisa de navegación D-pad horizontal entre canales
+                    int cardId = View.generateViewId();
+                    itemLayout.setId(cardId);
+                    if (prevId != -1) {
+                        itemLayout.setNextFocusLeftId(prevId);
+                        View prevCard = llEpisodesList.getChildAt(i - 1);
+                        if (prevCard != null) {
+                            prevCard.setNextFocusRightId(cardId);
+                        }
+                    }
+                    prevId = cardId;
+                    itemLayout.setNextFocusUpId(androidx.media3.ui.R.id.exo_play);
 
-                    TextView tvText = new TextView(this);
-                    tvText.setTextSize(12);
-                    tvText.setTypeface(null, android.graphics.Typeface.BOLD);
-                    tvText.setTextColor(getResources().getColorStateList(R.color.text_player_episode_selector, getTheme()));
-                    tvText.setText(chName);
-                    tvText.setMaxLines(1);
-                    tvText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    // Contenedor del Logo con esquinas redondeadas
+                    FrameLayout logoContainer = new FrameLayout(this);
+                    LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dpToPx(52), dpToPx(52));
+                    logoContainer.setLayoutParams(logoLp);
+
+                    android.graphics.drawable.GradientDrawable logoBg = new android.graphics.drawable.GradientDrawable();
+                    logoBg.setColor(android.graphics.Color.parseColor("#26FFFFFF"));
+                    logoBg.setCornerRadius(dpToPx(8));
+                    logoContainer.setBackground(logoBg);
+
+                    ImageView ivLogo = new ImageView(this);
+                    FrameLayout.LayoutParams ivLp = new FrameLayout.LayoutParams(dpToPx(46), dpToPx(46), Gravity.CENTER);
+                    ivLogo.setLayoutParams(ivLp);
+                    ivLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+
+                    TextView tvFallback = new TextView(this);
+                    FrameLayout.LayoutParams fbLp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+                    tvFallback.setLayoutParams(fbLp);
+                    tvFallback.setGravity(Gravity.CENTER);
+                    tvFallback.setText(String.valueOf(chNum));
+                    tvFallback.setTextSize(14);
+                    tvFallback.setTypeface(null, android.graphics.Typeface.BOLD);
+                    tvFallback.setTextColor(android.graphics.Color.parseColor("#22D3EE"));
+
+                    logoContainer.addView(tvFallback);
+                    logoContainer.addView(ivLogo);
+                    loadChannelLogo(chLogo, ivLogo, tvFallback);
+
+                    // Contenedor de Textos (Número, badge y Nombre de Canal)
+                    LinearLayout infoLayout = new LinearLayout(this);
+                    infoLayout.setOrientation(LinearLayout.VERTICAL);
+                    infoLayout.setGravity(Gravity.CENTER_VERTICAL);
+                    LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                    infoLp.setMarginStart(dpToPx(10));
+                    infoLayout.setLayoutParams(infoLp);
+
+                    // Fila superior: CH número y badge "EN VIVO"
+                    LinearLayout rowBadge = new LinearLayout(this);
+                    rowBadge.setOrientation(LinearLayout.HORIZONTAL);
+                    rowBadge.setGravity(Gravity.CENTER_VERTICAL);
+
+                    TextView tvNum = new TextView(this);
+                    tvNum.setTextSize(10);
+                    tvNum.setTypeface(null, android.graphics.Typeface.BOLD);
+                    tvNum.setTextColor(android.graphics.Color.parseColor("#A1A1AA"));
+                    tvNum.setText("CH " + chNum);
+                    rowBadge.addView(tvNum);
+
+                    TextView tvNow = new TextView(this);
+                    tvNow.setTextSize(9);
+                    tvNow.setTypeface(null, android.graphics.Typeface.BOLD);
+                    tvNow.setTextColor(android.graphics.Color.parseColor("#22D3EE"));
+                    tvNow.setText("• EN VIVO");
+                    tvNow.setPadding(dpToPx(6), 0, 0, 0);
+                    tvNow.setTag("badge_now");
 
                     boolean isCurrent = chId.equals(currentEpisodeId);
+                    tvNow.setVisibility(isCurrent ? View.VISIBLE : View.GONE);
+                    rowBadge.addView(tvNow);
+
+                    TextView tvName = new TextView(this);
+                    tvName.setTextSize(12);
+                    tvName.setTypeface(null, android.graphics.Typeface.BOLD);
+                    tvName.setTextColor(getResources().getColorStateList(R.color.text_player_episode_selector, getTheme()));
+                    tvName.setText(chName);
+                    tvName.setMaxLines(2);
+                    tvName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    tvName.setPadding(0, dpToPx(2), 0, 0);
+
+                    infoLayout.addView(rowBadge);
+                    infoLayout.addView(tvName);
+
+                    itemLayout.addView(logoContainer);
+                    itemLayout.addView(infoLayout);
+
+                    itemLayout.setContentDescription(chId);
                     if (isCurrent) {
-                        tvNum.setText("▶");
-                        tvNum.setTextColor(android.graphics.Color.parseColor("#22D3EE"));
                         itemLayout.setTag("current_ep");
                     } else {
-                        tvNum.setText(String.valueOf(chNum));
-                        tvNum.setTextColor(android.graphics.Color.parseColor("#A1A1AA"));
                         itemLayout.setTag(chId);
                     }
 
-                    itemLayout.addView(tvNum);
-                    itemLayout.addView(tvText);
-
+                    // Auto-desplazamiento suave y elevación al recibir foco del mando
                     itemLayout.setOnFocusChangeListener((v, hasFocus) -> {
                         if (hasFocus) {
-                            v.setScaleX(1.04f);
-                            v.setScaleY(1.04f);
+                            v.setScaleX(1.08f);
+                            v.setScaleY(1.08f);
+                            v.setElevation(dpToPx(8));
                             if (hsvEpisodes != null) {
                                 int scrollTo = v.getLeft() - (hsvEpisodes.getWidth() / 2) + (v.getWidth() / 2);
                                 hsvEpisodes.smoothScrollTo(Math.max(0, scrollTo), 0);
@@ -215,6 +356,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
                         } else {
                             v.setScaleX(1.0f);
                             v.setScaleY(1.0f);
+                            v.setElevation(0);
                         }
                     });
 
@@ -222,11 +364,11 @@ public class ExoPlayerActivity extends AppCompatActivity {
                         playNewEpisode(chUrl, chName, chId);
                     });
 
-                    itemLayout.setNextFocusUpId(androidx.media3.ui.R.id.exo_progress);
                     llEpisodesList.addView(itemLayout);
                 }
                 return;
             }
+
             final String seriesName = obj.optString("seriesName", "Serie");
             final int seasonNum = obj.optInt("seasonNumber", 1);
             currentEpisodeId = obj.optString("currentEpisodeId", "");
@@ -247,62 +389,131 @@ public class ExoPlayerActivity extends AppCompatActivity {
             if (llEpisodesList == null) return;
             llEpisodesList.removeAllViews();
 
+            int prevId = -1;
             for (int i = 0; i < epArray.length(); i++) {
                 JSONObject ep = epArray.getJSONObject(i);
                 final String epId = ep.optString("id", String.valueOf(i + 1));
                 final int epNum = ep.optInt("episodeNum", i + 1);
                 final String epTitle = ep.optString("title", "Capítulo " + epNum);
                 final String epUrl = ep.optString("streamUrl", "");
+                final String epPoster = ep.optString("posterUrl", "");
                 final String fullTitle = seriesName + " - T" + seasonNum + "E" + epNum + ": " + epTitle;
 
-                // Tarjeta de botón de cada capítulo
+                // Tarjeta de botón de cada capítulo con dimensiones amplias y estilo cinematográfico
                 LinearLayout itemLayout = new LinearLayout(this);
                 itemLayout.setOrientation(LinearLayout.HORIZONTAL);
-                itemLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                itemLayout.setGravity(Gravity.CENTER_VERTICAL);
                 itemLayout.setFocusable(true);
                 itemLayout.setClickable(true);
                 itemLayout.setBackgroundResource(R.drawable.bg_player_episode_item);
-                itemLayout.setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8));
+                itemLayout.setPadding(dpToPx(10), dpToPx(8), dpToPx(12), dpToPx(8));
 
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
+                        dpToPx(210),
+                        dpToPx(76)
                 );
-                lp.setMarginEnd(dpToPx(8));
+                lp.setMarginEnd(dpToPx(12));
                 itemLayout.setLayoutParams(lp);
 
+                int cardId = View.generateViewId();
+                itemLayout.setId(cardId);
+                if (prevId != -1) {
+                    itemLayout.setNextFocusLeftId(prevId);
+                    View prevCard = llEpisodesList.getChildAt(i - 1);
+                    if (prevCard != null) {
+                        prevCard.setNextFocusRightId(cardId);
+                    }
+                }
+                prevId = cardId;
+                itemLayout.setNextFocusUpId(androidx.media3.ui.R.id.exo_progress);
+
+                // Contenedor de Miniatura / Icono
+                FrameLayout thumbContainer = new FrameLayout(this);
+                LinearLayout.LayoutParams thumbLp = new LinearLayout.LayoutParams(dpToPx(52), dpToPx(52));
+                thumbContainer.setLayoutParams(thumbLp);
+
+                android.graphics.drawable.GradientDrawable thumbBg = new android.graphics.drawable.GradientDrawable();
+                thumbBg.setColor(android.graphics.Color.parseColor("#26FFFFFF"));
+                thumbBg.setCornerRadius(dpToPx(8));
+                thumbContainer.setBackground(thumbBg);
+
+                ImageView ivThumb = new ImageView(this);
+                FrameLayout.LayoutParams ivLp = new FrameLayout.LayoutParams(dpToPx(48), dpToPx(48), Gravity.CENTER);
+                ivThumb.setLayoutParams(ivLp);
+                ivThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+
+                TextView tvFallback = new TextView(this);
+                FrameLayout.LayoutParams fbLp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+                tvFallback.setLayoutParams(fbLp);
+                tvFallback.setGravity(Gravity.CENTER);
+                tvFallback.setText("E" + epNum);
+                tvFallback.setTextSize(13);
+                tvFallback.setTypeface(null, android.graphics.Typeface.BOLD);
+                tvFallback.setTextColor(android.graphics.Color.parseColor("#22D3EE"));
+
+                thumbContainer.addView(tvFallback);
+                thumbContainer.addView(ivThumb);
+                loadChannelLogo(epPoster, ivThumb, tvFallback);
+
+                // Contenedor de Textos
+                LinearLayout infoLayout = new LinearLayout(this);
+                infoLayout.setOrientation(LinearLayout.VERTICAL);
+                infoLayout.setGravity(Gravity.CENTER_VERTICAL);
+                LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                infoLp.setMarginStart(dpToPx(10));
+                infoLayout.setLayoutParams(infoLp);
+
+                // Fila superior: Badge T1 • E01 y estado
+                LinearLayout rowBadge = new LinearLayout(this);
+                rowBadge.setOrientation(LinearLayout.HORIZONTAL);
+                rowBadge.setGravity(Gravity.CENTER_VERTICAL);
+
                 TextView tvNum = new TextView(this);
-                tvNum.setTextSize(11);
+                tvNum.setTextSize(10);
                 tvNum.setTypeface(null, android.graphics.Typeface.BOLD);
-                tvNum.setPadding(0, 0, dpToPx(6), 0);
+                tvNum.setTextColor(android.graphics.Color.parseColor("#A1A1AA"));
+                tvNum.setText("T" + seasonNum + " • E" + epNum);
+                rowBadge.addView(tvNum);
+
+                TextView tvNow = new TextView(this);
+                tvNow.setTextSize(9);
+                tvNow.setTypeface(null, android.graphics.Typeface.BOLD);
+                tvNow.setTextColor(android.graphics.Color.parseColor("#22D3EE"));
+                tvNow.setText("• REPRODUCIENDO");
+                tvNow.setPadding(dpToPx(6), 0, 0, 0);
+                tvNow.setTag("badge_now");
+
+                boolean isCurrent = epId.equals(currentEpisodeId);
+                tvNow.setVisibility(isCurrent ? View.VISIBLE : View.GONE);
+                rowBadge.addView(tvNow);
 
                 TextView tvText = new TextView(this);
                 tvText.setTextSize(12);
                 tvText.setTypeface(null, android.graphics.Typeface.BOLD);
                 tvText.setTextColor(getResources().getColorStateList(R.color.text_player_episode_selector, getTheme()));
-                tvText.setText("Cap. " + epNum + ": " + epTitle);
-                tvText.setMaxLines(1);
+                tvText.setText(epTitle);
+                tvText.setMaxLines(2);
                 tvText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                tvText.setPadding(0, dpToPx(2), 0, 0);
 
-                boolean isCurrent = epId.equals(currentEpisodeId);
+                infoLayout.addView(rowBadge);
+                infoLayout.addView(tvText);
+
+                itemLayout.addView(thumbContainer);
+                itemLayout.addView(infoLayout);
+
+                itemLayout.setContentDescription(epId);
                 if (isCurrent) {
-                    tvNum.setText("▶");
-                    tvNum.setTextColor(android.graphics.Color.parseColor("#22D3EE"));
                     itemLayout.setTag("current_ep");
                 } else {
-                    tvNum.setText(String.valueOf(epNum));
-                    tvNum.setTextColor(android.graphics.Color.parseColor("#A1A1AA"));
                     itemLayout.setTag(epId);
                 }
 
-                itemLayout.addView(tvNum);
-                itemLayout.addView(tvText);
-
-                // Auto-desplazamiento y escalado al recibir foco del mando
                 itemLayout.setOnFocusChangeListener((v, hasFocus) -> {
                     if (hasFocus) {
-                        v.setScaleX(1.04f);
-                        v.setScaleY(1.04f);
+                        v.setScaleX(1.08f);
+                        v.setScaleY(1.08f);
+                        v.setElevation(dpToPx(8));
                         if (hsvEpisodes != null) {
                             int scrollTo = v.getLeft() - (hsvEpisodes.getWidth() / 2) + (v.getWidth() / 2);
                             hsvEpisodes.smoothScrollTo(Math.max(0, scrollTo), 0);
@@ -310,16 +521,13 @@ public class ExoPlayerActivity extends AppCompatActivity {
                     } else {
                         v.setScaleX(1.0f);
                         v.setScaleY(1.0f);
+                        v.setElevation(0);
                     }
                 });
 
-                // Reproducir el nuevo capítulo de inmediato sin salir del reproductor
                 itemLayout.setOnClickListener(v -> {
                     playNewEpisode(epUrl, fullTitle, epId);
                 });
-
-                // Flecha arriba regresa a la barra de tiempo
-                itemLayout.setNextFocusUpId(androidx.media3.ui.R.id.exo_progress);
 
                 llEpisodesList.addView(itemLayout);
             }
@@ -347,25 +555,20 @@ public class ExoPlayerActivity extends AppCompatActivity {
             }
         }
 
-        // Actualizar indicadores visuales en los capítulos
+        // Actualizar indicadores visuales en los capítulos / canales
         if (llEpisodesList != null) {
             for (int i = 0; i < llEpisodesList.getChildCount(); i++) {
                 View child = llEpisodesList.getChildAt(i);
-                if (child instanceof LinearLayout) {
-                    LinearLayout epItem = (LinearLayout) child;
-                    TextView numView = (TextView) epItem.getChildAt(0);
-                    Object tag = epItem.getTag();
-                    if (newEpId.equals(tag) || (tag != null && tag.toString().equals("current_ep"))) {
-                        if (newEpId.equals(tag) || newEpId.equals(child.getContentDescription())) {
-                            numView.setText("▶");
-                            numView.setTextColor(android.graphics.Color.parseColor("#22D3EE"));
-                            epItem.setTag("current_ep");
-                        } else {
-                            numView.setText(String.valueOf(i + 1));
-                            numView.setTextColor(android.graphics.Color.parseColor("#A1A1AA"));
-                            epItem.setTag(newEpId);
-                        }
-                    }
+                String tag = child.getContentDescription() != null ? child.getContentDescription().toString() : "";
+                boolean isMatch = newEpId.equals(tag) || newEpId.equals(child.getTag());
+                View nowBadge = child.findViewWithTag("badge_now");
+                if (nowBadge != null) {
+                    nowBadge.setVisibility(isMatch ? View.VISIBLE : View.GONE);
+                }
+                if (isMatch) {
+                    child.setTag("current_ep");
+                } else {
+                    child.setTag(tag);
                 }
             }
         }
@@ -585,18 +788,43 @@ public class ExoPlayerActivity extends AppCompatActivity {
         }
 
         int keyCode = event.getKeyCode();
+        View focused = getCurrentFocus();
+        boolean inCarousel = isViewInCarousel(focused);
 
         switch (keyCode) {
             case KeyEvent.KEYCODE_BACK:
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (inCarousel) {
+                        focusCenterControl();
+                        return true;
+                    }
                     finish();
                 }
                 return true;
 
-            case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
+                if (inCarousel && focused != null) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        focused.performClick();
+                    }
+                    return true;
+                }
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (player.isPlaying()) {
+                        player.pause();
+                    } else {
+                        player.play();
+                    }
+                    if (playerView != null) {
+                        playerView.showController();
+                        focusCenterControl();
+                    }
+                }
+                return true;
+
+            case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
             case KeyEvent.KEYCODE_SPACE:
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
                     if (player.isPlaying()) {
@@ -631,9 +859,10 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 }
                 return true;
 
-            case KeyEvent.KEYCODE_MEDIA_REWIND:
-            case KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD:
             case KeyEvent.KEYCODE_DPAD_LEFT:
+                if (inCarousel) {
+                    return super.dispatchKeyEvent(event);
+                }
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
                     if (!isLive && player.isCurrentMediaItemSeekable()) {
                         long current = player.getCurrentPosition();
@@ -646,9 +875,38 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 }
                 return true;
 
+            case KeyEvent.KEYCODE_MEDIA_REWIND:
+            case KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD:
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (!isLive && player.isCurrentMediaItemSeekable()) {
+                        long current = player.getCurrentPosition();
+                        player.seekTo(Math.max(0, current - 10000));
+                        if (playerView != null) {
+                            playerView.showController();
+                            focusCenterControl();
+                        }
+                    }
+                }
+                return true;
+
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                if (inCarousel) {
+                    return super.dispatchKeyEvent(event);
+                }
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (!isLive && player.isCurrentMediaItemSeekable()) {
+                        long current = player.getCurrentPosition();
+                        player.seekTo(current + 10000);
+                        if (playerView != null) {
+                            playerView.showController();
+                            focusCenterControl();
+                        }
+                    }
+                }
+                return true;
+
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
             case KeyEvent.KEYCODE_MEDIA_STEP_FORWARD:
-            case KeyEvent.KEYCODE_DPAD_RIGHT:
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
                     if (!isLive && player.isCurrentMediaItemSeekable()) {
                         long current = player.getCurrentPosition();
@@ -669,33 +927,41 @@ public class ExoPlayerActivity extends AppCompatActivity {
                     }
                     return true;
                 }
+                if (inCarousel) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (!isLive && playerView != null) {
+                            View progress = playerView.findViewById(androidx.media3.ui.R.id.exo_progress);
+                            if (progress != null && progress.getVisibility() == View.VISIBLE) {
+                                progress.requestFocus();
+                                return true;
+                            }
+                        }
+                        focusCenterControl();
+                    }
+                    return true;
+                }
                 break;
 
             case KeyEvent.KEYCODE_DPAD_DOWN:
                 if (playerView != null) {
-                    if (!playerView.isControllerFullyVisible()) {
-                        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        // 📺 Si el carrusel de capítulos o canales existe:
+                        // Con pulsar Flecha Abajo en cualquier momento se muestra y se enfoca directamente
+                        if (!inCarousel && llEpisodesList != null && llEpisodesList.getChildCount() > 0) {
+                            if (!playerView.isControllerFullyVisible()) {
+                                playerView.showController();
+                            }
+                            View currentEpView = llEpisodesList.findViewWithTag("current_ep");
+                            if (currentEpView != null) {
+                                currentEpView.requestFocus();
+                            } else {
+                                llEpisodesList.getChildAt(0).requestFocus();
+                            }
+                            return true;
+                        } else if (!playerView.isControllerFullyVisible()) {
                             playerView.showController();
                             focusCenterControl();
-                        }
-                        return true;
-                    } else if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        // 📺 Si el foco está en la barra de tiempo o controles y toca Flecha Abajo:
-                        // Llevar el foco inmediatamente al carrusel de capítulos de la serie
-                        View focused = getCurrentFocus();
-                        if (focused != null && (focused.getId() == androidx.media3.ui.R.id.exo_progress || 
-                                                focused.getId() == R.id.bottom_bar ||
-                                                focused.getId() == androidx.media3.ui.R.id.exo_play ||
-                                                focused.getId() == androidx.media3.ui.R.id.exo_pause)) {
-                            if (llEpisodesList != null && llEpisodesList.getChildCount() > 0) {
-                                View currentEpView = llEpisodesList.findViewWithTag("current_ep");
-                                if (currentEpView != null) {
-                                    currentEpView.requestFocus();
-                                } else {
-                                    llEpisodesList.getChildAt(0).requestFocus();
-                                }
-                                return true;
-                            }
+                            return true;
                         }
                     }
                 }

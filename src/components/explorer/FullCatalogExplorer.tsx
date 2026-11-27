@@ -1659,7 +1659,34 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     console.log(`[Series Play] Serie: ${series.name}, Temporada: ${selectedSeasonNumber}, Ep: ${epNum}, ID: ${epId}, Ext: ${cleanExt}, URL: ${streamUrl}`);
 
     // Construir lista estructurada de episodios para navegación dentro del reproductor de video
-    const seasonEps = (selectedSeriesDetails.episodes[String(selectedSeasonNumber)] || selectedSeriesDetails.episodes[selectedSeasonNumber] || []) as EpisodeItem[];
+    let rawSeasonEps: any = null;
+    const allEps = selectedSeriesDetails.episodes;
+    if (Array.isArray(allEps)) {
+      rawSeasonEps = allEps.filter((e: any) => 
+        Number(e.season ?? e.season_num ?? 1) === Number(selectedSeasonNumber)
+      );
+      if (rawSeasonEps.length === 0) rawSeasonEps = allEps;
+    } else if (allEps && typeof allEps === 'object') {
+      rawSeasonEps = allEps[String(selectedSeasonNumber)] || 
+                     allEps[Number(selectedSeasonNumber)] || 
+                     allEps[selectedSeasonNumber];
+      if (!rawSeasonEps || !Array.isArray(rawSeasonEps)) {
+        const keys = Object.keys(allEps);
+        const matchedKey = keys.find(k => 
+          k === String(selectedSeasonNumber) || 
+          k.toLowerCase().includes(`season ${selectedSeasonNumber}`) ||
+          k.toLowerCase().includes(`temporada ${selectedSeasonNumber}`) ||
+          Number(k) === Number(selectedSeasonNumber)
+        ) || keys[0];
+        if (matchedKey && Array.isArray(allEps[matchedKey])) {
+          rawSeasonEps = allEps[matchedKey];
+        }
+      }
+    }
+    const seasonEps: EpisodeItem[] = (Array.isArray(rawSeasonEps) && rawSeasonEps.length > 0)
+      ? rawSeasonEps
+      : ((currentSeasonEpisodes && currentSeasonEpisodes.length > 0) ? currentSeasonEpisodes : [episode]);
+
     const epList: SeriesEpisodeData[] = seasonEps.map((ep, idx) => {
       const eId = (ep as any).id ?? (ep as any).episode_id ?? (ep as any).stream_id ?? `ep_${idx}`;
       const rExt = (ep as any).container_extension || 

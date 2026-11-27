@@ -8,7 +8,8 @@ import {
   Volume2, 
   Subtitles, 
   ArrowLeft,
-  ExternalLink
+  ExternalLink,
+  Tv
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { recordWatchItem } from '../../store/useContinueWatchingStore';
@@ -911,8 +912,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </div>
         </div>
 
-        {/* Zona Inferior: Barra de Progreso y Controles (A todo lo ancho, fundida hacia arriba) */}
-        <div className="w-full bg-gradient-to-t from-black/95 via-black/75 to-transparent px-10 pb-8 pt-16 flex flex-col space-y-4 pointer-events-auto">
+        {/* Zona Inferior: Barra de Progreso y Controles (Fondo semi-transparente para ver el video debajo) */}
+        <div className="w-full bg-gradient-to-t from-black/60 via-black/30 to-transparent px-10 pb-8 pt-16 flex flex-col space-y-4 pointer-events-auto">
           {/* Barra de Progreso (Solo en VOD) o Indicador En Directo */}
           {!isLive ? (
             <div className="w-full flex items-center space-x-4">
@@ -1160,21 +1161,47 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                           e.stopPropagation();
                           playNewChannel(ch);
                         }}
-                        className={`flex-shrink-0 flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer border ${
+                        className={`flex-shrink-0 flex items-center space-x-3 px-3 py-2 rounded-2xl transition-all duration-200 cursor-pointer border ${
                           isFocused
                             ? 'bg-cyan-400 text-black border-cyan-300 ring-4 ring-cyan-300 scale-105 shadow-xl shadow-cyan-400/50 z-20 font-black'
                             : isCurrent
-                              ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/60 font-bold'
-                              : 'bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 border-white/10 font-medium'
+                              ? 'bg-cyan-950/70 text-cyan-300 border-cyan-500/60 font-bold backdrop-blur-md'
+                              : 'bg-black/50 hover:bg-black/70 text-zinc-200 border-white/10 font-medium backdrop-blur-md'
                         }`}
-                        style={{ minWidth: '180px', maxWidth: '260px' }}
+                        style={{ minWidth: '220px', maxWidth: '300px', height: '74px' }}
                       >
-                        <span className={`text-xs font-black ${isFocused ? 'text-black' : isCurrent ? 'text-cyan-400' : 'text-zinc-400'}`}>
-                          {isCurrent ? '▶ Ahora' : `${ch.channelNumber || idx + 1}`}
-                        </span>
-                        <span className="text-xs truncate flex-1 text-left">
-                          {ch.name}
-                        </span>
+                        {/* Logo del Canal con contenedor redondeado */}
+                        <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden flex-shrink-0 p-1 border border-white/5">
+                          {ch.logoUrl ? (
+                            <img
+                              src={ch.logoUrl}
+                              alt=""
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <Tv className={`w-6 h-6 ${isFocused ? 'text-black' : 'text-cyan-400'}`} />
+                          )}
+                        </div>
+
+                        {/* Textos: Número, Estado y Nombre */}
+                        <div className="flex flex-col items-start min-w-0 flex-1">
+                          <div className="flex items-center space-x-1.5 w-full">
+                            <span className={`text-[10px] font-mono font-bold ${isFocused ? 'text-black/80' : 'text-zinc-400'}`}>
+                              CH {ch.channelNumber || idx + 1}
+                            </span>
+                            {isCurrent && (
+                              <span className={`text-[9px] font-black ${isFocused ? 'text-black' : 'text-cyan-400'}`}>
+                                • EN VIVO
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-xs font-bold truncate w-full text-left mt-0.5 ${isFocused ? 'text-black' : 'text-white'}`}>
+                            {ch.name}
+                          </span>
+                        </div>
                       </button>
                     );
                   })}
