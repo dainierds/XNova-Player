@@ -40,6 +40,78 @@ export interface XtreamSeries {
   category_id: string;
 }
 
+export function normalizeArrayResponse<T>(data: any): T[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'object') {
+    return Object.values(data).filter((item) => item && typeof item === 'object') as T[];
+  }
+  return [];
+}
+
+export function isSeriesCategory(catName: string): boolean {
+  if (!catName) return false;
+  const name = catName.toLowerCase();
+
+  // Filtro estricto negativo: si es cine puro o canales en vivo
+  const isStrictlyMovie = /\b(pel[ií]culas?|pelis|movies?|cinema|cine|films?|estrenos cine|vod cine)\b/i.test(name);
+  const isStrictlyLive = /\b(en vivo|live tv|canales|channels|24\/7|deportes en vivo)\b/i.test(name);
+  if (isStrictlyLive) return false;
+
+  // Filtro positivo: palabras directas de series
+  const hasSeriesKeyword = /\b(series?|serie|temporadas?|seasons?|episodios?|anime|animes|doramas?|kdrama|k-drama|novelas?|telenovelas?|docuseries?)\b/i.test(name);
+  if (hasSeriesKeyword) return true;
+
+  // Filtro de plataformas de streaming (estilo TiviMate: Plex, Netflix, HBO, Disney+, etc. sin palabra exclusiva de película)
+  const hasPlatformKeyword = /\b(plex|netflix|hbo|disney|prime|amazon|apple\s*tv|paramount|star\+|hulu|peacock|vix)\b/i.test(name);
+  if (hasPlatformKeyword && !isStrictlyMovie) {
+    return true;
+  }
+
+  return false;
+}
+
+export function mergeSeriesCategories(
+  seriesCats: XtreamCategory[],
+  vodCats: XtreamCategory[],
+  knownSeriesCategoryIds?: Set<string>
+): XtreamCategory[] {
+  const existingIds = new Set<string>((seriesCats || []).map((c) => String(c.category_id)));
+  const existingNames = new Set<string>(
+    (seriesCats || []).map((c) => (c.category_name || '').trim().toLowerCase())
+  );
+
+  const merged = Array.isArray(seriesCats) ? [...seriesCats] : [];
+
+  if (Array.isArray(vodCats)) {
+    for (const cat of vodCats) {
+      if (!cat) continue;
+      const catIdStr = String(cat.category_id);
+      const catNameLower = (cat.category_name || '').trim().toLowerCase();
+
+      // Ya fue incluida
+      if (existingIds.has(catIdStr) || existingNames.has(catNameLower)) {
+        continue;
+      }
+
+      // Descubrir si corresponde a serie por nombre o si contiene series identificadas
+      if (
+        isSeriesCategory(cat.category_name) ||
+        (knownSeriesCategoryIds && knownSeriesCategoryIds.has(catIdStr))
+      ) {
+        existingIds.add(catIdStr);
+        existingNames.add(catNameLower);
+        merged.push({
+          ...cat,
+          category_id: String(cat.category_id),
+        });
+      }
+    }
+  }
+
+  return merged;
+}
+
 export class XtreamService {
   private static normalizeUrl(url: string): string {
     let clean = url.trim();
@@ -119,8 +191,13 @@ export class XtreamService {
   ): Promise<XtreamCategory[]> {
     const base = this.normalizeUrl(serverUrl);
     const url = `${base}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_vod_categories`;
-    const res = await fetch(url);
-    return res.json();
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      return normalizeArrayResponse<XtreamCategory>(data);
+    } catch {
+      return [];
+    }
   }
 
   public static async getVodStreams(
@@ -134,8 +211,13 @@ export class XtreamService {
     if (categoryId && categoryId !== 'all') {
       url += `&category_id=${encodeURIComponent(categoryId)}`;
     }
-    const res = await fetch(url);
-    return res.json();
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      return normalizeArrayResponse<XtreamStream>(data);
+    } catch {
+      return [];
+    }
   }
 
   // Obtener información detallada de una película VOD (sinopsis, actores, director, backdrop, duración, etc.)
@@ -184,8 +266,13 @@ export class XtreamService {
   ): Promise<XtreamCategory[]> {
     const base = this.normalizeUrl(serverUrl);
     const url = `${base}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_categories`;
-    const res = await fetch(url);
-    return res.json();
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      return normalizeArrayResponse<XtreamCategory>(data);
+    } catch {
+      return [];
+    }
   }
 
   public static async getLiveStreams(
@@ -199,8 +286,13 @@ export class XtreamService {
     if (categoryId && categoryId !== 'all') {
       url += `&category_id=${encodeURIComponent(categoryId)}`;
     }
-    const res = await fetch(url);
-    return res.json();
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      return normalizeArrayResponse<XtreamStream>(data);
+    } catch {
+      return [];
+    }
   }
 
   public static async getSeriesCategories(
@@ -210,8 +302,13 @@ export class XtreamService {
   ): Promise<XtreamCategory[]> {
     const base = this.normalizeUrl(serverUrl);
     const url = `${base}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_series_categories`;
-    const res = await fetch(url);
-    return res.json();
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      return normalizeArrayResponse<XtreamCategory>(data);
+    } catch {
+      return [];
+    }
   }
 
   public static async getSeries(
@@ -225,8 +322,13 @@ export class XtreamService {
     if (categoryId && categoryId !== 'all') {
       url += `&category_id=${encodeURIComponent(categoryId)}`;
     }
-    const res = await fetch(url);
-    return res.json();
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      return normalizeArrayResponse<XtreamSeries>(data);
+    } catch {
+      return [];
+    }
   }
 
   // Obtener información detallada y episodios de una serie

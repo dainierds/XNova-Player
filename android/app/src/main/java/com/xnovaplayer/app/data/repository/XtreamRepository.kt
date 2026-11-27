@@ -53,6 +53,7 @@ class XtreamRepository(
 
     suspend fun syncCategories(type: String): Result<Int> = withContext(Dispatchers.IO) {
         try {
+            val dtoList = mutableListOf<com.xnovaplayer.app.data.api.models.CategoryDto>()
             val response = when (type) {
                 "movies" -> api.getVodCategories(username, password)
                 "series" -> api.getSeriesCategories(username, password)
@@ -60,7 +61,30 @@ class XtreamRepository(
             }
 
             if (response.isSuccessful && response.body() != null) {
-                val dtoList = response.body()!!
+                dtoList.addAll(response.body()!!)
+            }
+
+            // Unificación inteligente de carpetas de series (ej. Plex Series 4K, Plex Netflix, Plex HBO Max)
+            if (type == "series") {
+                try {
+                    val vodResp = api.getVodCategories(username, password)
+                    if (vodResp.isSuccessful && vodResp.body() != null) {
+                        val existingIds = dtoList.map { it.categoryId }.toSet()
+                        val seriesRegex = Regex(".*(series|serie|temporada|plex|netflix|hbo|disney|prime|amazon|apple|paramount|anime|dorama|novela).*", RegexOption.IGNORE_CASE)
+                        val movieRegex = Regex(".*(pelicula|peliculas|movies|cinema|films).*", RegexOption.IGNORE_CASE)
+                        for (vodCat in vodResp.body()!!) {
+                            val name = vodCat.categoryName.lowercase()
+                            if (!existingIds.contains(vodCat.categoryId)) {
+                                if (seriesRegex.containsMatchIn(name) && !movieRegex.containsMatchIn(name)) {
+                                    dtoList.add(vodCat)
+                                }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            if (dtoList.isNotEmpty() || response.isSuccessful) {
                 val entities = dtoList.map { dto ->
                     CategoryEntity(
                         categoryId = dto.categoryId,

@@ -1,5 +1,5 @@
 import { get, set, del } from 'idb-keyval';
-import { XtreamService, type XtreamStream, type XtreamSeries } from './xtream';
+import { XtreamService, type XtreamStream, type XtreamSeries, mergeSeriesCategories } from './xtream';
 import { ImagePreloadService } from './imagePreloadService';
 
 /**
@@ -283,16 +283,23 @@ export const CatalogCacheService = {
 
     try {
       onProgress?.('Conectando al servidor y cargando categorías...', 10);
-      const [vodCats, seriesCats, liveCats] = await Promise.all([
+      const [vodCatsRaw, seriesCatsRaw, liveCatsRaw] = await Promise.all([
         XtreamService.getVodCategories(server, user, pass).catch(() => []),
         XtreamService.getSeriesCategories(server, user, pass).catch(() => []),
         XtreamService.getLiveCategories(server, user, pass).catch(() => []),
       ]);
 
+      const vodCats = Array.isArray(vodCatsRaw) ? vodCatsRaw : [];
+      const seriesCats = Array.isArray(seriesCatsRaw) ? seriesCatsRaw : [];
+      const liveCats = Array.isArray(liveCatsRaw) ? liveCatsRaw : [];
+
+      // 🚀 Unificación inteligente estilo TiviMate: Plex Series 4K, Plex Netflix, HBO Max, etc.
+      let mergedSeriesCats = mergeSeriesCategories(seriesCats, vodCats);
+
       await Promise.all([
-        this.setCategories(playlist.id, 'movies', vodCats || []),
-        this.setCategories(playlist.id, 'series', seriesCats || []),
-        this.setCategories(playlist.id, 'live', liveCats || []),
+        this.setCategories(playlist.id, 'movies', vodCats),
+        this.setCategories(playlist.id, 'series', mergedSeriesCats),
+        this.setCategories(playlist.id, 'live', liveCats),
       ]);
 
       onProgress?.('Descargando catálogo completo de Películas...', 30);
@@ -307,6 +314,14 @@ export const CatalogCacheService = {
       const rawSeries = await XtreamService.getSeries(server, user, pass).catch(() => []);
       let seriesCount = 0;
       if (Array.isArray(rawSeries) && rawSeries.length > 0) {
+        // Enriquecer categorías de series con cualquier categoría de vodCats que contenga series registradas
+        const seriesCatIds = new Set<string>();
+        rawSeries.forEach((s: any) => {
+          if (s && s.category_id) seriesCatIds.add(String(s.category_id));
+        });
+        mergedSeriesCats = mergeSeriesCategories(mergedSeriesCats, vodCats, seriesCatIds);
+        await this.setCategories(playlist.id, 'series', mergedSeriesCats);
+
         const compactSeries = await this.set(playlist.id, 'series', rawSeries);
         seriesCount = compactSeries.length;
       }

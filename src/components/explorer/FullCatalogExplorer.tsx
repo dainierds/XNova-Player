@@ -16,7 +16,7 @@ import {
   Tv
 } from 'lucide-react';
 import type { PlaylistAccount } from '../../types';
-import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries } from '../../services/xtream';
+import { XtreamService, type XtreamCategory, type XtreamStream, type XtreamSeries, mergeSeriesCategories } from '../../services/xtream';
 import { TmdbService } from '../../services/tmdb';
 import { CatalogCacheService, type CompactCatalogItem } from '../../services/catalogCacheService';
 import { ImagePreloadService } from '../../services/imagePreloadService';
@@ -886,7 +886,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         }
         setLoading(false);
       } else {
-        // 🚀 A. Intentar leer categorías desde IndexedDB en 0ms
+        // 🚀 A. Intentar leer categorías desde IndexedDB en 0ms (mostrar al instante y revalidar en segundo plano)
         const localCats = await CatalogCacheService.getCategories(playlist.id, contentType);
         if (localCats && localCats.length > 0) {
           globalCategoriesCache.set(cacheKey, localCats);
@@ -897,9 +897,9 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
             }
             setLoading(false);
           }
-          return;
+        } else {
+          setLoading(true);
         }
-        setLoading(true);
       }
 
       try {
@@ -908,8 +908,15 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           const res = await XtreamService.getVodCategories(server, user, pass);
           if (Array.isArray(res)) validCats = res;
         } else if (contentType === 'series') {
-          const res = await XtreamService.getSeriesCategories(server, user, pass);
-          if (Array.isArray(res)) validCats = res;
+          // 🚀 UNIFICACIÓN INTELIGENTE ESTILO TIVIMATE:
+          // En paneles Xtream (ej. America Play), carpetas como "Plex Series 4K", "Plex Netflix",
+          // "Plex HBO Max", etc. residen bajo VOD Categories o el panel las reporta ahí.
+          // TiviMate consulta tanto Series como VOD Categories y fusiona todas las carpetas de series.
+          const [seriesRes, vodRes] = await Promise.all([
+            XtreamService.getSeriesCategories(server, user, pass).catch(() => []),
+            XtreamService.getVodCategories(server, user, pass).catch(() => []),
+          ]);
+          validCats = mergeSeriesCategories(seriesRes, vodRes);
         } else {
           const res = await XtreamService.getLiveCategories(server, user, pass);
           if (Array.isArray(res)) validCats = res;
@@ -926,6 +933,7 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
 
         if (validCats.length > 0) {
           globalCategoriesCache.set(cacheKey, validCats);
+          CatalogCacheService.setCategories(playlist.id, contentType, validCats).catch(() => {});
         }
 
         if (isMounted) {
@@ -1023,6 +1031,33 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         } else if (contentType === 'series') {
           const res = await XtreamService.getSeries(server, user, pass, selectedCategoryId === 'all' ? undefined : selectedCategoryId);
           if (Array.isArray(res)) validItems = res;
+
+          // 🚀 Fallback inteligente: si la categoría de series devolvió 0 ítems del endpoint get_series
+          // (frecuente en paneles donde carpetas como Plex Netflix o Plex HBO se cargaron como VODs)
+          if (validItems.length === 0 && selectedCategoryId && selectedCategoryId !== 'all') {
+            try {
+              const vodFallback = await XtreamService.getVodStreams(server, user, pass, selectedCategoryId);
+              if (Array.isArray(vodFallback) && vodFallback.length > 0) {
+                validItems = vodFallback.map((vf: any) => ({
+                  num: vf.num || 0,
+                  name: vf.name || '',
+                  series_id: vf.stream_id || vf.series_id || 0,
+                  cover: vf.stream_icon || vf.cover || '',
+                  plot: vf.plot || vf.description || '',
+                  cast: vf.cast || '',
+                  director: vf.director || '',
+                  genre: vf.genre || '',
+                  releaseDate: vf.releaseDate || vf.added || '',
+                  rating: vf.rating || '',
+                  category_id: vf.category_id || selectedCategoryId,
+                  isVodFallback: true,
+                  container_extension: vf.container_extension || 'mp4',
+                } as any));
+              }
+            } catch (fallbackErr) {
+              console.warn('[FullCatalogExplorer] Error en fallback getVodStreams para series:', fallbackErr);
+            }
+          }
         } else {
           const res = await XtreamService.getLiveStreams(server, user, pass, selectedCategoryId === 'all' ? undefined : selectedCategoryId);
           if (Array.isArray(res)) validItems = res;
@@ -1624,9 +1659,14 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
           setFocusZone('series_modal');
         } else {
           // Si no tiene episodios pero tiene streamUrl o id, reproducir
-          const streamUrl = (item as any).streamUrl || XtreamService.buildSeriesStreamUrl(server, user, pass, seriesId, 'mp4');
+          const isFallback = (item as any)?.isVodFallback;
+          const streamUrl = (item as any).streamUrl || (
+            isFallback
+              ? XtreamService.buildVodStreamUrl(server, user, pass, seriesId, (item as any).container_extension || 'mp4')
+              : XtreamService.buildSeriesStreamUrl(server, user, pass, seriesId, 'mp4')
+          );
           onPlayStream({
-            id: `series_${seriesId}`,
+            id: isFallback ? `movie_${seriesId}` : `series_${seriesId}`,
             title: series.name || (series as any).title || 'Serie',
             streamUrl,
             posterUrl: series.cover || (series as any).stream_icon,
