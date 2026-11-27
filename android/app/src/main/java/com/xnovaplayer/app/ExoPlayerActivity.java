@@ -123,6 +123,11 @@ public class ExoPlayerActivity extends AppCompatActivity {
             btnBack.setOnClickListener(v -> finish());
         }
 
+        View btnNext = playerView.findViewById(R.id.btn_next_episode);
+        if (btnNext != null) {
+            btnNext.setOnClickListener(v -> playNextItem());
+        }
+
         TextView tvTitle = playerView.findViewById(R.id.tv_title);
         if (tvTitle != null && title != null && !title.isEmpty()) {
             tvTitle.setText(title);
@@ -137,6 +142,8 @@ public class ExoPlayerActivity extends AppCompatActivity {
         // Configurar carrusel de capítulos o canales de TV
         if (seriesInfoJson != null && !seriesInfoJson.isEmpty()) {
             setupSeriesEpisodes(seriesInfoJson);
+        } else {
+            updateNextButtonState();
         }
     }
 
@@ -200,6 +207,81 @@ public class ExoPlayerActivity extends AppCompatActivity {
             p = ((View) p).getParent();
         }
         return false;
+    }
+
+    private boolean isViewInActions(View view) {
+        if (view == null) return false;
+        int id = view.getId();
+        if (id == androidx.media3.ui.R.id.exo_play ||
+            id == androidx.media3.ui.R.id.exo_pause ||
+            id == androidx.media3.ui.R.id.exo_rew ||
+            id == androidx.media3.ui.R.id.exo_ffwd ||
+            id == R.id.btn_next_episode) {
+            return true;
+        }
+        ViewParent p = view.getParent();
+        while (p != null) {
+            if (p instanceof View && ((View) p).getId() == R.id.player_action_controls) {
+                return true;
+            }
+            if (!(p instanceof View)) break;
+            p = ((View) p).getParent();
+        }
+        return false;
+    }
+
+    private void playNextItem() {
+        if (llEpisodesList == null || llEpisodesList.getChildCount() == 0) return;
+        int currentIdx = -1;
+        for (int i = 0; i < llEpisodesList.getChildCount(); i++) {
+            View child = llEpisodesList.getChildAt(i);
+            if ("current_ep".equals(child.getTag())) {
+                currentIdx = i;
+                break;
+            }
+        }
+        int nextIdx = currentIdx + 1;
+        if (nextIdx < llEpisodesList.getChildCount()) {
+            View nextView = llEpisodesList.getChildAt(nextIdx);
+            if (nextView != null) {
+                nextView.performClick();
+            }
+        }
+    }
+
+    private void updateNextButtonState() {
+        if (playerView == null) return;
+        View btnNext = playerView.findViewById(R.id.btn_next_episode);
+        TextView tvLabel = playerView.findViewById(R.id.tv_btn_next_label);
+        if (btnNext == null) return;
+
+        if (llEpisodesList == null || llEpisodesList.getChildCount() <= 1) {
+            btnNext.setVisibility(View.GONE);
+            return;
+        }
+
+        int currentIdx = -1;
+        for (int i = 0; i < llEpisodesList.getChildCount(); i++) {
+            View child = llEpisodesList.getChildAt(i);
+            if ("current_ep".equals(child.getTag())) {
+                currentIdx = i;
+                break;
+            }
+        }
+
+        if (currentIdx != -1 && currentIdx + 1 < llEpisodesList.getChildCount()) {
+            btnNext.setVisibility(View.VISIBLE);
+            if (tvLabel != null) {
+                tvLabel.setText(isLive ? "Siguiente Canal" : "Siguiente Episodio");
+            }
+        } else if (currentIdx == -1 && llEpisodesList.getChildCount() > 1) {
+            btnNext.setVisibility(View.VISIBLE);
+            if (tvLabel != null) {
+                tvLabel.setText(isLive ? "Siguiente Canal" : "Siguiente Episodio");
+            }
+        } else {
+            btnNext.setVisibility(View.GONE);
+        }
     }
 
     private void setupSeriesEpisodes(String json) {
@@ -372,6 +454,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
 
                     llEpisodesList.addView(itemLayout);
                 }
+                updateNextButtonState();
                 return;
             }
 
@@ -537,6 +620,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
 
                 llEpisodesList.addView(itemLayout);
             }
+            updateNextButtonState();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -591,6 +675,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
         } else {
             initPlayer();
         }
+        updateNextButtonState();
     }
 
     private void initPlayer() {
@@ -787,6 +872,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
         int keyCode = event.getKeyCode();
         View focused = getCurrentFocus();
         boolean inCarousel = isViewInCarousel(focused);
+        boolean inActions = isViewInActions(focused);
 
         switch (keyCode) {
             case KeyEvent.KEYCODE_BACK:
@@ -802,13 +888,25 @@ public class ExoPlayerActivity extends AppCompatActivity {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
-                if (inCarousel && focused != null) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        focused.performClick();
-                    }
-                    return true;
-                }
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (inCarousel && focused != null) {
+                        focused.performClick();
+                        return true;
+                    }
+                    if (playerView != null && playerView.isControllerFullyVisible() && focused != null) {
+                        if (focused.getId() == R.id.btn_next_episode) {
+                            playNextItem();
+                            return true;
+                        }
+                        if (focused.getId() == R.id.btn_back) {
+                            finish();
+                            return true;
+                        }
+                        if (inActions) {
+                            focused.performClick();
+                            return true;
+                        }
+                    }
                     if (player.isPlaying()) {
                         player.pause();
                     } else {
@@ -857,7 +955,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 return true;
 
             case KeyEvent.KEYCODE_DPAD_LEFT:
-                if (inCarousel) {
+                if (inCarousel || inActions) {
                     return super.dispatchKeyEvent(event);
                 }
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
@@ -887,7 +985,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 return true;
 
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (inCarousel) {
+                if (inCarousel || inActions) {
                     return super.dispatchKeyEvent(event);
                 }
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
@@ -924,41 +1022,50 @@ public class ExoPlayerActivity extends AppCompatActivity {
                     }
                     return true;
                 }
-                if (inCarousel) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        if (!isLive && playerView != null) {
-                            View progress = playerView.findViewById(androidx.media3.ui.R.id.exo_progress);
-                            if (progress != null && progress.getVisibility() == View.VISIBLE) {
-                                progress.requestFocus();
-                                return true;
-                            }
-                        }
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (inCarousel) {
                         focusCenterControl();
+                        return true;
                     }
-                    return true;
+                    if (inActions) {
+                        View progress = playerView != null ? playerView.findViewById(androidx.media3.ui.R.id.exo_progress) : null;
+                        if (progress != null && progress.getVisibility() == View.VISIBLE) {
+                            progress.requestFocus();
+                            return true;
+                        }
+                        View back = playerView != null ? playerView.findViewById(R.id.btn_back) : null;
+                        if (back != null) {
+                            back.requestFocus();
+                            return true;
+                        }
+                    }
                 }
                 break;
 
             case KeyEvent.KEYCODE_DPAD_DOWN:
                 if (playerView != null) {
                     if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        // 📺 Si el carrusel de capítulos o canales existe:
-                        // Con pulsar Flecha Abajo en cualquier momento se muestra y se enfoca directamente
-                        if (!inCarousel && llEpisodesList != null && llEpisodesList.getChildCount() > 0) {
-                            if (!playerView.isControllerFullyVisible()) {
-                                playerView.showController();
-                            }
-                            View currentEpView = llEpisodesList.findViewWithTag("current_ep");
-                            if (currentEpView != null) {
-                                currentEpView.requestFocus();
-                            } else {
-                                llEpisodesList.getChildAt(0).requestFocus();
-                            }
-                            return true;
-                        } else if (!playerView.isControllerFullyVisible()) {
+                        if (!playerView.isControllerFullyVisible()) {
                             playerView.showController();
                             focusCenterControl();
                             return true;
+                        }
+                        // Si está en la barra de progreso (timeline), bajar a los botones de acción (Play/Pausa)
+                        if (focused != null && focused.getId() == androidx.media3.ui.R.id.exo_progress) {
+                            focusCenterControl();
+                            return true;
+                        }
+                        // Si está en los botones de acción, bajar al carrusel de episodios
+                        if (inActions || !inCarousel) {
+                            if (llEpisodesList != null && llEpisodesList.getChildCount() > 0) {
+                                View currentEpView = llEpisodesList.findViewWithTag("current_ep");
+                                if (currentEpView != null) {
+                                    currentEpView.requestFocus();
+                                } else {
+                                    llEpisodesList.getChildAt(0).requestFocus();
+                                }
+                                return true;
+                            }
                         }
                     }
                 }

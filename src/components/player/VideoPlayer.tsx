@@ -5,6 +5,7 @@ import {
   Pause, 
   RotateCcw, 
   RotateCw, 
+  SkipForward,
   Volume2, 
   Subtitles, 
   ArrowLeft,
@@ -71,8 +72,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const showControlsRef = useRef(true);
   showControlsRef.current = showControls;
 
-  type PlayerControl = 'rewind' | 'play_pause' | 'forward' | 'audio' | 'subtitles';
+  type PlayerControl = 'rewind' | 'play_pause' | 'forward' | 'next_episode' | 'audio' | 'subtitles';
   const [focusedControl, setFocusedControl] = useState<PlayerControl>('play_pause');
+
+  const hasNextEpisode = Boolean(
+    seriesContext?.episodes &&
+    seriesContext.episodes.findIndex((e) => e.id === activeEpisodeId) + 1 < seriesContext.episodes.length
+  );
+  const hasNextChannel = Boolean(
+    liveContext?.channels &&
+    liveContext.channels.findIndex((c) => c.id === activeChannelId) + 1 < liveContext.channels.length
+  );
+  const hasNextItem = hasNextEpisode || hasNextChannel;
 
   const [audioTracks, setAudioTracks] = useState<{ id: number; name: string }[]>([]);
   const [currentAudio, setCurrentAudio] = useState(0);
@@ -145,10 +156,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!isLive) list.push('rewind');
     list.push('play_pause');
     if (!isLive) list.push('forward');
+    if (hasNextItem) list.push('next_episode');
     list.push('audio');
     list.push('subtitles');
     return list;
-  }, [isLive]);
+  }, [isLive, hasNextItem]);
 
   // Reiniciar temporizador de ocultación de controles (4 segundos)
   const resetHideTimer = useCallback(() => {
@@ -677,6 +689,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 setIsPlaying(true);
                 setFocusedControl('play_pause');
               }
+            } else if (focusedControl === 'next_episode') {
+              if (hasNextEpisode && seriesContext?.episodes) {
+                const idx = seriesContext.episodes.findIndex((ep) => ep.id === activeEpisodeId);
+                if (idx !== -1 && idx + 1 < seriesContext.episodes.length) {
+                  playNewEpisode(seriesContext.episodes[idx + 1]);
+                }
+              } else if (hasNextChannel && liveContext?.channels) {
+                const idx = liveContext.channels.findIndex((c) => c.id === activeChannelId);
+                if (idx !== -1 && idx + 1 < liveContext.channels.length) {
+                  playNewChannel(liveContext.channels[idx + 1]);
+                }
+              }
             } else if (focusedControl === 'audio') {
               if (hlsRef.current && audioTracks.length > 1) {
                 const nextAudio = (currentAudio + 1) % audioTracks.length;
@@ -1010,6 +1034,37 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   title="Adelantar 10s"
                 >
                   <RotateCw className={`w-6 h-6 ${focusedControl === 'forward' ? 'text-black' : 'text-white'}`} />
+                </button>
+              )}
+
+              {/* Botón Siguiente Episodio / Canal (Estilo Amazon Prime Video) */}
+              {hasNextItem && (
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (hasNextEpisode && seriesContext?.episodes) {
+                      const idx = seriesContext.episodes.findIndex((ep) => ep.id === activeEpisodeId);
+                      if (idx !== -1 && idx + 1 < seriesContext.episodes.length) {
+                        playNewEpisode(seriesContext.episodes[idx + 1]);
+                      }
+                    } else if (hasNextChannel && liveContext?.channels) {
+                      const idx = liveContext.channels.findIndex((c) => c.id === activeChannelId);
+                      if (idx !== -1 && idx + 1 < liveContext.channels.length) {
+                        playNewChannel(liveContext.channels[idx + 1]);
+                      }
+                    }
+                  }}
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-full text-xs font-black transition-all duration-200 shadow-md ${
+                    focusedControl === 'next_episode'
+                      ? 'bg-cyan-400 text-black ring-4 ring-cyan-300 scale-105 shadow-cyan-400/60 z-20'
+                      : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                  }`}
+                  title={hasNextChannel ? 'Siguiente Canal' : 'Siguiente Episodio'}
+                >
+                  <SkipForward className={`w-4 h-4 ${focusedControl === 'next_episode' ? 'text-black' : 'text-cyan-400'}`} />
+                  <span>{hasNextChannel ? 'Siguiente Canal' : 'Siguiente'}</span>
                 </button>
               )}
             </div>
