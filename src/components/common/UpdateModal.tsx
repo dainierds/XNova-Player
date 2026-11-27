@@ -99,12 +99,25 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ onDismiss, onOpenState
       document.activeElement.blur();
     }
 
+    const nativeUpdater = (window as any).NativeUpdaterBridge;
+
+    // 🚀 Verificación PREVIA de permisos para instalar aplicaciones en Android TV
+    // Evita descargar 50MB y luego sufrir reinicio de proceso por cambio de permisos del sistema operativo
+    if (nativeUpdater && typeof nativeUpdater.canInstallApk === 'function') {
+      if (!nativeUpdater.canInstallApk()) {
+        setDownloadStatus('Se requiere autorizar a XNova Player para instalar apps. Abriendo Ajustes...');
+        if (typeof nativeUpdater.requestInstallPermission === 'function') {
+          nativeUpdater.requestInstallPermission();
+        }
+        return;
+      }
+    }
+
     setDownloading(true);
     setDownloadPercent(0);
     setDownloadStatus('Iniciando descarga interna...');
 
     // Si estamos en la app de Android TV, usar el puente nativo sin abrir Downloader
-    const nativeUpdater = (window as any).NativeUpdaterBridge;
     if (nativeUpdater && typeof nativeUpdater.downloadAndInstall === 'function') {
       nativeUpdater.downloadAndInstall(updateInfo.downloadUrl);
     } else {

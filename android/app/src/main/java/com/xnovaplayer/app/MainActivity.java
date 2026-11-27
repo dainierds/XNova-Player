@@ -181,9 +181,43 @@ public class MainActivity extends BridgeActivity {
                 // 🔄 Puente nativo oficial para actualización OTA interna sin usar Downloader
                 webView.addJavascriptInterface(new Object() {
                     @JavascriptInterface
+                    public boolean canInstallApk() {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            return getPackageManager().canRequestPackageInstalls();
+                        }
+                        return true;
+                    }
+
+                    @JavascriptInterface
+                    public void requestInstallPermission() {
+                        runOnUiThread(() -> {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                try {
+                                    Intent settingsIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                                    settingsIntent.setData(Uri.parse("package:" + getPackageName()));
+                                    settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    startActivity(settingsIntent);
+                                } catch (Exception e) {
+                                    try {
+                                        Intent fallbackSettings = new Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS);
+                                        fallbackSettings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                        startActivity(fallbackSettings);
+                                    } catch (Exception ignored) {}
+                                }
+                            }
+                        });
+                    }
+
+                    @JavascriptInterface
                     public void downloadAndInstall(String downloadUrl) {
                         new Thread(() -> {
                             try {
+                                // 1. Usar siempre almacenamiento interno privado de caché (getCacheDir)
+                                // para compatibilidad total con FileProvider y evitar bloqueos de Scoped Storage en Android 11+
+                                java.io.File cacheDir = getCacheDir();
+                                java.io.File apkFile = new java.io.File(cacheDir, "XNovaUpdate.apk");
+
+                                // 2. Realizar descarga HTTP con seguimiento de redirecciones de GitHub
                                 java.net.URL url = new java.net.URL(downloadUrl);
                                 java.net.HttpURLConnection conn = null;
                                 int redirects = 0;
@@ -207,8 +241,6 @@ public class MainActivity extends BridgeActivity {
                                 }
 
                                 int fileLength = conn.getContentLength();
-                                java.io.File cacheDir = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
-                                java.io.File apkFile = new java.io.File(cacheDir, "XNovaUpdate.apk");
                                 if (apkFile.exists()) {
                                     apkFile.delete();
                                 }
@@ -257,30 +289,7 @@ public class MainActivity extends BridgeActivity {
                                     );
                                 });
 
-                                // Si es Android 8+ y no tiene permiso para instalar apps desconocidas, solicitarlo y detener para no causar bloqueo
-                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                    if (!getPackageManager().canRequestPackageInstalls()) {
-                                        runOnUiThread(() -> {
-                                            webView.evaluateJavascript(
-                                                "window.dispatchEvent(new CustomEvent('native_update_error', { detail: { error: 'Debes conceder permiso para instalar apps desconocidas a XNova Player en Ajustes y luego volver a presionar Actualizar.' } }));",
-                                                null
-                                            );
-                                        });
-                                        try {
-                                            Intent settingsIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
-                                            settingsIntent.setData(Uri.parse("package:" + getPackageName()));
-                                            settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                            startActivity(settingsIntent);
-                                        } catch (Exception se) {
-                                            Intent fallbackSettings = new Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS);
-                                            fallbackSettings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                            startActivity(fallbackSettings);
-                                        }
-                                        return;
-                                    }
-                                }
-
-                                // Invocar el instalador oficial del sistema operativo con permisos completos
+                                // Invocar el instalador oficial del sistema operativo con permisos completos en el hilo de UI
                                 Uri apkUri = androidx.core.content.FileProvider.getUriForFile(
                                     MainActivity.this,
                                     getPackageName() + ".fileprovider",
@@ -292,13 +301,18 @@ public class MainActivity extends BridgeActivity {
                                 installIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                 installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                                 installIntent.addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+                                installIntent.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
 
                                 // Otorgar permisos de lectura explícitos a todas las apps que puedan manejar la instalación
                                 java.util.List<android.content.pm.ResolveInfo> resolveInfoList = getPackageManager().queryIntentActivities(installIntent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
-                                for (android.content.pm.ResolveInfo resolveInfo : resolveInfoList) {
-                                    try {
-                                        grantUriPermission(resolveInfo.activityInfo.packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                                    } catch (Exception ignored) {}
+                                if (resolveInfoList != null) {
+                                    for (android.content.pm.ResolveInfo resolveInfo : resolveInfoList) {
+                                        if (resolveInfo.activityInfo != null && resolveInfo.activityInfo.packageName != null) {
+                                            try {
+                                                grantUriPermission(resolveInfo.activityInfo.packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                            } catch (Exception ignored) {}
+                                        }
+                                    }
                                 }
                                 try {
                                     grantUriPermission("com.google.android.packageinstaller", apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
@@ -307,7 +321,17 @@ public class MainActivity extends BridgeActivity {
                                     grantUriPermission("com.android.packageinstaller", apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
                                 } catch (Exception ignored) {}
 
-                                startActivity(installIntent);
+                                runOnUiThread(() -> {
+                                    try {
+                                        startActivity(installIntent);
+                                    } catch (Exception ex) {
+                                        ex.printStackTrace();
+                                        webView.evaluateJavascript(
+                                            "window.dispatchEvent(new CustomEvent('native_update_error', { detail: { error: 'No se pudo abrir el instalador del sistema.' } }));",
+                                            null
+                                        );
+                                    }
+                                });
 
                             } catch (Exception e) {
                                 e.printStackTrace();
