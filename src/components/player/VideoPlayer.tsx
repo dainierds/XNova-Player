@@ -189,9 +189,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       currentTime: curTime,
       duration: dur,
       streamUrl: activeStreamUrl,
-      type: isLive ? 'live' : 'movie',
+      type: isLive ? 'live' : seriesContext ? 'series' : 'movie',
+      seriesContext,
+      liveContext,
     });
-  }, [activeContentId, activeTitle, posterUrl, duration, activeStreamUrl, isLive]);
+  }, [activeContentId, activeTitle, posterUrl, duration, activeStreamUrl, isLive, seriesContext, liveContext]);
 
   // Cambiar y reproducir un nuevo episodio directamente sin salir del reproductor
   const playNewEpisode = useCallback(

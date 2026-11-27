@@ -47,8 +47,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
     private String title = "";
     private boolean isLive = false;
     private boolean hasTriedAudioFallback = false;
-    private boolean hasTriedExtensionFallback = false;
-    private boolean hasTriedVlcFallback = false;
+    private int extensionFallbackCount = 0;
 
     private String seriesInfoJson = "";
     private String currentEpisodeId = "";
@@ -85,7 +84,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
         btnErrorBack.setOnClickListener(v -> finish());
         btnRetry.setOnClickListener(v -> {
             hasTriedAudioFallback = false;
-            hasTriedExtensionFallback = false;
+            extensionFallbackCount = 0;
             errorLayout.setVisibility(View.GONE);
             loadingSpinner.setVisibility(View.VISIBLE);
             initPlayer();
@@ -93,13 +92,20 @@ public class ExoPlayerActivity extends AppCompatActivity {
 
         btnErrorExternal.setOnClickListener(v -> {
             try {
-                Intent externalIntent = new Intent(Intent.ACTION_VIEW);
-                externalIntent.setDataAndType(Uri.parse(streamUrl), "video/*");
-                externalIntent.putExtra("title", title);
-                externalIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(Intent.createChooser(externalIntent, "Reproducir con..."));
+                Intent vlcIntent = new Intent(ExoPlayerActivity.this, VlcPlayerActivity.class);
+                vlcIntent.putExtra("url", streamUrl);
+                vlcIntent.putExtra("title", title);
+                startActivity(vlcIntent);
             } catch (Exception e) {
-                e.printStackTrace();
+                try {
+                    Intent externalIntent = new Intent(Intent.ACTION_VIEW);
+                    externalIntent.setDataAndType(Uri.parse(streamUrl), "video/*");
+                    externalIntent.putExtra("title", title);
+                    externalIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(Intent.createChooser(externalIntent, "Reproducir con..."));
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
             }
         });
 
@@ -603,7 +609,7 @@ public class ExoPlayerActivity extends AppCompatActivity {
 
             // User-Agent de alta compatibilidad (idéntico a TiviMate) para evitar rechazos de servidores IPTV
             DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
-                    .setUserAgent("TiviMate/4.7.0 (Linux; Android 11; Media3)")
+                    .setUserAgent("TiviMate/4.7.0")
                     .setConnectTimeoutMs(15000)
                     .setReadTimeoutMs(15000)
                     .setAllowCrossProtocolRedirects(true);
@@ -656,25 +662,30 @@ public class ExoPlayerActivity extends AppCompatActivity {
                 public void onPlayerError(PlaybackException error) {
                     loadingSpinner.setVisibility(View.GONE);
 
-                    // 1. Fallback automático de extensión para Canales en Vivo (.ts <-> .m3u8) y Series/VOD (.mp4 <-> .mkv)
-                    // Si el servidor IPTV responde con 404/recurso no encontrado o error de contenedor,
-                    // reintentar silenciosamente con la otra extensión exactamente como hace TiviMate
-                    if ((error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
-                         error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
-                         error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) &&
-                        !hasTriedExtensionFallback && streamUrl != null && !streamUrl.isEmpty()) {
-                        hasTriedExtensionFallback = true;
+                    // 1. Fallback automático multiformato de extensiones (.mp4 <-> .mkv <-> .ts y .m3u8 <-> .ts)
+                    // Si el servidor IPTV responde con 404/no encontrado o error de contenedor malformado/no soportado
+                    // Reintentar secuencialmente hasta 3 intentos como hace TiviMate
+                    boolean isContainerOrIoError = 
+                        error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
+                        error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
+                        error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
+                        error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
+                        error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED;
+
+                    if (isContainerOrIoError && extensionFallbackCount < 3 && streamUrl != null && !streamUrl.isEmpty()) {
+                        extensionFallbackCount++;
                         String newUrl = streamUrl;
                         if (streamUrl.matches(".*\\.m3u8(\\?.*)?$")) {
                             newUrl = streamUrl.replaceFirst("\\.m3u8(\\?|$)", ".ts$1");
                         } else if (streamUrl.matches(".*\\.ts(\\?.*)?$")) {
-                            newUrl = streamUrl.replaceFirst("\\.ts(\\?|$)", ".m3u8$1");
+                            newUrl = isLive ? streamUrl.replaceFirst("\\.ts(\\?|$)", ".m3u8$1") : streamUrl.replaceFirst("\\.ts(\\?|$)", ".mp4$1");
                         } else if (streamUrl.matches(".*\\.mp4(\\?.*)?$")) {
                             newUrl = streamUrl.replaceFirst("\\.mp4(\\?|$)", ".mkv$1");
                         } else if (streamUrl.matches(".*\\.mkv(\\?.*)?$")) {
-                            newUrl = streamUrl.replaceFirst("\\.mkv(\\?|$)", ".mp4$1");
+                            newUrl = streamUrl.replaceFirst("\\.mkv(\\?|$)", ".ts$1");
                         }
                         if (!newUrl.equals(streamUrl)) {
+                            android.util.Log.i("ExoPlayerActivity", "Fallback de extensión intento " + extensionFallbackCount + ": de " + streamUrl + " a " + newUrl);
                             streamUrl = newUrl;
                             initPlayer();
                             return;
@@ -700,29 +711,15 @@ public class ExoPlayerActivity extends AppCompatActivity {
                         }
                     }
 
-                    // 3. 🛡️ Salto automático a LibVLC nativo si el chip del televisor no puede decodificar con ExoPlayer
-                    if (!hasTriedVlcFallback && streamUrl != null && !streamUrl.isEmpty()) {
-                        hasTriedVlcFallback = true;
-                        try {
-                            Intent vlcIntent = new Intent(ExoPlayerActivity.this, VlcPlayerActivity.class);
-                            vlcIntent.putExtra("url", streamUrl);
-                            vlcIntent.putExtra("title", title);
-                            startActivity(vlcIntent);
-                            finish();
-                            return;
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
-                    }
-
+                    // 3. NO saltamos automáticamente a VLC a ciegas para evitar que la pantalla quede en negro sin controles.
+                    // En su lugar, mostramos el diálogo de error con botones "Reintentar", "Abrir con VLC" y "Volver".
                     boolean isDts = error.getMessage() != null && error.getMessage().toLowerCase().contains("dts");
                     showError("Error de reproducción (" + error.getErrorCodeName() + "): " + 
-                            (isDts ? "Esta película contiene audio DTS multicanal no soportado por el chip de este televisor." : error.getMessage()));
+                            (isDts ? "Este contenido contiene audio DTS no soportado por el chip de este televisor." : error.getMessage()));
                     
-                    // Si es error de audio/códec, resaltar por defecto el botón "Abrir con VLC"
-                    Button btnExternal = findViewById(R.id.btn_error_external);
-                    if (btnExternal != null) {
-                        btnExternal.requestFocus();
+                    Button btnRetry = findViewById(R.id.btn_retry);
+                    if (btnRetry != null) {
+                        btnRetry.requestFocus();
                     }
                 }
             });

@@ -33,6 +33,8 @@ export interface WatchProgressItem {
   year?: string;
   rating?: string;
   genresText?: string;
+  seriesContext?: any;
+  liveContext?: any;
 }
 
 export interface SavedFavoriteItem {

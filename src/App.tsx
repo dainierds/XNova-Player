@@ -1113,13 +1113,15 @@ export function App() {
               setFocusedZone('thumbnails');
             }}
             onPlayStream={(stream) => {
-              const watchType = stream.isLive ? 'live' : stream.id.startsWith('series_') ? 'series' : 'movie';
+              const watchType = stream.isLive ? 'live' : (stream.id.startsWith('series_') || stream.seriesContext) ? 'series' : 'movie';
               recordWatchItem({
                 id: stream.id,
                 title: stream.title,
                 posterUrl: stream.posterUrl,
                 streamUrl: stream.streamUrl,
                 type: watchType,
+                seriesContext: stream.seriesContext,
+                liveContext: stream.liveContext,
               });
 
               // 🚀 1. Intentar reproducir con Google Media3 ExoPlayer nativo (el mismo motor de TiviMate)

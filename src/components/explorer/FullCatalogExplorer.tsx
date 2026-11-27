@@ -1074,6 +1074,8 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
         duration: item.duration,
         streamUrl: item.streamUrl,
         type: item.type,
+        seriesContext: item.seriesContext,
+        liveContext: item.liveContext,
         isContinueWatchingItem: true,
       } as any));
 
@@ -1434,20 +1436,41 @@ export const FullCatalogExplorer: React.FC<FullCatalogExplorerProps> = ({
     // 0. Si es un elemento de "Continuar Viendo", continuar la reproducción directamente de inmediato
     if ((item as any).isContinueWatchingItem || selectedCategoryId === 'continue_watching') {
       const rawStreamUrl = (item as any).streamUrl;
-      if (rawStreamUrl) {
+      const itemSeriesContext = (item as any).seriesContext;
+      const itemLiveContext = (item as any).liveContext;
+      const isSeriesType = (item as any).type === 'series' || String((item as any).id || '').startsWith('series_') || Boolean(itemSeriesContext);
+
+      // Si es una serie y ya tiene seriesContext guardado, reproducir con su carrusel completo
+      if (rawStreamUrl && (!isSeriesType || itemSeriesContext)) {
         const streamId = (item as any).stream_id || (item as any).id || (item as any).series_id || `item_${(item as any).id}`;
         onPlayStream({
           id: String(streamId),
           title: item.name || (item as any).title || 'Continuar Viendo',
           streamUrl: rawStreamUrl,
           posterUrl: (item as any).stream_icon || (item as any).cover || (item as any).poster,
-          isLive: contentType === 'live',
+          isLive: contentType === 'live' || (item as any).type === 'live',
+          seriesContext: itemSeriesContext,
+          liveContext: itemLiveContext,
         });
         return;
       }
+
+      // Si no es serie o ya tiene streamUrl directo, reproducir de inmediato
+      if (!isSeriesType && rawStreamUrl) {
+        const streamId = (item as any).stream_id || (item as any).id || (item as any).series_id || `item_${(item as any).id}`;
+        onPlayStream({
+          id: String(streamId),
+          title: item.name || (item as any).title || 'Continuar Viendo',
+          streamUrl: rawStreamUrl,
+          posterUrl: (item as any).stream_icon || (item as any).cover || (item as any).poster,
+          isLive: contentType === 'live' || (item as any).type === 'live',
+        });
+        return;
+      }
+      // Si es una serie sin seriesContext previo, cae directamente a la sección de Series más abajo para cargar sus episodios
     }
 
-    if (contentType === 'movies') {
+    if (contentType === 'movies' && (item as any).type !== 'series' && !String((item as any).id || '').startsWith('series_')) {
       const vod = item as XtreamStream;
       const streamId = vod.stream_id || (vod as any).id;
       const meta = metadataCacheRef.current.get(streamId) || focusedMetadata || {

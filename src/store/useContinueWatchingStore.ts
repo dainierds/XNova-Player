@@ -84,6 +84,8 @@ export const recordWatchItem = (item: {
   year?: string;
   rating?: string;
   genresText?: string;
+  seriesContext?: any;
+  liveContext?: any;
 }) => {
   try {
     const dur = item.duration || 0;
@@ -104,6 +106,8 @@ export const recordWatchItem = (item: {
       year: item.year,
       rating: item.rating,
       genresText: item.genresText,
+      seriesContext: item.seriesContext,
+      liveContext: item.liveContext,
     });
   } catch (e) {
     console.warn('[recordWatchItem] Error:', e);
